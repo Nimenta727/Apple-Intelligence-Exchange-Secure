@@ -41,3 +41,6 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 ## 后续
 
 集中安装成功后，依据 P4 来源失败测试完成审计；P5 结构简化本次已完成“部署层级减负”，但主仓库历史源码保留，正式发布前仍需根据真机行为完成安全重构审查与文档迁移。
+
+
+脚本版本固定 SHA：b143280fe95e85fec197366afd735f1d46359e39；两条 hook 均指向此 commit 的原始脚本。
