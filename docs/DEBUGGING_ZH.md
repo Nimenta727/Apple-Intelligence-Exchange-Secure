@@ -34,7 +34,7 @@ Siri 文本请求
 | `ERROR_KEY_NOT_PROVISIONED` | 本地 Key 未写入 | 仅在设备本地配置，不粘贴到 URL |
 | `ERROR_HTTP_CLIENT_UNAVAILABLE` | 运行环境不支持 HTTP 请求 API | 记录环境版本 |
 | `ERROR_MODEL_NETWORK` / `ERROR_MODEL_TIMEOUT` | DeepSeek 网络或超时 | 检查网络和账户额度 |
-| `ERROR_MODEL_RESPONSE_INVALID` | 状态码/JSON/结束原因不符 | 重点检查 `deepseek-flash` 模型是否可用 |
+| `ERROR_MODEL_RESPONSE_INVALID` | 状态码/JSON/结束原因不符 | `deepseek-flash` 模型名官方已支持；检查实际账户、HTTP 状态和回复完整性 |
 | `ERROR_MODEL_EXCEPTION` / `DONE_EXCEPTION` | 运行时或回调异常 | 停止并核对固定脚本版本 |
 | `DEEPSEEK_RESPONSE_ATTEMPTED` 但原生 Siri 显示千问 | 客户端未接受替换、缓存或网络旁路 | 验收失败，不能标成功 |
 
