@@ -26,18 +26,21 @@ test("P1 rejects unsupported or malformed SSE instead of returning it",()=>{
  const reordered=original.replace("event: session.created","event: session.response.done");
  assert.equal(Rewrite.rewrite(reordered,Rewrite.FIXED).ok,false);
 });
-test("P1 runtime response hook only writes to synthetic test URL",()=>{
+test("P1 response hook changes only the fixed public fixture",()=>{
+ const URL="https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/siri-deepseek-response-rewrite/tests/fixtures/p1-http-origin.txt";
  const run=(url,body)=>{
   const out=[],logs=[];
   vm.runInNewContext(file,{$request:{url},$response:{body},$done:x=>out.push(x),console:{log:x=>logs.push(x)}},{timeout:1000});
   return {out,logs};
  };
- const good=run("https://aies-probe.invalid/__aies_rewrite_fixture",original);
+ const good=run(URL,"AIES_P1_ORIGIN_UNMODIFIED\n");
  assert.equal(good.out.length,1);
  assert.equal(good.out[0].body,"AIES_P1_RESPONSE_REWRITE_OK");
  assert.ok(good.logs.some(x=>x.includes("REWRITE_ATTEMPTED")));
- const bad=run("https://prod-yabuli.qianwen.com/v1/sessions/responses",original);
- assert.equal(bad.out[0].body,"AIES_P1_DENIED");
+ const changed=run(URL,"unexpected upstream data");
+ assert.equal(changed.out[0].body,"AIES_P1_INVALID_FIXTURE");
+ const bad=run("https://prod-yabuli.qianwen.com/v1/sessions/responses","AIES_P1_ORIGIN_UNMODIFIED");
+ assert.equal(bad.out[0].body,"AIES_P1_UNEXPECTED_URL");
 });
 test("P1 module is response-only and never targets Siri or calls DeepSeek",()=>{
  assert.match(moduleText,/type=http-response/);
