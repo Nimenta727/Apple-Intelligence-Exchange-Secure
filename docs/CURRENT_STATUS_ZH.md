@@ -62,3 +62,15 @@ B3：只有 B1/B2 经审计通过后，才能设计受控的真实 DeepSeek 调�
 - 先在**保留虚构域名**的最小可复现实验中验证 REJECT/请求脚本冲突的故障行为，独立证明失效时不会透传；必要时评估替代接管组件。该阶段失败时停机，不能将域名替换成真实千问。
 - 安全接管可证实之后，才验证 Siri 原生 SSE 接受性；随后才做最小 DeepSeek 调用。
 - 用户选择跳过 E2-N 仅代表暂不执行，不代表撤销发布前的安全门槛。继续保持 `providerEnabled:false`、`DOMAIN,prod-yabuli.qianwen.com,REJECT` 和真实 10 关闭。
+
+## 2026-11-18：MVP 30/31 真机对照收官
+
+- PR #8 (`mvp-transport-failure-probe`) 包含 `30` DIRECT、`31` REJECT、`aies_transport_fault_probe.js` 与离线检查；Actions #79 成功。PR 仍为 Draft，未并入 main。
+- E-MVP-01：启用 00+30、Safari 访问 `aies-probe.invalid/__aies_fault?case=ok`，用户确认显示 `AIES_FAULT_OK`；本地 HTTP 200 模拟响应成功。
+- E-MVP-02：同配置、`case=deny`，用户确认显示 `AIES_FAULT_DENIED`；本地 HTTP 503 模拟响应成功。
+- E-MVP-03：`case=throw`，Safari 显示无法连接或错误页面；这仅是故障时的客户端现象。
+- E-MVP-04：`case=nodone`，用户截图显示“Safari 浏览器打不开该网页，因为已丢失网络连接”；不等于网络出口零透传。
+- E-MVP-05：关闭 30、启用 00+31，`case=ok` 不能显示 `AIES_FAULT_OK`。用户提供的 Shadowrocket 连接截图明确显示 `DOMAIN,aies-probe.invalid,REJECT`；PacketTunnel 日志在 18:38:26 和 18:39:19 包含 `tcp rule ... type = REJECT` 与 `proxy stream ... reject`。截图中未见 `[AIES_FAULT] CASE_OK` 或 `MOCK_ATTEMPTED`，但日志并非完整输出，不能证明脚本根本未执行。
+- **阶段性决策**：当前设备配置中同域 REJECT 与成功返回本地 Mock 存在实测冲突；停止同类 Shadowrocket 规则排列组合测试，转为评估独立网络接管架构的可行性和成本。
+- 实验后用户报告已关闭 31，恢复 00 基线（其他实验模块保持关闭）。持续保持真实千问域名 REJECT、`providerEnabled:false`、真实 10 关闭、DeepSeek Key 未投入联调。
+- **未解决**：独立出口隔离证明、真实 Siri 请求的安全接管、Siri 是否接受自主生成 SSE、真实 DeepSeek 端到端。任何现有浏览器成功页面均不得宣传为完整功能可用。
