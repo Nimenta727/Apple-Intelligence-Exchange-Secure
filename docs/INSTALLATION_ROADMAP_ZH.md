@@ -1,6 +1,6 @@
 # Shadowrocket 安装规划与执行步骤（适用 main v0.4.0-lab）
 
-> **仅旧 main v0.4 阻断实验使用；新模式禁止照此安装。** v0.6 是允许问题到千问并尝试替换 Siri 回答的另一条技术路线，最新安装步骤在 [v0.6 安装与回滚说明](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md)。00 的 REJECT 与 60 模块相冲突，切换前必须备份并了解原问题上游出站风险。
+> **停止按本文安装新版本。** 这是旧 `main` v0.4.0-lab 的 REJECT/20/21 实验安装计划，**不是** v0.6 Siri→DeepSeek 响应替换的部署说明。新模式只使用 [v0.6 集中安装与回滚指南](INSTALL_SIRI_DEEPSEEK_V06_ZH.md)。旧 00 的 REJECT 与新 60 模块冲突；只在备份并明确接受千问可收到问题后，才按照 v0.6 指南切换。历史实验文本保留以便追溯。
 
 
 > **这不是可直接启用 Siri→DeepSeek 的成品安装指南。** 当前计划仅供在保留安全规则的情况下，执行无密钥本地接管实验。最先完成的是 00 阻断、20/21 对照；真实 10 模块与 DeepSeek Key 均不能作为第一轮步骤。

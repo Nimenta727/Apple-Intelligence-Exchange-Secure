@@ -1,38 +1,78 @@
 # Apple Intelligence Exchange Secure (AIES)
 
-**研究项目：在 Siri 原生界面中尝试显示来自 DeepSeek 的 AI 回答。**
+**Siri 原生界面 × DeepSeek 回答替换**。适用于 Shadowrocket 的独立研究项目，参考 [boitar/sair](https://github.com/boitar/sair) 的公开协议研究（MIT）。
 
-> **最新目标（2026-11-18）**：用户允许原始 Siri 文本请求经过千问，但要求最终展示的 AI 回答来自 DeepSeek，而不是千问。**v0.6 Clean Beta 已在独立开发分支完成候选代码及离线检查，真实 Siri 原生显示与系统回退仍未验证，不能宣称已可用或保证 DeepSeek-only。**
+> **当前状态：v0.6 Clean Beta，代码及离线 CI 已完成，尚未通过真实 Siri UI 验收。不是稳定版。** 新目标允许 Siri 的原始问题经过千问；项目尝试让最终展示的 AI 回答来自 DeepSeek。**如果 VPN/脚本/MITM 未工作，Siri 仍可能显示千问回答，无法承诺任何时候只显示 DeepSeek。**
 
-**当前代码位置请务必区分：**
+[English](README_EN.md) · [文档总览](docs/README.md) · [安装说明](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [当前状态](docs/CURRENT_STATUS_ZH.md) · [安全说明](docs/SECURITY_CURRENT_ZH.md) · [更新日志](CHANGELOG.md)
 
-| 分支 | 内容 | 状态 |
+## 产品范围
+
+只支持指定的 **Siri 文本问答**。不是 Apple、Shadowrocket 或 DeepSeek 官方插件；不支持视觉智能、写作工具、多模型切换、独立聊天 UI 或系统级流量保证。
+
+### 运行方式
+
+1. Shadowrocket 在请求阶段尝试获取 Siri 文本，并关联此次请求。
+2. 原始请求按新模式可以到达千问；千问的响应被视为 SSE 结构参考。
+3. Shadowrocket 在响应阶段调用用户自备的 DeepSeek API，从模型返回中提取文本。
+4. 脚本按识别到的 SSE 事件结构重新生成回答字段，尝试让 Siri 原生界面显示 DeepSeek 答案。
+5. 在脚本实际介入的失败路径中，尝试返回明确错误，不静默恢复千问的 AI 文本。
+
+上述是**候选实现路径**，不是已完成的真机效果证明；若 Shadowrocket 未拦截或 Siri 原生回退，脚本不能禁止千问原生响应。
+
+## 当前版本与仓库分支
+
+| 分支 / 版本 | 用途 | 状态 |
 |---|---|---|
-| [v0.6 Clean Beta](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/tree/siri-deepseek-v0.6-clean) | 最新候选模块 60、DeepSeek SSE 响应替换、完整文档 | [Draft PR #10](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/10)，待真机 |
-| `main` / v0.4.0-lab | 旧网络阻断研究代码、00/10/20/21 模块、旧 CI 基线 | 历史安全实验；不是当前新路线安装入口 |
+| [`siri-deepseek-v0.6-clean`](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/tree/siri-deepseek-v0.6-clean) | 当前新路线候选部署 | Draft PR #10，待真机 |
+| `main` / v0.4.0-lab | 旧“阻断千问出站”研究与 CI 基线 | 历史实验，不是 v0.6 安装入口 |
+| `siri-deepseek-response-rewrite` / 50 | 早期响应改写 Beta | 已被 v0.6 取代 |
+| 30/31/40 | 旧网络故障和模拟响应探针 | 非当前安装步骤 |
 
-## 最新版请从这里开始
+**不要混用 00 与 60**：00 对目标千问域名 REJECT，60 要求接收原始千问 SSE。仅在了解新目标的网络与隐私风险并备份后，按安装指南切换。版本测试结束可恢复 00。
 
-- **[v0.6 使用说明与回滚](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md)**
-- [v0.6 文档中心](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/README.md)
-- [当前项目状态](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/CURRENT_STATUS_ZH.md)
-- [当前安全与隐私边界](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/SECURITY_CURRENT_ZH.md)
-- [维护与贡献](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/MAINTENANCE_ZH.md)
-- [发布验收清单](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/RELEASE_CHECKLIST_ZH.md)
+## v0.6 的唯一部署入口
 
-## v0.6 的实际设计
+- [Shadowrocket 60 模块](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)
+- [v0.6 运行脚本](scripts/aies_siri_deepseek_v06.js)（request/response 两个钩子使用**同一固定 Git commit**）
+- [集中安装与回滚指南](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md)
+- [相关模拟测试](tests/siri-deepseek-v06.test.js)
 
-1. Shadowrocket 请求钩子尝试识别 Siri 文本问题，并关联到对应响应。
-2. 原始请求可以到千问；响应钩子读取其候选 SSE。
-3. 使用用户授权的 DeepSeek API 获取新答案，脚本重建已识别的回答字段。
-4. 在脚本确实介入的错误路径，尝试返回错误，不主动回退千问 AI 文本。
+安装模块：  
+`https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/siri-deepseek-v0.6-clean/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule`
 
-**重要限制**：VPN 未启动、MITM/脚本没有触发、Siri 使用缓存或其他网络通路时，仍可能看到千问答案。脚本级 fail-closed 不等于设备级来源保证。DeepSeek Key 与 Shadowrocket CA 私钥不得提交到仓库、URL 或聊天。
+**请先完整阅读安装/安全文档**。API Key 只能在设备本机配置，不能放到模块 URL、GitHub、聊天或日志中。真机测试需要 Shadowrocket CA 的目标域名 MITM，存在证书信任风险。不要在测试前提交敏感请求。
 
-## 本分支为什么仍保留旧内容？
+## 已实现和仍待验证
 
-main 的 `src/`、`scripts/sairs_router.js`、`shadowrocket/00/10/20/21` 及其自动化测试，属于前一轮“千问原始请求不出站”研究。它与 v0.6 新需求是**两种不同的部署模式**。不要直接关闭旧 00 然后导入旧 10；不要混用 00 和新版 60。历史实验从 [docs/](docs/README.md) 进入。
+| 项目 | 状态 |
+|---|---|
+| 请求校验、两阶段脚本、独立会话关联 | 已编码，并有模拟测试 |
+| 固定 DeepSeek API、SSE 候选重建、无脚本级千问回退 | 已编码，并有模拟测试 |
+| 自动化检查、生成包/历史规则审计 | CI 通过 |
+| Siri 原生界面实际显示 DeepSeek 回答 | **未验证** |
+| DeepSeek 真正联网 Key 调用与模型可用性 | **未验证** |
+| SSE 流式/压缩/大小/多会话兼容 | **未验证** |
+| 任何故障下都不显示千问 | **未证明，可能受系统绕过限制** |
+| 真机通过后的代码审查、持久化隐私优化和正式发布 | 待完成 |
 
-此分支保留 `npm run build` 和 `npm run check` 以维护旧实验基线；v0.6 的独立运行脚本不会由旧 `tools/build.js` 自动生成。
+## 开发与维护
 
-[English](README_EN.md) · [变更日志](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md) · [MIT License](LICENSE) · [历史文档](docs/history/README.md)。
+仓库保留两条不同架构的代码：
+- **新 v0.6**：`scripts/aies_siri_deepseek_v06.js` 是真正被 60 模块调用的单文件逻辑；开发时修改此文件和 `tests/siri-deepseek-v06.test.js`。
+- **旧 v0.4 lab**：`src/` → `tools/build.js` → `scripts/sairs_router.js` 是历史阻断实验的确定性构建；不能误认为它生成 v0.6。
+
+开发端执行 `npm run check`。旧 `src/` 改动还必须运行 `npm run build` 并提交生成文件。查看[维护指南](docs/MAINTENANCE_ZH.md)、[发布门槛](docs/RELEASE_CHECKLIST_ZH.md)、[需求计划](docs/SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md)与[贡献指南](CONTRIBUTING.md)。
+
+## 安全、隐私与法律声明
+
+问题可能同时被千问和 DeepSeek 处理；当前脚本会短期将用户问题写入 Shadowrocket 的本地持久存储，存储加密与中断后的擦除尚未证明。脚本并不提供系统级零千问回答或网络出口保证。不要把生产和个人隐私请求用于未验证版本。任何 CA 私钥、真实 Key、Authorization、原始请求/完整抓包均不得提交。保留上游 MIT 归属；详见 [LICENSE](LICENSE) 与 [安全文档](docs/SECURITY_CURRENT_ZH.md)。
+
+## 使用、调试与维护指南
+
+- [使用与首次启用](docs/USER_GUIDE_ZH.md)
+- [集中调试、错误码与反馈模板](docs/DEBUGGING_ZH.md)
+- [当前 v0.6 架构与目录职责](docs/ARCHITECTURE_CURRENT_ZH.md)
+- [开发、升级和维护流程](docs/OPERATIONS_ZH.md)
+
+这些指南描述的是可安装候选版，**不是已证明 Siri 原生功能成功或系统级不回退千问的承诺**。

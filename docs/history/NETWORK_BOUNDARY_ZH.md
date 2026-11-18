@@ -1,6 +1,6 @@
 # v0.2.2-lab 网络安全边界和真实设备证据
 
-> **历史研究记录（不适用于最新 v0.6 安装）**：本文为旧 v0.4 阻断千问路线的研究材料，可能包含已废弃的配置步骤。新需求允许请求到千问，要求 Siri 最终 AI 回答来自 DeepSeek；真实 Siri 尚未验收。请优先查看 [当前文档](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/README.md)、[v0.6 安装](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) 和 [安全限制](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/SECURITY_CURRENT_ZH.md)。
+> **历史资料（只读研究记录；不适用于 v0.6 安装）**：本文记录旧版网络阻断、候选协议、证书或测试假设。用户最新目标允许问题经过千问，要求尝试由 DeepSeek 提供 Siri 原生界面的最终 AI 回答。部分旧操作建议与新模式矛盾，**不得依本文启用旧模块、修改 REJECT 或配置密钥**。当前入口：[文档中心](../README.md) · [v0.6 安装](../INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全边界](../SECURITY_CURRENT_ZH.md)。
 
 ## 目前已知
 Shadowrocket 2.2.93 (3488) 用户实测：在 example.com 上完成 A（HTTPS mock 成功）—B（加入同域 REJECT 后连接被拒绝）—A（关闭测试 REJECT 后 mock 恢复）。缺少脚本入口的可靠观测和底层出站抓包，因此不能声称已经确定执行先后顺序，也不能证明 Siri 的请求一定被脚本捕获。

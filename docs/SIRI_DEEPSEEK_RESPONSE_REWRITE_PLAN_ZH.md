@@ -1,6 +1,6 @@
 # AIES：Siri 原生界面 DeepSeek 回答替换实施计划（v1.0）
 
-> **计划进度提示**：本计划 P0 已完成；P1–P3 有 [v0.6 Clean Beta 候选实现](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/tree/siri-deepseek-v0.6-clean)，但真实 Siri UI、真实 DeepSeek Key 接入、P4 来源保证、P5 后续隐私结构优化及 P6 发布审查尚未完成。用户选择直接集成、随后集中真机测试，不再要求逐项运行 40 等 Safari 旧探针。最新状态参见 [v0.6 进度](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/CURRENT_STATUS_ZH.md)。
+> **计划状态更新（2026-11-18）**：P0 已完成；P1–P3 已有 v0.6 候选实现与离线测试，但**未通过真实 Siri/DeepSeek 联调**；P4 故障来源保证、P5 后续结构/隐私优化、P6 正式发布审查仍未完成。用户选择在代码集成后做一次集中真机验收，不再将 40 等单独 Safari 探针视为安装前置步骤。权威实施入口：[当前状态](CURRENT_STATUS_ZH.md) · [v0.6 安装](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [验收表](RELEASE_CHECKLIST_ZH.md)。下方原计划中的逐项 P1 探针流程为早期建议，不代表已执行。
 
 
 > 决策日期：2026-11-18。状态：**已批准的工程目标与执行计划；尚未完成响应替换实现或真机验收**。本文是新路线的执行基准，取代旧路线中的“必须阻断千问原始出站”这一产品约束；旧研究文档保留为历史证据，不代表新版本现已可用。
