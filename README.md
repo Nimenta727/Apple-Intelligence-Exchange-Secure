@@ -36,7 +36,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 4. 启用模块后只用非隐私的测试问题检查 **Siri 原生界面**，而不是根据脚本日志判定成功。
 5. 失败时立即停用模块，恢复备份配置。完整错误码和处理顺序见[调试手册](docs/DEBUGGING_ZH.md)。
 
-**重要兼容性提示**：当前运行脚本的模型标识为 `deepseek-flash`，尚未完成官方 API 可用性核实。即使模块安装成功，模型也可能返回错误；不能称为已经完成端到端适配。
+**重要兼容性提示**：当前运行脚本使用的 `deepseek-flash` 已列在 [DeepSeek 官方 Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/) 支持列表中，但用户账户的实际 API 调用、费用/额度和 Siri 端到端效果仍未验证。
 
 ## 工作原理
 
