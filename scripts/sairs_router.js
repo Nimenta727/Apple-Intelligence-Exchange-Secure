@@ -218,6 +218,22 @@ function validateCandidateSse(stream,scenario) {
     for(i=0;i<suffix.length;i++)
       if(records[records.length-suffix.length+i].name!==suffix[i])
         return {ok:false,code:"ORDER"};
+    
+    // Verify choice indices across all choice-scoped SSE events.
+    for (i = 2; i < records.length - 1; i++) {
+      if (!records[i].value ||
+          records[i].value.choice_index !== 0) {
+        return {ok:false,code:"CHOICE_INDEX"};
+      }
+    }
+
+    // Verify the nested index of the initial choice.
+    if (!records[2].value.choice ||
+        records[2].value.choice.index !== 0) {
+      return {ok:false,code:"CHOICE_INDEX"};
+    }
+
+
     var n=records.length-suffix.length,joined="";
     for(i=5;i<n;i++){
       if(records[i].name!==N.delta || typeof records[i].value.delta!=="string")
