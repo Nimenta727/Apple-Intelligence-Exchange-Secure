@@ -39,3 +39,12 @@ Code checks do not prove Siri or system-level answer provenance. The candidate i
 ## Development
 
 Run `npm run check` for offline checks. The historical modular `src/` tree and generated `scripts/sairs_router.js` belong to v0.4 research; the actual v0.6 deployed script is a separate self-contained implementation, so the legacy build command does not generate it. Keep tests, docs and pinned deployment URLs synchronized.
+
+## Practical documentation
+
+- [User and initial setup guide (Chinese)](docs/USER_GUIDE_ZH.md)
+- [Debugging, error codes, and safe feedback format (Chinese)](docs/DEBUGGING_ZH.md)
+- [Current architecture (Chinese)](docs/ARCHITECTURE_CURRENT_ZH.md)
+- [Operations, upgrades, and maintenance (Chinese)](docs/OPERATIONS_ZH.md)
+
+These describe the test candidate; real native Siri success and system-level fallback behavior are still unverified.
