@@ -98,3 +98,19 @@ test("out-of-scope URL is untouched",()=>{
  assert.equal(r.returned.length,1);
  assert.equal(Object.keys(r.returned[0]).length,0);
 });
+
+test("upstream metadata cannot smuggle model text into rewritten SSE",()=>{
+ const e=env(),a=e.invoke(e.request);
+ const malicious=fixture.replace(/"expires_at":\d+/,'"expires_at":"QWEN_SMUGGLED_ANSWER"');
+ const b=e.invoke({...e.request,headers:a.returned[0].headers},{body:malicious});
+ assert.equal(b.returned[0].status,502);
+ assert.ok(!JSON.stringify(b.returned[0]).includes("QWEN_SMUGGLED_ANSWER"));
+});
+test("incomplete DeepSeek completion cannot be displayed as a final answer",()=>{
+ const e=env(),a=e.invoke(e.request);
+ const b=e.invoke({...e.request,headers:a.returned[0].headers},{body:fixture},{
+  post:(opts,cb)=>cb(null,{statusCode:200},JSON.stringify({choices:[{finish_reason:"length",message:{content:"TRUNCATED"}}]}))
+ });
+ assert.equal(b.returned[0].status,502);
+ assert.ok(!JSON.stringify(b.returned[0]).includes("TRUNCATED"));
+});
