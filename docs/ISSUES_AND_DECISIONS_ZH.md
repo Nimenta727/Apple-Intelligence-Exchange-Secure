@@ -28,5 +28,5 @@
 ## 已有测试/提交线索
 
 - GitHub CI：Actions #17、#19、#23、#24（历史通过）；PR #6 合并累计代码到 main。
-- 现有实验方法与约束详见 [网络边界](NETWORK_BOUNDARY_ZH.md) 和 [实验矩阵](EXPERIMENT_MATRIX_ZH.md)。
+- 现有实验方法与约束详见 [网络边界](history/NETWORK_BOUNDARY_ZH.md) 和 [实验矩阵](EXPERIMENT_MATRIX_ZH.md)。
 - 历史口述 A–B–A 记录不是可独立验证的原始抓包证据；不得转写为“零透传已通过”。
