@@ -5,7 +5,22 @@
 > **状态：v0.4.0-lab · Experimental / 未经过真实 iPhone 验收。**
 > 目前**不能保证**阻止全部 Apple 智能云端流量，也**不能保证** Siri 接受独立合成的 SSE；严禁将实验版宣传为已验证生产可用。
 
-[简体中文安装与证书指南](docs/CONFIGURATION_ZH.md) · [安全设计](docs/SECURITY_ZH.md) · [真机验收](docs/TEST_PLAN.md) · [架构与维护](docs/ARCHITECTURE_ZH.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
+[交接总览](docs/PROJECT_HANDOFF_ZH.md) · [遇到的问题](docs/ISSUES_AND_DECISIONS_ZH.md) · [项目现状](docs/CURRENT_STATUS_ZH.md) · [安装规划](docs/INSTALLATION_ROADMAP_ZH.md) · [实验矩阵](docs/EXPERIMENT_MATRIX_ZH.md) · [证书及历史配置](docs/CONFIGURATION_ZH.md) · [安全设计](docs/SECURITY_ZH.md) · [真机验收](docs/TEST_PLAN.md) · [架构与维护](docs/ARCHITECTURE_ZH.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
+
+## 当前阶段从这里开始（2026-11-18）
+
+**核心目标未变：安全本地接管 Siri 文本请求 → 用户授权的 DeepSeek → Siri 原生 SSE；原始请求不得传至千问。** `main` 是最新集成版本，但仍为 **v0.4.0-lab**，不能承诺现已可用。
+
+请按顺序阅读：
+
+1. [项目交接总览](docs/PROJECT_HANDOFF_ZH.md)：当前架构、决策、贡献规范和真正的完成条件。
+2. [本次对话问题台账](docs/ISSUES_AND_DECISIONS_ZH.md)：已遇到的问题、证据、是否解决。
+3. [当前实现和阻塞条件](docs/CURRENT_STATUS_ZH.md)：哪些功能是代码层完成，哪些未经真机证明。
+4. [Shadowrocket 安装与安全回滚规划](docs/INSTALLATION_ROADMAP_ZH.md)：00 基线、20/21 两个互斥的虚构域名实验。
+5. [实验矩阵与证据模板](docs/EXPERIMENT_MATRIX_ZH.md)：E0–E6 测试的通过、失败及停机条件。
+
+**现在只应进行无 API Key 的安全基线与虚构域名对照实验。** 真实 Siri 安全接管与 SSE 客户端兼容尚未通过，主脚本故意保持 `providerEnabled:false` 和目标域名 REJECT。实验模块 20/21 不得同时开启，更不得把其虚构域名直接替换成真实千问域名。
+
 
 ## 项目简介
 
@@ -40,12 +55,12 @@
 
 请修改 src/ 后执行 npm run build；切勿只修改生成的 scripts/sairs_router.js。
 
-## 最短部署路线
+## 历史部署概要（请以最新安装规划为准）
 
 1. **先做阻断基线**：在 Shadowrocket 导入 `00-SAIRS-LOCKDOWN.sgmodule`，保持本地 VPN 启用。检查 `prod-yabuli.qianwen.com` 被拒绝。
-2. **谨慎启用实验模式**：只有确认 Shadowrocket 当前版本支持本地 `script-path` 与请求阶段 mock response，才测试 `10-SAIRS-DEEPSEEK-LAB.sgmodule`。
+2. **先做无密钥实验**：只在虚构域名上分别测试 `20-AIES-LOCAL-BOUNDARY-PROBE.sgmodule` 和 `21-AIES-HTTP-ENGINE-PROBE.sgmodule`（不得同时启用），**不要直接启用 10 进行真实 Siri→DeepSeek 联调**。
 3. **本机自行生成 CA**：只为必要的目标主机启用 HTTPS 解密。**证书私钥不需要也不应填写到插件。**
-4. **DeepSeek API Key 本机初始化**：官方创建低额度专用 Key，按 [配置指南](docs/CONFIGURATION_ZH.md) 在本地执行一次初始化脚本，不把 Key 写入 GitHub、URL 或模块配置。
+4. **DeepSeek API Key 暂不配置**：当前真实域名安全隔离和 SSE 尚未证明可行；只有通过 [实验矩阵](docs/EXPERIMENT_MATRIX_ZH.md) 中相应安全门槛后，才进行后续授权联调。
 5. **先运行检查再上真机**：`npm run build` 及 `npm run check`；按照 [测试计划](docs/TEST_PLAN.md) 观察网络连接和 Siri 行为。
 
 **不可跳过的重要门槛**：LAB 模块中的 REJECT 规则可能在脚本之前生效，导致 DeepSeek 不会运行；移除 REJECT 则可能导致异常时原始请求透传。任何情况下，都不要为了“让 Siri 能回答”而牺牲千问隔离验证。
