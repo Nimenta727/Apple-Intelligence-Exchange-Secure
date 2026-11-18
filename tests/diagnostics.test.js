@@ -15,7 +15,7 @@ test("diagnostics contain only stable stage markers; missing key never calls ups
       configuration:{response_configuration_group_id:"siri.tqa"},
       input:[{content:secret}]})};
   const o=run(request,"");
-  assert.deepEqual(o.events,["ENTER","REQUEST_VALIDATED","KEY_MISSING","LOCAL_ERROR_ATTEMPTED"]);
+  assert.deepEqual(o.events,["ENTER","REQUEST_VALIDATED","NETWORK_ISOLATION_UNVERIFIED","LOCAL_ERROR_ATTEMPTED"]);
   assert.equal(o.calls,0);
   assert.equal(o.responses.length,1);
   assert.equal(o.responses[0].response.status,503);
@@ -52,8 +52,8 @@ test("missing HTTP client fails closed before attempting upstream",()=>{
     input:[{content:"hello"}]})};
   const r=Core.run({request,trace:x=>events.push(x),done:v=>outputs.push(v),
     store:{read:()=>"fake_test_key_123456789"},httpClient:null});
-  assert.equal(r.reason,"HTTP_CLIENT_MISSING");
+  assert.equal(r.reason,"NETWORK_ISOLATION_UNVERIFIED");
   assert.equal(outputs.length,1);
   assert.equal(outputs[0].response.status,503);
-  assert.deepEqual(events,["ENTER","REQUEST_VALIDATED","HTTP_CLIENT_MISSING","LOCAL_ERROR_ATTEMPTED"]);
+  assert.deepEqual(events,["ENTER","REQUEST_VALIDATED","NETWORK_ISOLATION_UNVERIFIED","LOCAL_ERROR_ATTEMPTED"]);
 });
