@@ -24,7 +24,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 Follow the [installation and rollback guide](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) before enabling it. Back up your config, disable any existing conflicting same-host REJECT rules, provide your own DeepSeek API key **only on the device**, and verify HTTPS MITM is limited to the intended host. Use only nonsensitive Siri questions in testing.
 
-The current script specifies `deepseek-flash`; live availability of that model ID has **not been verified**. Do not interpret importing the module as proof of API compatibility.
+The `deepseek-flash` model ID is documented by the [official DeepSeek Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/), but real calls with the user's account and end-to-end Siri behavior remain **unverified**.
 
 ## Code layout
 
