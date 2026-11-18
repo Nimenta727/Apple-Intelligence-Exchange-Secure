@@ -34,3 +34,10 @@
 4. 通过 [发布核对表](RELEASE_CHECKLIST_ZH.md) 后，再决定合并与发布。
 
 [文档中心](README.md) · [安装](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全](SECURITY_CURRENT_ZH.md) · [维护](MAINTENANCE_ZH.md) · [历史实验](EXPERIMENT_MATRIX_ZH.md)。
+
+## 后续操作资料（v0.6）
+
+- [首次使用及集中验收](USER_GUIDE_ZH.md)
+- [真机调试、错误码和脱敏反馈](DEBUGGING_ZH.md)
+- [当前脚本结构和双阶段数据流](ARCHITECTURE_CURRENT_ZH.md)
+- [升级、维护、版本 pin 和发布流程](OPERATIONS_ZH.md)
