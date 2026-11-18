@@ -1,0 +1,235 @@
+/*
+ * AIES Siri -> DeepSeek native answer rewrite v0.6 clean beta.
+ * One file, two Shadowrocket hooks: http-request and http-response.
+ * Original request MAY reach Qwen. All observed Siri AI response content
+ * must come from DeepSeek; never silently return Qwen in our response hook.
+ * NOT a system-level guarantee if MITM/script fails or is bypassed.
+ *
+ * Original SAIR architecture research: boitar/sair, MIT.
+ */
+(function () {
+"use strict";
+var C={
+  version:"0.6.0-beta",
+  target:/^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?[^#]*)?$/i,
+  endpoint:"https://api.deepseek.com/chat/completions",
+  model:"deepseek-flash",
+  keyName:"SAIRS_DEEPSEEK_API_KEY",
+  maxRequest:300000,maxPrompt:14000,maxSse:900000,maxAnswer:12000,
+  timeoutMs:11000,sessionTtlMs:45000
+};
+var req=typeof $request!=="undefined" ? $request : null;
+var res=typeof $response!=="undefined" ? $response : null;
+var store=typeof $persistentStore!=="undefined" ? $persistentStore : null;
+var http=typeof $httpClient!=="undefined" ? $httpClient : null;
+var finish=typeof $done==="function" ? $done : null;
+if(!finish)return;
+var once=false,timer=null;
+function log(s){try{if(typeof console!=="undefined"&&console.log)console.log("[AIES_V06] "+s);}catch(e){}}
+function done(data){if(once)return;once=true;if(timer!==null&&typeof clearTimeout==="function")try{clearTimeout(timer);}catch(e){};try{finish(data);}catch(e){log("DONE_EXCEPTION");}}
+function error(code){
+ log("ERROR_"+code);
+ var body=JSON.stringify({error:"AIES_"+code});
+ // Directly replace the observed HTTP response with a generic non-model error.
+ if(res)done({status:502,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"},body:body});
+ else done({response:{status:502,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"},body:body}});
+}
+function header(headers,name){
+ if(!headers||typeof headers!=="object")return "";
+ var ks=Object.keys(headers);
+ for(var i=0;i<ks.length;i++)if(ks[i].toLowerCase()===name.toLowerCase())return String(headers[ks[i]]);
+ return "";
+}
+function rawRequest(){
+ if(!req||typeof req.body!=="string"||req.body.length>C.maxRequest)return "";
+ return req.body;
+}
+function parseRequest(raw){
+ if(!raw||raw.length>C.maxRequest)return null;
+ try{
+ var o=JSON.parse(raw);
+ var g=o&&o.configuration&&o.configuration.response_configuration_group_id;
+ if(typeof g!=="string"||!/^(siri\.tqa|siri_tqa)$/i.test(g))return null;
+ if(!Array.isArray(o.input)||o.input.length<1||o.input.length>12)return null;
+ var parts=[];
+ for(var i=0;i<o.input.length;i++){
+  var it=o.input[i],m=it&&it.message&&typeof it.message==="object"?it.message:it;
+  var content=m&&m.content;
+  var list=typeof content==="string"?[content]:content;
+  if(!Array.isArray(list)||list.length<1||list.length>64)return null;
+  for(var j=0;j<list.length;j++){
+    var v=list[j],str;
+    if(typeof v==="string")str=v;
+    else if(v&&typeof v==="object"&&!Array.isArray(v)&&
+      Object.keys(v).every(function(k){return /^(type|text|input_text|value)$/.test(k);})&&
+      (!v.type||/^(text|input_text)$/.test(v.type)))
+      str=typeof v.text==="string"?v.text:typeof v.input_text==="string"?v.input_text:typeof v.value==="string"?v.value:null;
+    else return null;
+    if(typeof str!=="string"||/data:(image|audio|video)\//i.test(str))return null;
+    if(str.trim())parts.push(str.trim());
+  }
+ }
+ var prompt=parts.join("\n\n");
+ return prompt&&prompt.length<=C.maxPrompt?prompt:null;
+ }catch(e){return null;}
+}
+function validKey(k){return typeof k==="string"&&/^[A-Za-z0-9_-]{12,256}$/.test(k)&&!/REPLACE_WITH|PLACEHOLDER/i.test(k);}
+function statusCode(resp){
+ var s=resp&&(resp.statusCode||resp.status)||0;
+ return typeof s==="number"?s:Number((String(s).match(/\b\d{3}\b/)||[])[0]||0);
+}
+function modelReply(resp,body){
+ if(statusCode(resp)!==200||typeof body!=="string"||body.length>900000)return null;
+ try{
+  var obj=JSON.parse(body),choice=obj.choices&&obj.choices[0];
+  if(!choice||choice.finish_reason!=="stop")return null;
+  var a=choice.message&&choice.message.content;
+  if(typeof a!=="string"||!a.trim()||a.length>C.maxAnswer)return null;
+  return a.trim();
+ }catch(e){return null;}
+}
+function safeJson(v){return JSON.stringify(v);}
+function event(name,data){
+ var o={type:name};o[name]=data;
+ return "event: "+name+"\ndata: "+safeJson(o)+"\n\n";
+}
+var E={
+ session:"session.created",created:"session.response.created",
+ choice:"session.response.choices[].added",
+ item:"session.response.choices[].items[].added",
+ added:"session.response.choices[].items[].message.content[].added",
+ delta:"session.response.choices[].items[].message.content[].text.value.delta",
+ textDone:"session.response.choices[].items[].message.content[].text.value.done",
+ contentDone:"session.response.choices[].items[].message.content[].done",
+ itemDone:"session.response.choices[].items[].done",
+ completed:"session.response.choices[].completed",
+ choiceDone:"session.response.choices[].done",
+ responseDone:"session.response.done"
+};
+function validId(x){return typeof x==="string"&&/^[A-Za-z0-9_-]{1,160}$/.test(x);}
+function rewriteSse(original,answer){
+ // This parser intentionally rejects unknown SSE events rather than copy any
+ // potentially answer-bearing Qwen text through to Siri.
+ if(typeof original!=="string"||original.length>C.maxSse||!original.length)return null;
+ var frames=original.replace(/\r\n/g,"\n").split("\n\n"),out=[],entries=[],i;
+ for(i=0;i<frames.length;i++){
+  var f=frames[i].trim();
+  if(!f)continue;
+  var lines=f.split("\n");
+  if(lines.length!==2||lines[0].slice(0,7)!=="event: "||
+     lines[1].slice(0,6)!=="data: ")return null;
+  var name=lines[0].slice(7),obj;
+  if(Object.keys(E).every(function(k){return E[k]!==name;}))return null;
+  try{obj=JSON.parse(lines[1].slice(6));}catch(e){return null;}
+  if(!obj||obj.type!==name||!Object.prototype.hasOwnProperty.call(obj,name))return null;
+  entries.push({name:name,payload:obj[name]});
+ }
+ if(entries.length<12||entries.length>256)return null;
+ // Require complete, known event progression and one or more deltas.
+ var names=entries.map(function(x){return x.name;});
+ var prefix=[E.session,E.created,E.choice,E.item,E.added];
+ var suffix=[E.textDone,E.contentDone,E.itemDone,E.completed,E.choiceDone,E.responseDone];
+ for(i=0;i<5;i++)if(names[i]!==prefix[i])return null;
+ for(i=0;i<6;i++)if(names[names.length-6+i]!==suffix[i])return null;
+ for(i=5;i<names.length-6;i++)if(names[i]!==E.delta)return null;
+ if(names.length<12)return null;
+ var s=entries[0].payload,r=entries[1].payload;
+ if(!s||!r||!validId(s.id)||!validId(r.id)||r.session_id!==s.id||
+    typeof s.expires_at!=="number"||!isFinite(s.expires_at)||
+    s.expires_at<0||Math.floor(s.expires_at)!==s.expires_at)return null;
+ var ids={s:s.id,r:r.id};
+ // No Qwen answer strings or arbitrary keys are preserved. Recreate event
+ // payloads from verified IDs + DeepSeek output only.
+ var body=safeJson({content:answer,suggestions:[],summary:"DeepSeek"});
+ var outputs=[{message:{content:[{text:{value:body}}]}}];
+ var n=[
+ {id:ids.s,object:"realtime.session",expires_at:s.expires_at},
+ {id:ids.r,session_id:ids.s,model:"aies/deepseek",status:"in_progress"},
+ {choice_index:0,choice:{index:0,status:"in_progress"}},
+ {choice_index:0,item_index:0,item:{id:"item_aies_"+ids.r.slice(0,40),type:"message",message:{role:"assistant",content:[]}}},
+ {choice_index:0,item_index:0,content_index:0,content:{type:"text",text:{value:""}}}
+ ];
+ for(i=5;i<names.length-6;i++)n.push({choice_index:0,item_index:0,content_index:0,delta:i===5?body:""});
+ n.push(
+ {choice_index:0,item_index:0,content_index:0,value:body},
+ {choice_index:0,item_index:0,content_index:0,content:{type:"text",text:{value:body}}},
+ {choice_index:0,item_index:0,item:{type:"message",message:{role:"assistant",content:[{type:"text",text:{value:body}}]}}},
+ {choice_index:0,choice:{output:outputs}},
+ {choice_index:0,choice:{output:outputs}},
+ {id:ids.r,choices:[{output:outputs}]}
+ );
+ for(i=0;i<names.length;i++)out.push(event(names[i],n[i]));
+ var joined=out.join("");
+ if(joined.length>C.maxSse||joined.indexOf(answer)<0)return null;
+ return joined;
+}
+function randomToken(){
+ return "aies_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,14)+"_"+Math.random().toString(36).slice(2,14);
+}
+function storeWrite(key,val){try{return !!(store&&store.write&&store.write(val,key));}catch(e){return false;}}
+function storeRead(key){try{return store&&store.read?store.read(key):null;}catch(e){return null;}}
+function isTarget(){return !!(req&&typeof req.url==="string"&&C.target.test(req.url));}
+if(!isTarget()){done({});return;}
+if(!res){
+ // Phase 1: capture a prompt and explicitly couple request/response using
+ // an opaque ID. Unlike "latest prompt", concurrent requests never share a slot.
+ var prompt=parseRequest(rawRequest());
+ if(!prompt){error("UNSUPPORTED_SIRI_REQUEST");return;}
+ if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){error("INVALID_METHOD");return;}
+ var token=randomToken();
+ if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,exp:Date.now()+C.sessionTtlMs}))){
+  error("SESSION_STORE_UNAVAILABLE");return;
+ }
+ var headers={};Object.keys(req.headers||{}).forEach(function(k){
+  if(k.toLowerCase()!=="x-aies-request-id")headers[k]=req.headers[k];
+ });
+ headers["X-AIES-Request-ID"]=token;
+ log("REQUEST_CAPTURED");
+ done({headers:headers});
+ return;
+}
+// Phase 2: never return the raw Qwen body from code paths we control.
+if(statusCode(res)!==200){error("ORIGINAL_RESPONSE_STATUS");return;}
+if(!res||typeof res.body!=="string"||res.body.length>C.maxSse){error("SSE_UNAVAILABLE");return;}
+var tag=header(req.headers,"X-AIES-Request-ID"),current=null,prompt2=null;
+if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
+ var raw=storeRead("AIES_R1_"+tag);
+ try{current=raw&&JSON.parse(raw);}catch(e){}
+ storeWrite("AIES_R1_"+tag,""); // consume once, even if invalid
+ if(current&&current.exp>Date.now()&&current.exp<=Date.now()+C.sessionTtlMs&&
+    typeof current.p==="string"&&current.p.length<=C.maxPrompt)prompt2=current.p;
+}
+var fromReq=parseRequest(rawRequest());
+if(prompt2&&fromReq&&prompt2!==fromReq){error("CORRELATION_MISMATCH");return;}
+if(!prompt2)prompt2=fromReq;
+if(!prompt2){error("PROMPT_UNAVAILABLE");return;}
+// Fail before billing DeepSeek if this upstream stream cannot be rewritten.
+if(!rewriteSse(res.body,"AIES_VALIDATION_ONLY")){error("SSE_REWRITE_UNSUPPORTED");return;}
+var key=storeRead(C.keyName);
+if(!validKey(key)){error("KEY_NOT_PROVISIONED");return;}
+if(!http||typeof http.post!=="function"){error("HTTP_CLIENT_UNAVAILABLE");return;}
+if(typeof setTimeout==="function")timer=setTimeout(function(){error("MODEL_TIMEOUT");},C.timeoutMs);
+log("DEEPSEEK_STARTED");
+try{
+ http.post({
+  url:C.endpoint,method:"POST",timeout:10,"auto-redirect":false,
+  headers:{"Content-Type":"application/json","Accept":"application/json","Authorization":"Bearer "+key},
+  body:safeJson({
+   model:C.model,stream:false,max_tokens:500,
+   messages:[
+    {role:"system",content:"你是简洁准确的中文 Siri 问答助手。只给出直接回答，避免寒暄与动作描写。"},
+    {role:"user",content:prompt2}
+   ]
+  })
+ },function(err,reply,bodyText){
+  if(once)return;
+  if(err){error("MODEL_NETWORK");return;}
+  var answer=modelReply(reply,bodyText);
+  if(!answer){error("MODEL_RESPONSE_INVALID");return;}
+  var rewritten=rewriteSse(res.body,answer);
+  if(!rewritten){error("SSE_REWRITE_UNSUPPORTED");return;}
+  log("DEEPSEEK_RESPONSE_ATTEMPTED");
+  done({status:200,headers:{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-store","X-AIES-Answer-Source":"deepseek"},body:rewritten});
+ });
+}catch(e){error("MODEL_EXCEPTION");}
+})();
