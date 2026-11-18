@@ -2,7 +2,7 @@
 
 > 基于 [boitar/sair](https://github.com/boitar/sair) 协议研究的 **Shadowrocket / iPhone 本地安全实验项目**。
 >
-> **状态：v0.2.2-lab · Experimental / 未经过真实 iPhone 验收。**
+> **状态：v0.4.0-lab · Experimental / 未经过真实 iPhone 验收。**
 > 目前**不能保证**阻止全部 Apple 智能云端流量，也**不能保证** Siri 接受独立合成的 SSE；严禁将实验版宣传为已验证生产可用。
 
 [简体中文安装与证书指南](docs/CONFIGURATION_ZH.md) · [安全设计](docs/SECURITY_ZH.md) · [真机验收](docs/TEST_PLAN.md) · [架构与维护](docs/ARCHITECTURE_ZH.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
@@ -21,7 +21,7 @@
 - **无 ChatGPT 订阅接口**：ChatGPT Plus/Pro 不能作为本项目的通用 API Key；当前只适配 DeepSeek 独立 API Key。
 - **仓库公开**：公开代码不等于公开密钥。建议 Fork 或自行保管私有配置，**绝不向仓库提交真实密钥/CA 私钥**。
 
-## 仓库结构（v0.2.2-lab）
+## 仓库结构（v0.4.0-lab）
 
 维护性源码已拆分为清晰的独立模块；实际导入 Shadowrocket 的脚本仍然只有一个自动构建文件。
 
@@ -46,7 +46,7 @@
 2. **谨慎启用实验模式**：只有确认 Shadowrocket 当前版本支持本地 `script-path` 与请求阶段 mock response，才测试 `10-SAIRS-DEEPSEEK-LAB.sgmodule`。
 3. **本机自行生成 CA**：只为必要的目标主机启用 HTTPS 解密。**证书私钥不需要也不应填写到插件。**
 4. **DeepSeek API Key 本机初始化**：官方创建低额度专用 Key，按 [配置指南](docs/CONFIGURATION_ZH.md) 在本地执行一次初始化脚本，不把 Key 写入 GitHub、URL 或模块配置。
-5. **先运行检查再上真机**：`npm run check` 及 `npm run check`；按照 [测试计划](docs/TEST_PLAN.md) 观察网络连接和 Siri 行为。
+5. **先运行检查再上真机**：`npm run build` 及 `npm run check`；按照 [测试计划](docs/TEST_PLAN.md) 观察网络连接和 Siri 行为。
 
 **不可跳过的重要门槛**：LAB 模块中的 REJECT 规则可能在脚本之前生效，导致 DeepSeek 不会运行；移除 REJECT 则可能导致异常时原始请求透传。任何情况下，都不要为了“让 Siri 能回答”而牺牲千问隔离验证。
 
@@ -55,7 +55,7 @@
 需要 Node.js（只用于开发电脑上的离线测试；不需要在 iPhone 安装 Node）：
 
 ```bash
-npm run check
+npm run build
 npm run check
 ```
 
@@ -109,3 +109,10 @@ npm run check
 本阶段新增 `shadowrocket/20-AIES-LOCAL-BOUNDARY-PROBE.sgmodule`、`scripts/aies_boundary_probe.js`、脱敏证据判定工具和离线测试。探针只匹配 RFC 2606 预留的 `aies-probe.invalid`，尝试将其 Host 映射到 `127.0.0.1`，在 HTTPS 请求阶段返回固定 `AIES_BOUNDARY_PROBE_OK`。**这只是独立测试模块；不修改真实 Siri 模块或现有千问 REJECT，也不需要 DeepSeek API Key。**
 
 详情及限制：[阶段三本地边界探针](docs/LOCAL_BOUNDARY_PROBE_ZH.md)。测试成功也仅说明模拟域名的机制有效，不能证明真实 Siri 请求已经被安全接管。默认 `providerEnabled: false` 仍保持。
+
+
+## v0.4.0-lab：独立 Siri SSE 协议构建与虚构端到端测试
+
+独立生成器 `src/sse.js` 现在对 Siri 的 `content/suggestions/summary`、写作工具的 `body/refinements` 执行受限结构化输出处理；较长文本被切分为多个 delta，所有 `done` 节点复用相同最终数据。`validateCandidateSse` 逐事件校验完整性、顺序、会话 ID、delta 汇总和场景 Schema，核心代码在尝试返回前进行自检。`tests/protocol-synthetic.test.js` 仅用虚构请求和模拟 DeepSeek HTTP 响应验证全链路，不发送任何真实请求。
+
+这仍是**协议候选实现**：原作者 SAIR 依赖真正的千问 SSE 骨架，公开协议说明不等于完整、经过验证的 Apple 协议规范。测试通过不意味着 iOS 接受 SSE。**保持 `providerEnabled: false` 与目标域名 REJECT，直到独立网络接管被证实安全。** 导入脚本路径在实验模块中写为 `Script/sairs_router.js`；路径仍须依真机环境核实。
