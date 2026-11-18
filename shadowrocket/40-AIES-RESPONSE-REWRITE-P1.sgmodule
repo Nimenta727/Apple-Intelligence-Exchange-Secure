@@ -1,0 +1,9 @@
+#!name=AIES 40 - Synthetic Response Rewrite P1 (NOT SIRI)
+#!desc=P1 HTTP-response hook only for .invalid local test; NOT real Siri/DeepSeek.
+#!system=ios
+
+[MITM]
+hostname = %APPEND% aies-probe.invalid
+
+[Script]
+AIES P1 Response Rewrite = type=http-response,pattern=^https:\/\/aies-probe\.invalid\/__aies_rewrite_fixture$,requires-body=true,max-size=921600,timeout=10,engine=jsc,script-path=Script/aies_response_rewrite_probe.js
