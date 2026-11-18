@@ -35,4 +35,4 @@
 
 只对 E1（loopback）提供的 JSON 证据使用 node tools/evaluate-boundary.js evidence.json；PROBE_PASS 表示**虚构域名**满足脚本内的测试条件，不表示已具备真实 Siri 安全代理能力。Fake-IP 方案需要独立记录，其映射与判定条件不同，不能不加修改复用 E1 判定。
 
-补充细节：[E1 说明](LOCAL_BOUNDARY_PROBE_ZH.md) · [E2 说明](HTTP_ENGINE_PROBE_ZH.md) · [既有真机验收计划](TEST_PLAN.md)。
+补充细节：[E1 说明](LOCAL_BOUNDARY_PROBE_ZH.md) · [E2 说明](HTTP_ENGINE_PROBE_ZH.md) · [旧版真机验收计划](../history/TEST_PLAN.md)。
