@@ -13,7 +13,7 @@ test("both modules contain a matching Qwen REJECT",()=>{
 });
 test("no mutable script URL in Shadowrocket lab module",()=>{
   const m=read("shadowrocket/10-SAIRS-DEEPSEEK-LAB.sgmodule");
-  assert.match(m,/script-path=sairs_router\.js/);
+  assert.match(m,/script-path=Script\/sairs_router\.js/);
   assert.doesNotMatch(m,/raw\.githubusercontent\.com/);
 });
 test("generated runtime has no dashboard, permissive CORS or silent passthrough",()=>{
