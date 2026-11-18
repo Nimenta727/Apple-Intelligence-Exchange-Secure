@@ -1,7 +1,10 @@
 "use strict";
 // Audited defaults. No runtime URL-based configuration or remote code loading.
 module.exports = Object.freeze({
-  version: "0.2.1-lab",
+  version: "0.2.2-lab",
+  // Actual network isolation cannot be attested by the request JS runtime.
+  // Remain false until a transport with independently verified no-upstream behavior exists.
+  providerEnabled: false,
   diagnosticsEnabled: true,
   host: "prod-yabuli.qianwen.com",
   targetPath: "/v1/sessions/responses",
