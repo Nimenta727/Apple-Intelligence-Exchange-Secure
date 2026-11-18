@@ -2,7 +2,7 @@
 
 > **历史资料（只读研究记录；不适用于 v0.6 安装）**：本文记录旧版网络阻断、候选协议、证书或测试假设。用户最新目标允许问题经过千问，要求尝试由 DeepSeek 提供 Siri 原生界面的最终 AI 回答。部分旧操作建议与新模式矛盾，**不得依本文启用旧模块、修改 REJECT 或配置密钥**。当前入口：[文档中心](../README.md) · [v0.6 安装](../INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全边界](../SECURITY_CURRENT_ZH.md)。
 
-> **重要更新（2026-11-18）**：本文保留 CA / Key 技术背景及历史排障内容，但其中部分实验安装顺序已过时。请以 [当前安装规划](../INSTALLATION_ROADMAP_ZH.md)、[实验矩阵](../EXPERIMENT_MATRIX_ZH.md) 和 [项目现状](../CURRENT_STATUS_ZH.md) 为准。当前**不要填写真实 DeepSeek API Key，不要尝试将 10 模块当作可用 Siri 方案**；先使用 00 阻断和 20/21 虚构域名探针。
+> **重要更新（2026-11-18）**：本文保留 CA / Key 技术背景及历史排障内容，但其中部分实验安装顺序已过时。请以 [当前安装规划](INSTALLATION_ROADMAP_ZH.md)、[实验矩阵](EXPERIMENT_MATRIX_ZH.md) 和 [项目现状](../CURRENT_STATUS_ZH.md) 为准。当前**不要填写真实 DeepSeek API Key，不要尝试将 10 模块当作可用 Siri 方案**；先使用 00 阻断和 20/21 虚构域名探针。
 
 
 > 历史参考文档；当前仓库为 v0.4.0-lab。**仅供测试；不是已验证的 Siri 可用版。** 本指南不要求越狱，不要求云服务器。最重要的是不要把 CA 私钥或真实 DeepSeek API Key 发给任何人，也不要提交到 GitHub。
@@ -93,7 +93,7 @@ var key = 'REPLACE_WITH_YOUR_DEEPSEEK_API_KEY';
 3. **不要同时启用 00 和 10 两个模块**。单独启用 \`10-SAIRS-DEEPSEEK-LAB.sgmodule\` 并核实其内的 REJECT 后备规则仍在。
 4. 仅针对需要的主机名启用 MITM，并按第 2 节生成/信任自己的 CA。
 5. **当前版本禁止本步骤**：因 `providerEnabled:false` 且真实域名隔离未通过，暂时不要录入真实 Key。只有安全评审允许以后才能进行。
-6. **当前不进行真实 Siri/DeepSeek 联调**。先完成 [E0–E2](../EXPERIMENT_MATRIX_ZH.md) 的无密钥测试；真实链路的出站监测、SSE 接受和故障演练都属于后续安全评审后的环节。
+6. **当前不进行真实 Siri/DeepSeek 联调**。先完成 [E0–E2](EXPERIMENT_MATRIX_ZH.md) 的无密钥测试；真实链路的出站监测、SSE 接受和故障演练都属于后续安全评审后的环节。
 7. **若只能看到 REJECT，或 Siri 无法显示回答：视为实验未通过。不要为了让功能可用而直接删除 REJECT 后备保护。** 不同 Shadowrocket 版本可能存在请求脚本与 REJECT 规则执行顺序差异。
 
 ## 5. 如何确认没有泄露？如何卸载？
