@@ -102,3 +102,10 @@ npm run check
 `src/config.js` 的 `providerEnabled: false` 是**发布安全闸**：即使请求匹配、Key 已配置，主脚本也只尝试返回 `AIES_NETWORK_ISOLATION_UNVERIFIED`，绝不调用 DeepSeek。它不具备网络层阻断能力，必须继续保留 `DOMAIN,prod-yabuli.qianwen.com,REJECT`。不要将它改为 `true` 来追求运行效果。
 
 `npm run check` 新增静态边界审查，拒绝删除阻断规则、误开模型调用或使用原始千问上游回包。这一阶段提供安全停止与证据记录机制，**不意味着已经实现无透传的 Siri 接管**。下一阶段必须寻找能独立证明“本地响应、零原始上游连接”同时成立的网络引擎；未通过验收，不发布 Siri→DeepSeek 可用版。详情见 [安全边界验证](docs/NETWORK_BOUNDARY_ZH.md)。
+
+
+## 阶段三（开发）：只针对保留域名的本地接管探针
+
+本阶段新增 `shadowrocket/20-AIES-LOCAL-BOUNDARY-PROBE.sgmodule`、`scripts/aies_boundary_probe.js`、脱敏证据判定工具和离线测试。探针只匹配 RFC 2606 预留的 `aies-probe.invalid`，尝试将其 Host 映射到 `127.0.0.1`，在 HTTPS 请求阶段返回固定 `AIES_BOUNDARY_PROBE_OK`。**这只是独立测试模块；不修改真实 Siri 模块或现有千问 REJECT，也不需要 DeepSeek API Key。**
+
+详情及限制：[阶段三本地边界探针](docs/LOCAL_BOUNDARY_PROBE_ZH.md)。测试成功也仅说明模拟域名的机制有效，不能证明真实 Siri 请求已经被安全接管。默认 `providerEnabled: false` 仍保持。
