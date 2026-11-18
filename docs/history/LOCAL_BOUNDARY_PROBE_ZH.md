@@ -1,5 +1,7 @@
 # 阶段三：隔离域名本地响应实验（UNVERIFIED）
 
+> **历史研究记录（不适用于最新 v0.6 安装）**：本文为旧 v0.4 阻断千问路线的研究材料，可能包含已废弃的配置步骤。新需求允许请求到千问，要求 Siri 最终 AI 回答来自 DeepSeek；真实 Siri 尚未验收。请优先查看 [当前文档](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/README.md)、[v0.6 安装](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) 和 [安全限制](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/SECURITY_CURRENT_ZH.md)。
+
 本实验**仅用于验证 Shadowrocket 的本地响应机制**，不接入 Siri、千问或 DeepSeek，不能证明真实 Siri 请求的私密性。不要修改正式域名的 `REJECT` 规则或打开 `providerEnabled`。
 
 ## 测试设计
