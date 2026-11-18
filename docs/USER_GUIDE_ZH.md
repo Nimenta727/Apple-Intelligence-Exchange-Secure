@@ -14,7 +14,7 @@
 
 1. 启用 60 模块并确认 VPN 已连接。
 2. 向 Siri 提一个非隐私的、答案容易核验的文本问题。
-3. 打开 Shadowrocket 日志，仅检查固定阶段码：`REQUEST_CAPTURED`、`DEEPSEEK_STARTED`、`DEEPSEEK_RESPONSE_ATTEMPTED` 或 `ERROR_*`；不要复制原始请求或响应。
+3. 打开 Shadowrocket 日志，仅检查固定阶段码：`REQUEST_CAPTURED`、`DEEPSEEK_STARTED`、`DEEPSEEK_RESPONSE_ATTEMPTED`、`REQUEST_DIAG_*` 或 `ERROR_*`；不要复制原始请求或响应。若出现 `REQUEST_DIAG_*`，参照[调试手册](DEBUGGING_ZH.md)查看原因；不需重新写入已确认有效的 Key。
 4. 查看 **Siri 原生界面**实际显示的文字。若为空、报错、千问回答或与当前问题不对应，记为未通过。
 5. 遇到错误按照 [调试手册](DEBUGGING_ZH.md) 分类，暂停测试；不需要重复无关的网络探针。
 
