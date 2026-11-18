@@ -41,3 +41,24 @@ B3：只有 B1/B2 经审计通过后，才能设计受控的真实 DeepSeek 调�
 代码检查通过 != 浏览器探针成功 != 真实域名无上游流量 != Siri 接受 SSE != 产品可用。发布前需要各门槛**分别**拿到可以复现的证据，并审查脚本失效时是否存在透传。
 
 参考：[交接总览](PROJECT_HANDOFF_ZH.md) · [历史问题](ISSUES_AND_DECISIONS_ZH.md) · [历史验收清单](history/TEST_PLAN.md)。
+
+## 2026-11-18 追加：本轮真机实测与 MVP 收敛
+
+> 以下为用户在本次会话提供的 Shadowrocket 截图、Safari 显示结果和 GitHub CI 记录的归纳；不是独立完整抓包鉴定。旧表中“20/21 尚未按新模块完成真机测试”已被本节更新。
+
+- 环境：iOS/iPadOS 27.3 beta 2（用户确认沿用历史版本），Shadowrocket 2.2.93 (3488)，规则模式、VPN 已连接，使用 main 的 v0.4.0-lab 模块。
+- E0：00-SAIRS-LOCKDOWN 单独启用时，用户在连接日志观察到 `prod-yabuli.qianwen.com` 命中 `REJECT`。**本次域名级规则命中成立**，不代表全系统零出站。
+- E1：00+20（21 关闭），`Script/aies_boundary_probe.js` 与本机受信任 CA/指定 MITM 域名生效；Safari `case=1/2` 显示 `AIES_BOUNDARY_PROBE_OK`。用户日志包含 `[AIES_BOUNDARY] MOCK_ATTEMPTED` 和 `script http request send early response to client`，说明虚构域名的本地响应在真机成功。**不等于真实 Siri 接管或零出站。**
+- E2：00+21（20 关闭），Safari `case=3` 显示 `AIES_BOUNDARY_PROBE_OK`，脚本执行与 early response 日志亦出现。21 模块文本含 `198.18.41.221` 与 `force-http-engine-hosts`；但未取得实际路由到 Fake-IP / 专用 HTTP Engine 的独立证明。
+- E2-N：用户明确选择**暂时跳过独立网络出站核验**。结论是“未验证/证据不足”，绝不能转写为“通过”。
+- E3/E4 真机 Siri SSE/E5 DeepSeek：未完成。SSE 内部测试通过不能替代 Siri 客户端接受性。
+- 收尾：用户关闭 20/21，只保留 00 阻断；未启用 10，未配置真实 DeepSeek Key。
+- 开发修复：在独立 `e4-sse-hardening` 分支新增 `choice_index` 错误注入和校验，重新生成 `scripts/sairs_router.js`（commit `6b44eb9`），GitHub Actions #74 的 quality 检查成功。此变更**不等于已合并 main**。
+
+### 产品范围和接下来的唯一关键路径
+
+- **目标**：保留 Siri 原生唤醒与原生显示界面，仅使其文本请求由 DeepSeek 回答；要求原始文本不透传千问。
+- 暂缓写作工具、视觉智能、多模型切换、普适 SSE 强化；不再为已成功的浏览器 Mock 重复测试。
+- 先在**保留虚构域名**的最小可复现实验中验证 REJECT/请求脚本冲突的故障行为，独立证明失效时不会透传；必要时评估替代接管组件。该阶段失败时停机，不能将域名替换成真实千问。
+- 安全接管可证实之后，才验证 Siri 原生 SSE 接受性；随后才做最小 DeepSeek 调用。
+- 用户选择跳过 E2-N 仅代表暂不执行，不代表撤销发布前的安全门槛。继续保持 `providerEnabled:false`、`DOMAIN,prod-yabuli.qianwen.com,REJECT` 和真实 10 关闭。
