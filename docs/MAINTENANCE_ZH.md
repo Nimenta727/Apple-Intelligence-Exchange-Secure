@@ -30,7 +30,7 @@
 - `docs/README.md`：统一入口。
 - `docs/CURRENT_STATUS_ZH.md`：唯一当前状态。
 - `docs/SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md`：需求与 P0–P6 计划。
-- `docs/ISSUES_AND_DECISIONS_ZH.md`：历史决策保留，最新目标覆盖旧要求。
+- `docs/ISSUES_AND_DECISIONS_ZH.md`：只记录当前决策与未解决问题；旧台账见 `docs/history/ISSUES_AND_DECISIONS_ZH.md`。
 - `docs/history/`：历史原文不删除、不当作当前安装说明。
 
 ## 下一步优先事项

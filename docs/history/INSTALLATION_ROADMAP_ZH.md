@@ -1,6 +1,8 @@
 # Shadowrocket 安装规划与执行步骤（适用 main v0.4.0-lab）
 
-> **停止按本文安装新版本。** 这是旧 `main` v0.4.0-lab 的 REJECT/20/21 实验安装计划，**不是** v0.6 Siri→DeepSeek 响应替换的部署说明。新模式只使用 [v0.6 集中安装与回滚指南](INSTALL_SIRI_DEEPSEEK_V06_ZH.md)。旧 00 的 REJECT 与新 60 模块冲突；只在备份并明确接受千问可收到问题后，才按照 v0.6 指南切换。历史实验文本保留以便追溯。
+> **历史完整记录**：本文件归档于 `docs/history/`，仅供追溯旧研究和当时的判断；当前目标、配置与发布判定以 [文档中心](../README.md) 为准。
+
+> **停止按本文安装新版本。** 这是旧 `main` v0.4.0-lab 的 REJECT/20/21 实验安装计划，**不是** v0.6 Siri→DeepSeek 响应替换的部署说明。新模式只使用 [v0.6 集中安装与回滚指南](../INSTALL_SIRI_DEEPSEEK_V06_ZH.md)。旧 00 的 REJECT 与新 60 模块冲突；只在备份并明确接受千问可收到问题后，才按照 v0.6 指南切换。历史实验文本保留以便追溯。
 
 
 > **这不是可直接启用 Siri→DeepSeek 的成品安装指南。** 当前计划仅供在保留安全规则的情况下，执行无密钥本地接管实验。最先完成的是 00 阻断、20/21 对照；真实 10 模块与 DeepSeek Key 均不能作为第一轮步骤。
@@ -22,7 +24,7 @@
 
 ## C. 第二步：仅虚构域名的本地 HTTPS 测试
 
-预备：测试虚构域名的 HTTPS 请求可能要求在设备本地生成并信任 Shadowrocket 自己的 CA。若尚未安装 CA，按当前客户端正规流程生成、安装并启用信任；**绝不导入第三方共享 CA**。MITM 主机仅添加 aies-probe.invalid，不开全域解密。证书位置可参照 [历史证书配置指南](history/CONFIGURATION_ZH.md)。
+预备：测试虚构域名的 HTTPS 请求可能要求在设备本地生成并信任 Shadowrocket 自己的 CA。若尚未安装 CA，按当前客户端正规流程生成、安装并启用信任；**绝不导入第三方共享 CA**。MITM 主机仅添加 aies-probe.invalid，不开全域解密。证书位置可参照 [历史证书配置指南](CONFIGURATION_ZH.md)。
 
 ### C1：20 Loopback 模块
 

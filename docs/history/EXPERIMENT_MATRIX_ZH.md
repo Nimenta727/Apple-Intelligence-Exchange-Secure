@@ -1,6 +1,8 @@
 # 真机实验矩阵与验收流程（仅限安全实验）
 
-> **历史实验归档：旧 v0.4 及 30/31 网络阻断路线。** 本页 E0–E6 的零千问原始出站要求不再适用于最新产品目标，也不是 v0.6 的安装测试清单。用户已允许请求经过千问；最新门槛见 [v0.6 发布核对表](RELEASE_CHECKLIST_ZH.md) 和 [Siri→DeepSeek 计划](SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md)。原始实验记录予以保留，不应作为已经验证 v0.6 的证据。
+> **历史完整记录**：本文件归档于 `docs/history/`，仅供追溯旧研究和当时的判断；当前目标、配置与发布判定以 [文档中心](../README.md) 为准。
+
+> **历史实验归档：旧 v0.4 及 30/31 网络阻断路线。** 本页 E0–E6 的零千问原始出站要求不再适用于最新产品目标，也不是 v0.6 的安装测试清单。用户已允许请求经过千问；最新门槛见 [v0.6 发布核对表](../RELEASE_CHECKLIST_ZH.md) 和 [Siri→DeepSeek 计划](../SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md)。原始实验记录予以保留，不应作为已经验证 v0.6 的证据。
 
 
 > 测试环境目标：之前记录的 iOS/iPadOS 27.3 beta 2、Shadowrocket 2.2.93 (3488)。如果设备更新，先记录新版本。**以下步骤不是通过记录，所有未做的项目一律标为未运行。**
@@ -38,7 +40,7 @@
 
 只对 E1（loopback）提供的 JSON 证据使用 node tools/evaluate-boundary.js evidence.json；PROBE_PASS 表示**虚构域名**满足脚本内的测试条件，不表示已具备真实 Siri 安全代理能力。Fake-IP 方案需要独立记录，其映射与判定条件不同，不能不加修改复用 E1 判定。
 
-补充细节：[E1 说明](history/LOCAL_BOUNDARY_PROBE_ZH.md) · [E2 说明](history/HTTP_ENGINE_PROBE_ZH.md) · [旧版真机验收计划](history/TEST_PLAN.md)。
+补充细节：[E1 说明](LOCAL_BOUNDARY_PROBE_ZH.md) · [E2 说明](HTTP_ENGINE_PROBE_ZH.md) · [旧版真机验收计划](TEST_PLAN.md)。
 
 ## 2026-11-18 已运行案例（历史结果记录，不覆盖原验收要求）
 
