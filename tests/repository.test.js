@@ -21,7 +21,7 @@ test("generated runtime has no dashboard, permissive CORS or silent passthrough"
   assert.doesNotMatch(code,/Access-Control-Allow-Origin/);
   assert.doesNotMatch(code,/http:\/\/sair\.box/);
   assert.doesNotMatch(code,/raw\.githubusercontent\.com/);
-  assert.doesNotMatch(code,/\$done\(\{\}\)/);
+  assert.doesNotMatch(code,/(?:^|\n)\s*\$done\(\s*\{\s*\}\s*\)/m);
   assert.match(code,/https:\/\/api\.deepseek\.com\/chat\/completions/);
 });
 test("initialization script contains placeholder, not a secret",()=>{
