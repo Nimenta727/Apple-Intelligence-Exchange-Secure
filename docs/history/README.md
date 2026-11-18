@@ -1,24 +1,22 @@
-# 历史归档（docs/history）
+# AIES 历史技术资料（只读参考）
 
-此目录保存**旧安装文档、旧验收计划，以及早期阶段的独立技术记录**。这些资料有助于追溯，但不再与 `docs/` 中的当前任务文档并列展示。
+> **本目录全部为旧版研究档案，不能作为 v0.6 安装或当前安全承诺。** 旧要求是“千问零出站”，已被用户更新为“允许请求到千问，但最终 Siri AI 回答必须来自 DeepSeek”。仓库保留原始研究证据与失败案例，用于避免重复实验。
 
-## 历史资料
+## 资料目录
 
-- [CONFIGURATION_ZH.md](CONFIGURATION_ZH.md) — 旧版 Shadowrocket、证书和 Key 设置说明。
-- [TEST_PLAN.md](TEST_PLAN.md) — 旧版 T01–T14 真机测试清单。
-- [ARCHITECTURE_ZH.md](ARCHITECTURE_ZH.md) — 早期架构说明。
-- [SECURITY_ZH.md](SECURITY_ZH.md) — 早期安全设计说明。
-- [NETWORK_BOUNDARY_ZH.md](NETWORK_BOUNDARY_ZH.md) — 第二阶段网络隔离风险研究。
-- [LOCAL_BOUNDARY_PROBE_ZH.md](LOCAL_BOUNDARY_PROBE_ZH.md) — 第三阶段 Loopback 探针设计。
-- [PROTOCOL_LAB_ZH.md](PROTOCOL_LAB_ZH.md) — 第四阶段候选 SSE 协议研究。
-- [HTTP_ENGINE_PROBE_ZH.md](HTTP_ENGINE_PROBE_ZH.md) — 第五阶段 Fake-IP HTTP 引擎对照研究。
+- [CONFIGURATION_ZH.md](CONFIGURATION_ZH.md)：旧 Shadowrocket、证书和 Key 操作说明。
+- [TEST_PLAN.md](TEST_PLAN.md)：旧版 T01–T14 真机计划。
+- [ARCHITECTURE_ZH.md](ARCHITECTURE_ZH.md)：旧 src/ 和独立候选 SSE 架构。
+- [SECURITY_ZH.md](SECURITY_ZH.md)：旧零透传威胁模型。
+- [NETWORK_BOUNDARY_ZH.md](NETWORK_BOUNDARY_ZH.md)：同域 REJECT 风险。
+- [LOCAL_BOUNDARY_PROBE_ZH.md](LOCAL_BOUNDARY_PROBE_ZH.md)：20 Loopback 原型。
+- [HTTP_ENGINE_PROBE_ZH.md](HTTP_ENGINE_PROBE_ZH.md)：21 Fake-IP / HTTP Engine。
+- [PROTOCOL_LAB_ZH.md](PROTOCOL_LAB_ZH.md)：旧合成 SSE 候选研究。
 
-## 当前正式工作入口
+30/31 故障注入与 40/50 改写原型保留在原 PR/提交历史中，不是 v0.6 安装前置测试。
 
-- [项目交接总览](../PROJECT_HANDOFF_ZH.md)
-- [问题与决策](../ISSUES_AND_DECISIONS_ZH.md)
-- [当前状态](../CURRENT_STATUS_ZH.md)
-- [实验矩阵](../EXPERIMENT_MATRIX_ZH.md)
-- [安装规划](../INSTALLATION_ROADMAP_ZH.md)
+## 当前项目请从这些文档开始
 
-> 安全隔离、Siri SSE 接受和真机端到端联调仍未验收。归档不代表实验成功。请优先使用当前安装规划，而不是照旧指南直接填写 API Key。
+[文档中心](../README.md) · [v0.6 安装](../INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全边界](../SECURITY_CURRENT_ZH.md) · [当前状态](../CURRENT_STATUS_ZH.md) · [发布门槛](../RELEASE_CHECKLIST_ZH.md)。
+
+请勿按历史配置直接修改真实目标域名路由、安装未经审核的远程脚本或上传自己的 DeepSeek API Key。
