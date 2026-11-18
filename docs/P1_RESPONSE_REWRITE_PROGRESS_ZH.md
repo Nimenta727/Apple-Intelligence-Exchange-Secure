@@ -20,3 +20,23 @@
 1. 建立受控的非真实域名 HTTP-response fixture 机制（本地模拟服务或等效可控源），验证 Shadowrocket P1 response hook 是否实际接收到并修改响应。
 2. 证实响应替换能力、流式/压缩限制后，再经独立授权规划真实 Siri 固定假回答的实验。
 3. 固定回答真机验收成功后才进入 DeepSeek API Adapter 集成；随后按正式计划完成安全来源验证、P5 必做简化重构。
+
+## P1-A 第二次实现：公开固定 HTTPS 响应源（2026-11-18）
+
+**替代上文“40 先不导入”的旧条件：** 现在已经有可访问的公开 HTTPS 静态 fixture，40 可用于**仅该固定 URL**的短时测试，但仍然不能用于 Siri。
+
+- 原始测试地址：`https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/siri-deepseek-response-rewrite/tests/fixtures/p1-http-origin.txt`
+- 不启用 40 时，预期 Safari 可看到 `AIES_P1_ORIGIN_UNMODIFIED`。
+- 安装并启用 40，且本机 Shadowrocket CA 对 `raw.githubusercontent.com` 的 HTTPS MITM 生效时，预期 **同一 URL** 看到 `AIES_P1_RESPONSE_REWRITE_OK`。
+- 日志预期出现 `[AIES_P1] REWRITE_ATTEMPTED`，但日志不能单独证明最终 Safari/Siri 显示。
+- 如果返回 `AIES_P1_INVALID_FIXTURE`，说明脚本执行但收到的 response body 与预期不一致；若继续显示原文则响应阶段改写可能未生效；任何结果都只表示测试行为。
+
+**安全边界：** 该主机是 GitHub 的共享内容域名，不是专用私有测试域名。开启对 `raw.githubusercontent.com` 的 MITM 代表对该主机的 TLS 处理范围扩大，虽然脚本 URL 已严格限定到单个文件，也不应长期保留。仅在测试时开启 40，完成后立即关闭并撤销该主机 MITM（确认其他模块没有保留此项）。不要在临时测试期间访问该主机的任何私有资源或敏感链接。
+
+**真机操作采取单步确认，不能跳过：**
+1. 先保持 00 开启、40 关闭，使用 Safari 访问原始测试 URL 并确认原文。
+2. 仅确认原文后，才导入 `scripts/aies_response_rewrite_probe.js` 到本机 Shadowrocket 的 `Script/`，导入并启用 40，保持 10/20/21/30/31 关闭。
+3. 同一 URL 复测，看 Safari 实际出现的文字，并在必要时提供固定标签日志。不能通过截图中的普通文本就推断 SSE 兼容。
+4. 立即停用 40，继续保留 00，不将 40 用在真实 Siri。仍需 P1-B 真机 Siri SSE 与用户授权。
+
+**当前未完成：** 这一步只验证一个普通 text/plain HTTPS response 的整体 body 改写。尚未验证真正 SSE body、streaming 的缓冲/分块、response 无法取得时的透传、跨阶段数据关联以及 Siri 原生 UI。实验成功后应继续设计受控合成 SSE fixture，再考虑真实 Siri。
