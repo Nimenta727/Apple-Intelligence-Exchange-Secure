@@ -13,8 +13,8 @@
 
 | 分支 / PR | 内容 | 当前地位 |
 |---|---|---|
-| `main` | v0.4.0-lab 原安全研究、生成脚本和 CI | 保留独立历史基线 |
-| `siri-deepseek-v0.6-clean` / PR #10 | 当前 60 模块、唯一 v0.6 JS、离线回归与文档 | Draft，等待真机 |
+| `main` | v0.6 Beta 候选及 v0.4 历史研究文件 | 合并后仍待真机验收 |
+| `siri-deepseek-v0.6-clean` / PR #10 | 当前 60 模块、唯一 v0.6 JS、离线回归与文档 | 已整合至 main，仍待真机 |
 | `siri-deepseek-response-rewrite` / PR #9 | 40/50 早期响应改写候选 | 被 v0.6 取代 |
 | `mvp-transport-failure-probe` / PR #8 | 30/31 同域故障实验 | 历史证据 |
 | `e4-sse-hardening` / PR #7 | 旧合成 SSE 边界补丁 | 研究内容，非新发布前提 |
@@ -35,7 +35,7 @@
 - 需要修改 v0.6 **直接编辑部署脚本和对应测试**，不要误改旧 `src/` 当作 v0.6。
 - 旧 `src/` 改动则使用 `npm run build` 更新旧生成包；所有变更至少执行 `npm run check`。
 - 更新两个 hook 的不可变 commit pin 以及文档、CHANGELOG、安装/回滚说明。
-- **未通过 P4 来源安全验证前不把 PR #10 标记 Stable/合并为正式发布。** 不因用户改变隐私取舍就省略来源审查。
+- **虽然用户已要求合并代码至 main，但 P4 来源安全未通过前不得将 main 视为稳定发布。** 不因用户改变隐私取舍就省略来源审查。
 
 ## 工作入口
 
