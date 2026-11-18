@@ -36,3 +36,23 @@
 只对 E1（loopback）提供的 JSON 证据使用 node tools/evaluate-boundary.js evidence.json；PROBE_PASS 表示**虚构域名**满足脚本内的测试条件，不表示已具备真实 Siri 安全代理能力。Fake-IP 方案需要独立记录，其映射与判定条件不同，不能不加修改复用 E1 判定。
 
 补充细节：[E1 说明](history/LOCAL_BOUNDARY_PROBE_ZH.md) · [E2 说明](history/HTTP_ENGINE_PROBE_ZH.md) · [旧版真机验收计划](history/TEST_PLAN.md)。
+
+## 2026-11-18 已运行案例（历史结果记录，不覆盖原验收要求）
+
+| ID | 本轮实际结果 | 证据等级 | 后续 |
+|---|---|---|---|
+| E0 | `prod-yabuli.qianwen.com` 在连接日志命中 REJECT | 该配置中的域名规则命中 | 仍需覆盖额外网络状态 |
+| E1 | Safari case=1/2 回 `AIES_BOUNDARY_PROBE_OK`；脚本日志有 `MOCK_ATTEMPTED` 与提前响应 | 虚构域名本地 Mock 成功；零出站未知 | 不重复普通成功路径 |
+| E2 | Safari case=3 回同一标记；日志有脚本执行和提前响应 | Mock 成功；Fake-IP / HTTP Engine 实际接管未知 | 不重复普通成功路径 |
+| E2-N | 用户决定跳过 | **未运行/证据不足** | 保持正式上线前的硬门槛 |
+| E3 | 未完成 | 真实 Siri 安全接管未知 | 不启用 10 |
+| E4 | 分支上完成 choice_index 的离线回归；Siri 真机 SSE 未测试 | 仅代码自检 | 等待 B1 安全接管后验证客户端 |
+| E5 | 未运行 | 无真实 DeepSeek 调用 | 保持 Key 与 provider 关闭 |
+
+### 下一轮最小故障注入（仅虚构域名）
+
+- 用新的独立实验模块和固定诊断脚本，不触碰真实 Siri 域名，分别对比：`ok`（固定 200）、`deny`（固定 503）、`throw`（故意异常）、`nodone`（不调用 `$done` 的研究路径）。
+- 故障案例的目标是**识别是否有异常回退到请求原始目标的风险**，不是证明断网；无独立出口证据时仅记“客户端行为观察”。
+- 实验中关闭 20/21，仅开 00 与新实验模块；停止后撤销新模块，恢复仅 00。
+- 对所有 `throw` / `nodone` 模式，先严格限制在 `.invalid` 测试域名，不能复制到真实流量。
+- 如果代理引擎无法实现安全接管，停止真实域名联调并评估替代传输方案；不移除真实千问 REJECT。
