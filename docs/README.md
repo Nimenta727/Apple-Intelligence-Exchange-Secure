@@ -1,6 +1,6 @@
 # AIES 文档中心
 
-> 最新状态：**v0.6 Clean Beta 候选实现已提交，但 Siri 原生界面尚未通过真机验证**。当前发布渠道为开发分支 `siri-deepseek-v0.6-clean`（Draft PR #10）；`main` 仍保留 v0.4.0-lab 安全研究基线。请勿把 CI 通过理解为 Siri 已可用。
+> 最新状态：**v0.6 Clean Beta 候选实现已提交，但 Siri 原生界面尚未通过真机验证**。v0.6 已整合到 `main`；旧 v0.4.0-lab 安全研究文件继续保留在同一仓库。请勿把 CI 通过理解为 Siri 已可用。
 
 ## 当前产品定义
 
