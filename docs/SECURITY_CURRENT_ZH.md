@@ -13,6 +13,7 @@
 - 对已识别 SSE 结构重建答案，不在脚本能控制的成功路径中保留千问 AI 文本；未知 SSE 拒绝重写。
 - 对无 Key、网络/模型超时、SSE 错误等情况尝试用 502 代替上游回复。
 - 两个脚本钩子固定到同一不可变 Git commit，避免追踪开发分支更新。
+- 2026-11-19 新增请求解析固定原因码：代码只打印静态分类，不打印请求 body、header、Authorization、Private-Access-Token、Key 或真实问题。**Shadowrocket 自带的 PacketTunnel 日志可能显示敏感请求头，不能将整个日志发送给他人。**
 
 ## 尚未解决的重要风险
 
