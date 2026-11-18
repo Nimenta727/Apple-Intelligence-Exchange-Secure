@@ -24,8 +24,8 @@
 
 | 分支 / 版本 | 用途 | 状态 |
 |---|---|---|
-| [`siri-deepseek-v0.6-clean`](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/tree/siri-deepseek-v0.6-clean) | 当前新路线候选部署 | Draft PR #10，待真机 |
-| `main` / v0.4.0-lab | 旧“阻断千问出站”研究与 CI 基线 | 历史实验，不是 v0.6 安装入口 |
+| [`siri-deepseek-v0.6-clean`](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/tree/siri-deepseek-v0.6-clean) | 已整合至 main 的候选来源 | 已合入，待真机 |
+| `main` / v0.6 Clean Beta | 当前候选代码及历史 v0.4 实验基线 | 已合入仓库，真机待验收 |
 | `siri-deepseek-response-rewrite` / 50 | 早期响应改写 Beta | 已被 v0.6 取代 |
 | 30/31/40 | 旧网络故障和模拟响应探针 | 非当前安装步骤 |
 
@@ -38,8 +38,8 @@
 - [集中安装与回滚指南](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md)
 - [相关模拟测试](tests/siri-deepseek-v06.test.js)
 
-安装模块：  
-`https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/siri-deepseek-v0.6-clean/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule`
+安装模块（main 当前版本）：  
+`https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule`
 
 **请先完整阅读安装/安全文档**。API Key 只能在设备本机配置，不能放到模块 URL、GitHub、聊天或日志中。真机测试需要 Shadowrocket CA 的目标域名 MITM，存在证书信任风险。不要在测试前提交敏感请求。
 
@@ -59,8 +59,8 @@
 ## 开发与维护
 
 仓库保留两条不同架构的代码：
-- **新 v0.6**：`scripts/aies_siri_deepseek_v06.js` 是真正被 60 模块调用的单文件逻辑；开发时修改此文件和 `tests/siri-deepseek-v06.test.js`。
-- **旧 v0.4 lab**：`src/` → `tools/build.js` → `scripts/sairs_router.js` 是历史阻断实验的确定性构建；不能误认为它生成 v0.6。
+- **新 v0.6（main 已包含）**：`scripts/aies_siri_deepseek_v06.js` 是真正被 60 模块调用的单文件逻辑；开发时修改此文件和 `tests/siri-deepseek-v06.test.js`。
+- **保留的旧 v0.4 lab**：`src/` → `tools/build.js` → `scripts/sairs_router.js` 是历史阻断实验的确定性构建；不能误认为它生成 v0.6。
 
 开发端执行 `npm run check`。旧 `src/` 改动还必须运行 `npm run build` 并提交生成文件。查看[维护指南](docs/MAINTENANCE_ZH.md)、[发布门槛](docs/RELEASE_CHECKLIST_ZH.md)、[需求计划](docs/SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md)与[贡献指南](CONTRIBUTING.md)。
 
