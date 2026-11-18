@@ -1,93 +1,36 @@
-# 当前项目状态与未完成工作（2026-11-18）
+# AIES 当前项目状态（2026-11-18）
 
-> **最新目标优先级更新**：请先阅读 [Siri → DeepSeek 响应替换实施计划](SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md)。允许原始 Siri 文本请求到千问，但最终 Siri 原生界面所展示的 AI 回答必须来自 DeepSeek；如果不能在失败/回退时保证这一点，则不能发布为“必定 DeepSeek”。本页旧表格和旧 B1–B3 属于“零千问原文出站”阶段的历史记录，不再是新目标的阻塞顺序。
+> **这是当前状态的权威入口。** 活跃候选为 [v0.6 Clean Beta](INSTALL_SIRI_DEEPSEEK_V06_ZH.md)，开发分支 `siri-deepseek-v0.6-clean`，Draft [PR #10](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/10)。`main` 仍为 v0.4.0-lab 旧阻断研究基线。**v0.6 离线自动检查通过，但尚未完成 Siri 原生界面和 DeepSeek 真实 API 验收。**
 
-## 版本与判定
+## 目标与验收
 
-- 仓库：Nimenta727/Apple-Intelligence-Exchange-Secure。
-- 集中交付：main（累计实验代码经 PR #6 合并）。
-- 版本：v0.4.0-lab（package.json / src/config.js）。
-- 安全状态：**实验、不可宣称可用、不可关闭 REJECT**。providerEnabled:false。
+只保留 Siri 原生界面中的文本问答。原始请求允许发送千问；**最终 AI 答案必须是 DeepSeek 生成的内容，而非千问**。代码在确实介入的响应路径不会主动回退千问，但脚本缺席、VPN/MITM 失效时 Siri 仍可能使用千问，故系统级“任何时候必为 DeepSeek”尚无法保证。
 
-| 项目 | 代码状态 | 实测状态 |
+## 当前进度
+
+| 范围 | 事实 | 判定 |
 |---|---|---|
-| 请求 URL / POST / JSON / 文本输入白名单 | 已实现 | 通过离线自动测试，不等于真实设备兼容 |
-| DeepSeek API 适配与错误处理 | 已编码 | 模拟响应已测试，真实 Key 联调未完成 |
-| Siri SSE 生成器 | 已编码 | 内部一致性测试通过，Siri 接受性未知 |
-| 写作工具响应生成器 | 已编码 | 内部测试通过，系统写作工具接受性未知 |
-| 网络域名 REJECT | 配置存在 | 用户曾观察到 REJECT 触发；全网络状态验证不足 |
-| Shadowrocket 同域安全接管 | 有 10 实验模块 | **未成功证明可用且零原始上游** |
-| 20 Loopback / 21 Fake-IP 探针 | 已编码且 CI 通过 | 真实设备尚未按新模块完成 |
-| Siri → DeepSeek → Siri 成功回答 | 非发布状态（安全闸关闭） | **未完成** |
-| 图像 / 视觉智能 | 未实现，保守拒绝 | 不支持 |
-| API Key 安全初始化 | 一次性脚本存在 | 需验证 Shadowrocket 当前版本手动脚本/存储操作；现阶段不需要 Key |
-| 断开 VPN、蜂窝切换、HTTP/3、DNS 绕行 | 未形成可证明的全局保护 | 待实测，不得承诺设备级零泄露 |
+| 需求和实施计划 | 新目标、P0–P6 和发布门槛已文档化 | 已完成规划 |
+| 部署收敛 | 60 模块 + 1 个固定提交的 JS，40/50 已从 v0.6 分支删除 | 代码已提交 |
+| 文本解析、请求关联、DeepSeek API、SSE 重建 | 代码存在并有离线模拟与错误路径测试 | 已编码，真机未验证 |
+| GitHub CI | 最新已观察的 v0.6 代码提交 Actions #102 success | 离线通过 |
+| Siri 原生 UI 真机显示 | 没有真实结果 | **未运行** |
+| 使用用户自己的 DeepSeek Key 的实际联调 | 没有真实结果 | **未运行** |
+| Shadowrocket 失效 / Siri 回退 | 无系统级阻断证明 | **未解决** |
+| 隐私生命周期 / 安全审计 | 暂存用户问题于本机 store，逻辑 TTL 不能保证物理清除 | 待加强 |
+| 正式发布 | Draft PR，尚未合并 main 或发布稳定 Tag | **未发布** |
 
-## 当前最关键的阻塞条件
+## 仓库代码分层
 
-B1（必须先解决）：Shadowrocket 2.2.93 上，同域 REJECT 的安全阻断与 request 阶段合成响应存在冲突。需要先在隔离域名验证 HTTP 引擎、脚本入口与网络出站，并找到能安全覆盖真实请求的架构；不能通过取消 REJECT 来“修复”。
+- **当前 v0.6**：`shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule` → `scripts/aies_siri_deepseek_v06.js`；它们就是安装部署入口。
+- **v0.4 历史**：`src/`、`tools/build.js`、`scripts/sairs_router.js`、00/10/20/21，继续在 CI 中维护，但不能当作新版本部署脚本。
+- 旧 30/31、40、50 原型位于历史分支和 PR，当前安装不需要。
 
-B2：无法确认 Siri 接受独立构造的 SSE 事件和 JSON。即使 B1 成功，仍需完成不泄露用户数据的协议验收。
+## 接下来按顺序
 
-B3：只有 B1/B2 经审计通过后，才能设计受控的真实 DeepSeek 调用测试，并且必须重新测试故障、超时、切换网络状态。
+1. 完成一次集中 Siri 真机验收，确认两阶段脚本被调用且 Siri UI 真正使用 DeepSeek 回答。
+2. 完成模型失败、脚本缺席、断网/缓存及千问回退的来源安全验证。不能保证时明确支持条件，不宣称“必定”。
+3. 整理状态管理、减少本地用户问题明文持久化，进一步重构和审查；锁定发布版本。
+4. 通过 [发布核对表](RELEASE_CHECKLIST_ZH.md) 后，再决定合并与发布。
 
-## 当前可直接执行的安全工作
-
-1. 在 main 下载/核对 00 基线模块、20/21 虚构域名实验模块、scripts/aies_boundary_probe.js。
-2. 不安装 10 作为“已可用 Siri”方案，不配置真实 DeepSeek Key。
-3. 执行 [安装规划](INSTALLATION_ROADMAP_ZH.md) 的阶段 A–C 和 [实验矩阵](EXPERIMENT_MATRIX_ZH.md)，记录脱敏结果。
-4. 回传结果后按证据修复代码；只把真实通过的阶段记为完成。
-
-## 严格验收口径
-
-代码检查通过 != 浏览器探针成功 != 真实域名无上游流量 != Siri 接受 SSE != 产品可用。发布前需要各门槛**分别**拿到可以复现的证据，并审查脚本失效时是否存在透传。
-
-参考：[交接总览](PROJECT_HANDOFF_ZH.md) · [历史问题](ISSUES_AND_DECISIONS_ZH.md) · [历史验收清单](history/TEST_PLAN.md)。
-
-## 2026-11-18 追加：本轮真机实测与 MVP 收敛
-
-> 以下为用户在本次会话提供的 Shadowrocket 截图、Safari 显示结果和 GitHub CI 记录的归纳；不是独立完整抓包鉴定。旧表中“20/21 尚未按新模块完成真机测试”已被本节更新。
-
-- 环境：iOS/iPadOS 27.3 beta 2（用户确认沿用历史版本），Shadowrocket 2.2.93 (3488)，规则模式、VPN 已连接，使用 main 的 v0.4.0-lab 模块。
-- E0：00-SAIRS-LOCKDOWN 单独启用时，用户在连接日志观察到 `prod-yabuli.qianwen.com` 命中 `REJECT`。**本次域名级规则命中成立**，不代表全系统零出站。
-- E1：00+20（21 关闭），`Script/aies_boundary_probe.js` 与本机受信任 CA/指定 MITM 域名生效；Safari `case=1/2` 显示 `AIES_BOUNDARY_PROBE_OK`。用户日志包含 `[AIES_BOUNDARY] MOCK_ATTEMPTED` 和 `script http request send early response to client`，说明虚构域名的本地响应在真机成功。**不等于真实 Siri 接管或零出站。**
-- E2：00+21（20 关闭），Safari `case=3` 显示 `AIES_BOUNDARY_PROBE_OK`，脚本执行与 early response 日志亦出现。21 模块文本含 `198.18.41.221` 与 `force-http-engine-hosts`；但未取得实际路由到 Fake-IP / 专用 HTTP Engine 的独立证明。
-- E2-N：用户明确选择**暂时跳过独立网络出站核验**。结论是“未验证/证据不足”，绝不能转写为“通过”。
-- E3/E4 真机 Siri SSE/E5 DeepSeek：未完成。SSE 内部测试通过不能替代 Siri 客户端接受性。
-- 收尾：用户关闭 20/21，只保留 00 阻断；未启用 10，未配置真实 DeepSeek Key。
-- 开发修复：在独立 `e4-sse-hardening` 分支新增 `choice_index` 错误注入和校验，重新生成 `scripts/sairs_router.js`（commit `6b44eb9`），GitHub Actions #74 的 quality 检查成功。此变更**不等于已合并 main**。
-
-### 产品范围和接下来的唯一关键路径
-
-- **目标**：保留 Siri 原生唤醒与原生显示界面，仅使其文本请求由 DeepSeek 回答；要求原始文本不透传千问。
-- 暂缓写作工具、视觉智能、多模型切换、普适 SSE 强化；不再为已成功的浏览器 Mock 重复测试。
-- 先在**保留虚构域名**的最小可复现实验中验证 REJECT/请求脚本冲突的故障行为，独立证明失效时不会透传；必要时评估替代接管组件。该阶段失败时停机，不能将域名替换成真实千问。
-- 安全接管可证实之后，才验证 Siri 原生 SSE 接受性；随后才做最小 DeepSeek 调用。
-- 用户选择跳过 E2-N 仅代表暂不执行，不代表撤销发布前的安全门槛。继续保持 `providerEnabled:false`、`DOMAIN,prod-yabuli.qianwen.com,REJECT` 和真实 10 关闭。
-
-## 2026-11-18：MVP 30/31 真机对照收官
-
-- PR #8 (`mvp-transport-failure-probe`) 包含 `30` DIRECT、`31` REJECT、`aies_transport_fault_probe.js` 与离线检查；Actions #79 成功。PR 仍为 Draft，未并入 main。
-- E-MVP-01：启用 00+30、Safari 访问 `aies-probe.invalid/__aies_fault?case=ok`，用户确认显示 `AIES_FAULT_OK`；本地 HTTP 200 模拟响应成功。
-- E-MVP-02：同配置、`case=deny`，用户确认显示 `AIES_FAULT_DENIED`；本地 HTTP 503 模拟响应成功。
-- E-MVP-03：`case=throw`，Safari 显示无法连接或错误页面；这仅是故障时的客户端现象。
-- E-MVP-04：`case=nodone`，用户截图显示“Safari 浏览器打不开该网页，因为已丢失网络连接”；不等于网络出口零透传。
-- E-MVP-05：关闭 30、启用 00+31，`case=ok` 不能显示 `AIES_FAULT_OK`。用户提供的 Shadowrocket 连接截图明确显示 `DOMAIN,aies-probe.invalid,REJECT`；PacketTunnel 日志在 18:38:26 和 18:39:19 包含 `tcp rule ... type = REJECT` 与 `proxy stream ... reject`。截图中未见 `[AIES_FAULT] CASE_OK` 或 `MOCK_ATTEMPTED`，但日志并非完整输出，不能证明脚本根本未执行。
-- **阶段性决策**：当前设备配置中同域 REJECT 与成功返回本地 Mock 存在实测冲突；停止同类 Shadowrocket 规则排列组合测试，转为评估独立网络接管架构的可行性和成本。
-- 实验后用户报告已关闭 31，恢复 00 基线（其他实验模块保持关闭）。持续保持真实千问域名 REJECT、`providerEnabled:false`、真实 10 关闭、DeepSeek Key 未投入联调。
-- **未解决**：独立出口隔离证明、真实 Siri 请求的安全接管、Siri 是否接受自主生成 SSE、真实 DeepSeek 端到端。任何现有浏览器成功页面均不得宣传为完整功能可用。
-
-
-## 最新待办与状态：Response Rewrite MVP
-
-| 阶段 | 状态 | 主要验收 |
-|---|---|---|
-| P0 详细计划与需求变更 | **已记录** | 见 [Siri → DeepSeek 响应替换实施计划](SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md) |
-| P1 Shadowrocket 请求/响应关联与 Siri 固定答案替换 | 未开始 | 原生 Siri 界面展示固定替换文本 |
-| P2 DeepSeek 调用适配 | 未开始（旧 Adapter 可复用） | Key 安全、错误分类、模型响应来源核对 |
-| P3 DeepSeek→Siri 联调 | 未开始 | 连续提问答案来自 DeepSeek、无串话 |
-| P4 失败与来源保证 | 未开始 | 任何失败不得显示千问 AI 答案，否则不达标 |
-| P5 代码重构/结构简化 | 未开始、**必做** | 保持功能不变、统一配置、清理旧部署路径 |
-| P6 最终安全审查与发布 | 未开始 | CI、真机、回滚、文档和风险验收 |
-
-注意：**P0 只完成文档计划，不代表实现已开工或完成**。旧 00 阻断仍保留在当前用户设备和 main，直到另行评审新的隔离测试配置。
+[文档中心](README.md) · [安装](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全](SECURITY_CURRENT_ZH.md) · [维护](MAINTENANCE_ZH.md) · [历史实验](EXPERIMENT_MATRIX_ZH.md)。
