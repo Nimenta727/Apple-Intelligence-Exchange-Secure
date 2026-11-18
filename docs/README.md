@@ -15,12 +15,12 @@
 5. [发布核对表](RELEASE_CHECKLIST_ZH.md)：真机与安全审计未过之前不能标稳定。
 6. [开发维护手册](MAINTENANCE_ZH.md)：代码、测试、分支与文档管理。
 7. [项目交接](PROJECT_HANDOFF_ZH.md)：单页状态与下一步。
-8. [问题与决策台账](ISSUES_AND_DECISIONS_ZH.md)：含旧路线实验结论与目标变更。
+8. [当前问题与决策](ISSUES_AND_DECISIONS_ZH.md)：v0.6 有效决策和未解决风险；旧台账在 history。
 
 ## 历史路线（只作记录，不按其操作）
 
-- [旧版阻断安装路线](INSTALLATION_ROADMAP_ZH.md)：仅适用于 main 的 00/10/20/21 历史安全实验。
-- [旧实验矩阵](EXPERIMENT_MATRIX_ZH.md)：E0–E5、30/31 同域 REJECT 对照；不是当前发布门槛。
+- [旧版阻断安装路线](history/INSTALLATION_ROADMAP_ZH.md)：仅适用于 main 的 00/10/20/21 历史安全实验。
+- [旧实验矩阵](history/EXPERIMENT_MATRIX_ZH.md)：E0–E5、30/31 同域 REJECT 对照；不是当前发布门槛。
 - [history 归档](history/README.md)：旧架构、MITM、SSE 与网络边界研究。归档内容可能包含已废弃的操作建议，不能覆盖本目录的最新说明。
 
 ## 文档维护规则
