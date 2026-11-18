@@ -1,7 +1,8 @@
 "use strict";
 // Audited defaults. No runtime URL-based configuration or remote code loading.
 module.exports = Object.freeze({
-  version: "0.2.0-lab",
+  version: "0.2.1-lab",
+  diagnosticsEnabled: true,
   host: "prod-yabuli.qianwen.com",
   targetPath: "/v1/sessions/responses",
   deepseekUrl: "https://api.deepseek.com/chat/completions",
