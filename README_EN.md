@@ -22,8 +22,8 @@ The current candidate targets one Siri **text question-answering** endpoint only
 
 | Branch | Purpose | Status |
 |---|---|---|
-| `siri-deepseek-v0.6-clean` | Current one-module installation candidate | Draft PR #10, pending device acceptance |
-| `main` (v0.4.0-lab) | Previous no-upstream research baseline | Historical, not current beta deployment |
+| `siri-deepseek-v0.6-clean` | Current one-module installation candidate | Merged into main; pending device acceptance |
+| `main` (v0.6 Clean Beta with v0.4 history) | Current candidate deployment and preserved research | Merged into main; native Siri unverified |
 | Earlier 30/31/40/50 experiments | Network/fault/rewrite prototypes | Not required to install v0.6 |
 
 The **single v0.6 module** is [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule), backed by [aies_siri_deepseek_v06.js](scripts/aies_siri_deepseek_v06.js). Both request and response hooks are pinned to the same immutable script commit. See the [installation and rollback guide](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md).
