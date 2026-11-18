@@ -1,0 +1,23 @@
+#!name=AIES 21 - Fake-IP HTTP Engine Probe (SYNTHETIC ONLY)
+#!desc=UNVERIFIED. Isolated .invalid host only. Never enable together with 20 probe.
+#!author=Apple Intelligence Exchange Secure contributors
+#!system=ios
+
+[General]
+# Research-only: client support and engine ordering must be verified on device.
+force-http-engine-hosts = %APPEND% aies-probe.invalid
+
+[Host]
+# RFC 2544 benchmark network. This address is not an actual internet origin.
+aies-probe.invalid = 198.18.41.221
+
+[Rule]
+# DIRECT is scoped to this reserved fake hostname; never use for Qwen.
+DOMAIN,aies-probe.invalid,DIRECT
+
+[MITM]
+hostname = %APPEND% aies-probe.invalid
+
+[Script]
+# Same synthetic-only script as the loopback A/B alternative.
+AIES HTTP Engine Probe = type=http-request,pattern=^https:\/\/aies-probe\.invalid\/__aies_probe(?:\?.*)?$,requires-body=false,timeout=10,engine=jsc,script-path=Script/aies_boundary_probe.js

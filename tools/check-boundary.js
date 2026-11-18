@@ -37,4 +37,13 @@ if(/prod-yabuli\.qianwen\.com|api\.deepseek\.com/.test(probe+probeScript))
   fail("probe must not reference real Siri or DeepSeek hosts");
 if(/\$httpClient|\$task\.fetch|XMLHttpRequest|fetch\s*\(/.test(probeScript))
   fail("probe must not attempt network requests");
+const fake=read("shadowrocket/21-AIES-HTTP-ENGINE-PROBE.sgmodule");
+if(!/^force-http-engine-hosts\s*=\s*%APPEND%\s+aies-probe\.invalid\s*$/m.test(fake))
+  fail("fake-IP probe HTTP engine host not isolated");
+if(!/^aies-probe\.invalid\s*=\s*198\.18\.41\.221\s*$/m.test(fake))
+  fail("fake-IP probe address is not RFC2544 fixture");
+if(!/^DOMAIN,aies-probe\.invalid,DIRECT\s*$/m.test(fake))
+  fail("fake-IP probe rule mismatch");
+if(/prod-yabuli\.qianwen\.com|api\.deepseek\.com/.test(fake))
+  fail("fake-IP probe must never match actual provider host");
 if(!process.exitCode) console.log("Static boundary checks passed; NO claim of network isolation.");
