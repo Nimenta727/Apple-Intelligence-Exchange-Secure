@@ -42,6 +42,14 @@ function run(runtime) {
     var parsed=Request.parseBody(runtime.request);
     if (!parsed.ok) {trace("REQUEST_REJECTED");fail(422,parsed.code);return {started:false,reason:parsed.code};}
     trace("REQUEST_VALIDATED");
+    // A JS-only fail-closed response is NOT proof that the original connection
+    // cannot reach the upstream provider. No real prompt may leave this lab
+    // while the network-boundary deployment remains unverified.
+    if (!C.providerEnabled) {
+      trace("NETWORK_ISOLATION_UNVERIFIED");
+      fail(503,"NETWORK_ISOLATION_UNVERIFIED");
+      return {started:false,reason:"NETWORK_ISOLATION_UNVERIFIED"};
+    }
     var store=runtime.store;
     var key=store && typeof store.read==="function" ? store.read(C.keyName) : "";
     if (typeof key!=="string" ||
