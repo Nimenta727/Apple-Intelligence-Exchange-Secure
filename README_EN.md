@@ -1,50 +1,37 @@
 # Apple Intelligence Exchange Secure (AIES)
 
-**An experimental Shadowrocket bridge for native Siri text answers sourced from DeepSeek.** Based in part on publicly available protocol research from [boitar/sair](https://github.com/boitar/sair) (MIT).
+**Experimental DeepSeek-sourced answers in the native Siri interface, via Shadowrocket.**
 
-> **Current candidate: v0.6 Clean Beta — offline tests have passed; actual native Siri compatibility has NOT been validated.** The updated goal allows the original Siri request to reach Qwen, but aims to display an answer sourced from DeepSeek. When the proxy, MITM, response hook or Siri itself bypasses the rewrite, a Qwen answer may still appear. **There is no unconditional DeepSeek-only guarantee.**
+> **v0.6.0-beta — device validation pending.** Offline unit tests do not demonstrate real Siri compatibility, a successful live DeepSeek API call, or protection against operating-system fallback. Not affiliated with Apple, Shadowrocket, or DeepSeek.
 
-[中文 README](README.md) · [Documentation index](docs/README.md) · [Installation (Chinese)](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [Security](docs/SECURITY_CURRENT_ZH.md) · [Changelog](CHANGELOG.md)
+[中文](README.md) · [Install (Chinese)](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [Documentation](docs/README.md) · [Security](docs/SECURITY_CURRENT_ZH.md)
 
-## Scope and approach
+## Purpose
 
-The current candidate targets one Siri **text question-answering** endpoint only, not Writing Tools, images, vision, a separate chat interface or general model routing.
+The module targets one Siri **text question-answering** network endpoint. The original request **may reach Qwen**, while the response hook attempts to obtain text from DeepSeek and rebuild the recognized answer events. Errors handled within the script do not intentionally fall back to Qwen.
 
-1. A Shadowrocket HTTP request hook attempts to parse a supported Siri text request and associate its context with a single request.
-2. The original request may continue to Qwen; its eventual SSE response is used only as a protocol reference.
-3. An HTTP response hook calls the user-authorized DeepSeek API and attempts to rebuild recognized SSE answer fields with DeepSeek's answer.
-4. When the script itself detects a model/protocol failure, it attempts to return an error instead of falling back to Qwen.
-5. If the script never runs or traffic bypasses it, no JavaScript-level error handling can prevent native upstream output.
+**This is not a system-level provenance guarantee.** Siri may display Qwen content when the VPN, MITM or script fails to run, or when the client uses a separate path or cached response.
 
-**No real-device Siri result is claimed here.**
+## Install
 
-## Versions and deployment
+The only current module is [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule):
 
-| Branch | Purpose | Status |
-|---|---|---|
-| `siri-deepseek-v0.6-clean` | Current one-module installation candidate | Merged into main; pending device acceptance |
-| `main` (v0.6 Clean Beta with v0.4 history) | Current candidate deployment and preserved research | Merged into main; native Siri unverified |
-| Earlier 30/31/40/50 experiments | Network/fault/rewrite prototypes | Not required to install v0.6 |
+```text
+https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule
+```
 
-The **single v0.6 module** is [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule), backed by [aies_siri_deepseek_v06.js](scripts/aies_siri_deepseek_v06.js). Both request and response hooks are pinned to the same immutable script commit. See the [installation and rollback guide](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md).
+Follow the [installation and rollback guide](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) before enabling it. Back up your config, disable any existing conflicting same-host REJECT rules, provide your own DeepSeek API key **only on the device**, and verify HTTPS MITM is limited to the intended host. Use only nonsensitive Siri questions in testing.
 
-For this new mode, the former `00-SAIRS-LOCKDOWN` REJECT module conflicts with the intended Qwen response path. Do **not** simply mix 00 and 60. Back up your setup and follow the documented, explicit mode switch. The original Qwen prompt may then be transmitted.
+The current script specifies `deepseek-flash`; live availability of that model ID has **not been verified**. Do not interpret importing the module as proof of API compatibility.
 
-## Security and limitations
+## Code layout
 
-The API key must remain on the user's device and must not be committed, sent in a URL or disclosed in chat. Shadowrocket's local persistent store currently holds short-lived prompt context; physical deletion/encryption properties are unverified. HTTPS MITM and a locally trusted CA have their own risks. SSE streaming/compression, response interception, native Siri UI acceptance, timeouts and system bypass/fallback still require independent device validation.
+- `shadowrocket/`: the single installable module, with request and response hooks
+- `scripts/`: the runtime JS plus one-time on-device key provisioning and clearing templates
+- `tests/`: current beta unit tests and synthetic SSE fixtures
+- `tools/`: documentation and deployment integrity checks
+- `docs/`: current documentation only
 
-Code checks do not prove Siri or system-level answer provenance. The candidate is **not production-ready**. See [current status](docs/CURRENT_STATUS_ZH.md), [release gates](docs/RELEASE_CHECKLIST_ZH.md), [maintenance](docs/MAINTENANCE_ZH.md) and [original MIT license](LICENSE).
+Run `npm run check` with Node.js >=20. See the [architecture](docs/ARCHITECTURE_CURRENT_ZH.md), [debugging runbook](docs/DEBUGGING_ZH.md), [operations](docs/OPERATIONS_ZH.md), [release gates](docs/RELEASE_CHECKLIST_ZH.md), and [verification status](docs/CURRENT_STATUS_ZH.md).
 
-## Development
-
-Run `npm run check` for offline checks. The historical modular `src/` tree and generated `scripts/sairs_router.js` belong to v0.4 research; the actual v0.6 deployed script is a separate self-contained implementation, so the legacy build command does not generate it. Keep tests, docs and pinned deployment URLs synchronized.
-
-## Practical documentation
-
-- [User and initial setup guide (Chinese)](docs/USER_GUIDE_ZH.md)
-- [Debugging, error codes, and safe feedback format (Chinese)](docs/DEBUGGING_ZH.md)
-- [Current architecture (Chinese)](docs/ARCHITECTURE_CURRENT_ZH.md)
-- [Operations, upgrades, and maintenance (Chinese)](docs/OPERATIONS_ZH.md)
-
-These describe the test candidate; real native Siri success and system-level fallback behavior are still unverified.
+API keys, CA private keys, real prompts, Authorization headers and traffic captures must not be submitted. AIES is MIT licensed and credits the published research in [boitar/sair](https://github.com/boitar/sair).

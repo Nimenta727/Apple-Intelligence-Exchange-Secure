@@ -4,7 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const vm=require("node:vm");
 const path=require("node:path");
-const Sse=require("../src/sse");
+const Sse=require("./fixtures/siri-sse");
 const script=fs.readFileSync(path.join(__dirname,"../scripts/aies_siri_deepseek_v06.js"),"utf8");
 const moduleText=fs.readFileSync(path.join(__dirname,"../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");
 const URL="https://prod-yabuli.qianwen.com/v1/sessions/responses";
@@ -28,7 +28,7 @@ function env(options={}){
  const request={url:URL,method:"POST",headers:{"Content-Type":"application/json"},body:promptBody};
  return {data,logs,requests,invoke,request};
 }
-test("single import module connects both hooks without dropping REJECT from legacy",()=>{
+test("single install module exposes both HTTP hooks",()=>{
  assert.match(moduleText,/type=http-request/);
  assert.match(moduleText,/type=http-response/);
  assert.match(moduleText,/requires-body=true/);

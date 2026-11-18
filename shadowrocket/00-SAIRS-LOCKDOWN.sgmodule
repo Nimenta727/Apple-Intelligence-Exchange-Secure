@@ -1,7 +1,0 @@
-#!name=Apple Intelligence Exchange Secure - 00 Privacy Lockdown
-#!desc=Baseline Qwen target block. No MITM, no certificate, no API key. Use this mode FIRST; do not combine with lab.
-#!author=Apple Intelligence Exchange Secure contributors (original research: boitar/sair, MIT)
-#!system=ios
-
-[Rule]
-DOMAIN,prod-yabuli.qianwen.com,REJECT
