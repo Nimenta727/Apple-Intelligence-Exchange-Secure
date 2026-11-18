@@ -1,5 +1,7 @@
 # 阶段三：隔离域名本地响应实验（UNVERIFIED）
 
+> **历史资料（只读研究记录；不适用于 v0.6 安装）**：本文记录旧版网络阻断、候选协议、证书或测试假设。用户最新目标允许问题经过千问，要求尝试由 DeepSeek 提供 Siri 原生界面的最终 AI 回答。部分旧操作建议与新模式矛盾，**不得依本文启用旧模块、修改 REJECT 或配置密钥**。当前入口：[文档中心](../README.md) · [v0.6 安装](../INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全边界](../SECURITY_CURRENT_ZH.md)。
+
 本实验**仅用于验证 Shadowrocket 的本地响应机制**，不接入 Siri、千问或 DeepSeek，不能证明真实 Siri 请求的私密性。不要修改正式域名的 `REJECT` 规则或打开 `providerEnabled`。
 
 ## 测试设计
