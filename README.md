@@ -5,7 +5,7 @@
 > **状态：v0.4.0-lab · Experimental / 未经过真实 iPhone 验收。**
 > 目前**不能保证**阻止全部 Apple 智能云端流量，也**不能保证** Siri 接受独立合成的 SSE；严禁将实验版宣传为已验证生产可用。
 
-[交接总览](docs/PROJECT_HANDOFF_ZH.md) · [遇到的问题](docs/ISSUES_AND_DECISIONS_ZH.md) · [项目现状](docs/CURRENT_STATUS_ZH.md) · [安装规划](docs/INSTALLATION_ROADMAP_ZH.md) · [实验矩阵](docs/EXPERIMENT_MATRIX_ZH.md) · [历史文档](history/README.md) · [安全设计](docs/SECURITY_ZH.md) · [旧验收清单](history/TEST_PLAN.md) · [架构与维护](docs/ARCHITECTURE_ZH.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
+[交接总览](docs/PROJECT_HANDOFF_ZH.md) · [遇到的问题](docs/ISSUES_AND_DECISIONS_ZH.md) · [项目现状](docs/CURRENT_STATUS_ZH.md) · [安装规划](docs/INSTALLATION_ROADMAP_ZH.md) · [实验矩阵](docs/EXPERIMENT_MATRIX_ZH.md) · [历史文档](docs/history/README.md) · [安全设计](docs/history/SECURITY_ZH.md) · [旧验收清单](docs/history/TEST_PLAN.md) · [架构与维护](docs/history/ARCHITECTURE_ZH.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
 
 ## 当前阶段从这里开始（2026-11-18）
 
@@ -91,12 +91,12 @@ npm run check
 
 ## 安全与开源声明
 
-本项目不是 Apple、Shadowrocket、DeepSeek、OpenAI 或原 SAIR 作者的官方产品。系统 HTTPS 解密会引入 CA 信任风险，请阅读 [安全文档](docs/SECURITY_ZH.md)。上游项目版权属于原作者 boitar，MIT License 要求保留原版权及许可文本。未经真实设备验证的能力不得标注为已完成。
+本项目不是 Apple、Shadowrocket、DeepSeek、OpenAI 或原 SAIR 作者的官方产品。系统 HTTPS 解密会引入 CA 信任风险，请阅读 [安全文档](docs/history/SECURITY_ZH.md)。上游项目版权属于原作者 boitar，MIT License 要求保留原版权及许可文本。未经真实设备验证的能力不得标注为已完成。
 
 
 ## 维护与持续优化
 
-第二轮重构将配置、解析、模型调用、SSE 与运行时状态机独立维护，并在 GitHub Actions 中检查生成脚本与源码完全一致。详细模块职责见 [架构与开发指南](docs/ARCHITECTURE_ZH.md)。这并不能取代真实 iPhone 的隔离与协议验收。
+第二轮重构将配置、解析、模型调用、SSE 与运行时状态机独立维护，并在 GitHub Actions 中检查生成脚本与源码完全一致。详细模块职责见 [架构与开发指南](docs/history/ARCHITECTURE_ZH.md)。这并不能取代真实 iPhone 的隔离与协议验收。
 
 
 ## 0.2.1-lab 脚本诊断（仅阶段标记）
@@ -116,14 +116,14 @@ npm run check
 
 `src/config.js` 的 `providerEnabled: false` 是**发布安全闸**：即使请求匹配、Key 已配置，主脚本也只尝试返回 `AIES_NETWORK_ISOLATION_UNVERIFIED`，绝不调用 DeepSeek。它不具备网络层阻断能力，必须继续保留 `DOMAIN,prod-yabuli.qianwen.com,REJECT`。不要将它改为 `true` 来追求运行效果。
 
-`npm run check` 新增静态边界审查，拒绝删除阻断规则、误开模型调用或使用原始千问上游回包。这一阶段提供安全停止与证据记录机制，**不意味着已经实现无透传的 Siri 接管**。下一阶段必须寻找能独立证明“本地响应、零原始上游连接”同时成立的网络引擎；未通过验收，不发布 Siri→DeepSeek 可用版。详情见 [安全边界验证](docs/NETWORK_BOUNDARY_ZH.md)。
+`npm run check` 新增静态边界审查，拒绝删除阻断规则、误开模型调用或使用原始千问上游回包。这一阶段提供安全停止与证据记录机制，**不意味着已经实现无透传的 Siri 接管**。下一阶段必须寻找能独立证明“本地响应、零原始上游连接”同时成立的网络引擎；未通过验收，不发布 Siri→DeepSeek 可用版。详情见 [安全边界验证](docs/history/NETWORK_BOUNDARY_ZH.md)。
 
 
 ## 阶段三（开发）：只针对保留域名的本地接管探针
 
 本阶段新增 `shadowrocket/20-AIES-LOCAL-BOUNDARY-PROBE.sgmodule`、`scripts/aies_boundary_probe.js`、脱敏证据判定工具和离线测试。探针只匹配 RFC 2606 预留的 `aies-probe.invalid`，尝试将其 Host 映射到 `127.0.0.1`，在 HTTPS 请求阶段返回固定 `AIES_BOUNDARY_PROBE_OK`。**这只是独立测试模块；不修改真实 Siri 模块或现有千问 REJECT，也不需要 DeepSeek API Key。**
 
-详情及限制：[阶段三本地边界探针](docs/LOCAL_BOUNDARY_PROBE_ZH.md)。测试成功也仅说明模拟域名的机制有效，不能证明真实 Siri 请求已经被安全接管。默认 `providerEnabled: false` 仍保持。
+详情及限制：[阶段三本地边界探针](docs/history/LOCAL_BOUNDARY_PROBE_ZH.md)。测试成功也仅说明模拟域名的机制有效，不能证明真实 Siri 请求已经被安全接管。默认 `providerEnabled: false` 仍保持。
 
 
 ## v0.4.0-lab：独立 Siri SSE 协议构建与虚构端到端测试
