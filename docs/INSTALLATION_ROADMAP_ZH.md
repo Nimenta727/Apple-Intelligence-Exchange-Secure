@@ -19,7 +19,7 @@
 
 ## C. 第二步：仅虚构域名的本地 HTTPS 测试
 
-预备：测试虚构域名的 HTTPS 请求可能要求在设备本地生成并信任 Shadowrocket 自己的 CA。若尚未安装 CA，按当前客户端正规流程生成、安装并启用信任；**绝不导入第三方共享 CA**。MITM 主机仅添加 aies-probe.invalid，不开全域解密。证书位置可参照 [原配置指南](CONFIGURATION_ZH.md)。
+预备：测试虚构域名的 HTTPS 请求可能要求在设备本地生成并信任 Shadowrocket 自己的 CA。若尚未安装 CA，按当前客户端正规流程生成、安装并启用信任；**绝不导入第三方共享 CA**。MITM 主机仅添加 aies-probe.invalid，不开全域解密。证书位置可参照 [历史证书配置指南](../history/CONFIGURATION_ZH.md)。
 
 ### C1：20 Loopback 模块
 
