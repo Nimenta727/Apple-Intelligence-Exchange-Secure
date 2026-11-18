@@ -205,7 +205,7 @@ P5 验收：代码职责清楚、配置入口唯一、部署脚本可重复生�
 ## 7. 参考与历史边界
 
 - [交接总览](PROJECT_HANDOFF_ZH.md)；[当前状态](CURRENT_STATUS_ZH.md)；[问题台账](ISSUES_AND_DECISIONS_ZH.md)。
-- [历史网络边界研究](history/NETWORK_BOUNDARY_ZH.md) 与 [MVP 同域冲突实验](MVP_TRANSPORT_EXPERIMENT_ZH.md，存在于 PR #8 实验分支)：保留证据但不再作为新目标的产品需求。
+- [历史网络边界研究](history/NETWORK_BOUNDARY_ZH.md) 与 [MVP 同域冲突实验（旧 PR #8）](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/8)：保留证据但不再作为新目标的产品需求。
 - [boitar/sair](https://github.com/boitar/sair)：响应阶段改写的历史灵感，需审查版权与实际接口行为。
 - [DeepSeek 官方 API](https://api-docs.deepseek.com/api/create-chat-completion/) 与 [官方更新日志](https://api-docs.deepseek.com/zh-cn/updates/)：API 参数的事实源，版本变化时应重新确认。
 
