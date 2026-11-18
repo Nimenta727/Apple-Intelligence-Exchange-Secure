@@ -3,7 +3,7 @@
 ## 两套代码的明确分工
 
 - **v0.6 候选部署**：`shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule` + `scripts/aies_siri_deepseek_v06.js`。双阶段脚本为自包含实现；`tests/siri-deepseek-v06.test.js` 是相关模拟测试。
-- **v0.4 历史研究基线**：`src/`、`tools/build.js`、`scripts/sairs_router.js`、`00/10/20/21` 与对应测试。它们仍属于仓库 CI 与研究记录，**不依赖于 60 的运行**。不能以修改 src/ 代替修改 v0.6 脚本。
+- **v0.4 历史研究文件（main 内保留）**：`src/`、`tools/build.js`、`scripts/sairs_router.js`、`00/10/20/21` 与对应测试。它们仍属于仓库 CI 与研究记录，**不依赖于 60 的运行**。不能以修改 src/ 代替修改 v0.6 脚本。
 - **旧 40/50、30/31**：存在于历史 PR/分支，不再是 v0.6 当前安装步骤。
 
 ## 代码修改与发布工作流
