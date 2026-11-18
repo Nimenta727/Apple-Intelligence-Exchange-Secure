@@ -1,0 +1,15 @@
+#!name=AIES 30 - Synthetic Transport Fault DIRECT
+#!desc=Experimental .invalid fault probe ONLY. No Siri host, model, or external origin.
+#!system=ios
+
+[Host]
+aies-probe.invalid = 127.0.0.1
+
+[Rule]
+DOMAIN,aies-probe.invalid,DIRECT
+
+[MITM]
+hostname = %APPEND% aies-probe.invalid
+
+[Script]
+AIES Synthetic Fault Direct = type=http-request,pattern=^https:\/\/aies-probe\.invalid\/__aies_fault\?case=(?:ok|deny|throw|nodone)$,requires-body=false,timeout=10,engine=jsc,script-path=Script/aies_transport_fault_probe.js
