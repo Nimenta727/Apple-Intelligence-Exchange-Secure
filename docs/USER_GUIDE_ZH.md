@@ -21,7 +21,7 @@
 ## 目前的能力边界
 
 - 只接受已知的 Siri 文本 POST 与 SSE 事件顺序；未知协议结构会导致失败。
-- DeepSeek 模型 `deepseek-flash` 尚未真实验证可用，因此 API 即使有有效 Key 也可能失败。
+- `deepseek-flash` 已获 DeepSeek 官方文档确认支持，但用户账户、真实 Key、网络/额度及实际 API 返回均尚未真机验证。
 - Shadowrocket 未运行、HTTPS MITM 未命中、网络切换、系统缓存和 Siri 原生回退都可能绕过替换逻辑；**不能保证最终显示内容始终来自 DeepSeek**。
 - 请求文本目前会短期存于设备本地 `$persistentStore`，逻辑到期不一定自动清除物理记录。
 - 只使用自己授权的 API Key，注意 API 配额与调用费用。
