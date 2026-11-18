@@ -2,7 +2,7 @@
 
 > 基于 [boitar/sair](https://github.com/boitar/sair) 协议研究的 **Shadowrocket / iPhone 本地安全实验项目**。
 >
-> **状态：v0.2.1-lab · Experimental / 未经过真实 iPhone 验收。**
+> **状态：v0.2.2-lab · Experimental / 未经过真实 iPhone 验收。**
 > 目前**不能保证**阻止全部 Apple 智能云端流量，也**不能保证** Siri 接受独立合成的 SSE；严禁将实验版宣传为已验证生产可用。
 
 [简体中文安装与证书指南](docs/CONFIGURATION_ZH.md) · [安全设计](docs/SECURITY_ZH.md) · [真机验收](docs/TEST_PLAN.md) · [架构与维护](docs/ARCHITECTURE_ZH.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
@@ -21,7 +21,7 @@
 - **无 ChatGPT 订阅接口**：ChatGPT Plus/Pro 不能作为本项目的通用 API Key；当前只适配 DeepSeek 独立 API Key。
 - **仓库公开**：公开代码不等于公开密钥。建议 Fork 或自行保管私有配置，**绝不向仓库提交真实密钥/CA 私钥**。
 
-## 仓库结构（v0.2.0-lab）
+## 仓库结构（v0.2.2-lab）
 
 维护性源码已拆分为清晰的独立模块；实际导入 Shadowrocket 的脚本仍然只有一个自动构建文件。
 
@@ -93,3 +93,12 @@ npm run check
 与上游 [boitar/sair](https://github.com/boitar/sair) 的关键区别：原版通过放行请求获得千问 SSE 骨架，再在 `http-response` 阶段替换内容；本安全版不允许原始请求透传千问，因此无法直接移植其双阶段方案。即使独立 mock 在 HTTP/HTTPS 中成功，同域 `REJECT` 仍可能阻止真实请求脚本触发。不要删除保护规则。
 
 诊断标记 `LOCAL_RESPONSE_ATTEMPTED` / `LOCAL_ERROR_ATTEMPTED` 发生在调用 `$done` 之前；`DONE_THROW` 表示 `$done` 同步抛错。**不存在可据此证明 Siri 收到回答的 `SUCCESS` 标记。**
+
+
+## 0.2.2-lab：真实流量安全门槛（阶段二）
+
+针对 Shadowrocket 2.2.93 的 A–B–A 真机观测：独立 HTTPS mock 能工作，同域 REJECT 命中后页面请求被拒绝，移除 REJECT 后 mock 恢复。**这只是冲突现象的证据，不能证明精确内部执行时序，也不能推断全设备或其他版本行为。**
+
+`src/config.js` 的 `providerEnabled: false` 是**发布安全闸**：即使请求匹配、Key 已配置，主脚本也只尝试返回 `AIES_NETWORK_ISOLATION_UNVERIFIED`，绝不调用 DeepSeek。它不具备网络层阻断能力，必须继续保留 `DOMAIN,prod-yabuli.qianwen.com,REJECT`。不要将它改为 `true` 来追求运行效果。
+
+`npm run check` 新增静态边界审查，拒绝删除阻断规则、误开模型调用或使用原始千问上游回包。这一阶段提供安全停止与证据记录机制，**不意味着已经实现无透传的 Siri 接管**。下一阶段必须寻找能独立证明“本地响应、零原始上游连接”同时成立的网络引擎；未通过验收，不发布 Siri→DeepSeek 可用版。详情见 [安全边界验证](docs/NETWORK_BOUNDARY_ZH.md)。
