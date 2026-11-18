@@ -1,6 +1,9 @@
 # iPhone / Shadowrocket 配置指南（简体中文）
 
-> 适用版本：v0.1.0-lab。**仅供测试；不是已验证的 Siri 可用版。** 本指南不要求越狱，不要求云服务器。最重要的是不要把 CA 私钥或真实 DeepSeek API Key 发给任何人，也不要提交到 GitHub。
+> **重要更新（2026-11-18）**：本文保留 CA / Key 技术背景及历史排障内容，但其中部分实验安装顺序已过时。请以 [当前安装规划](INSTALLATION_ROADMAP_ZH.md)、[实验矩阵](EXPERIMENT_MATRIX_ZH.md) 和 [项目现状](CURRENT_STATUS_ZH.md) 为准。当前**不要填写真实 DeepSeek API Key，不要尝试将 10 模块当作可用 Siri 方案**；先使用 00 阻断和 20/21 虚构域名探针。
+
+
+> 历史参考文档；当前仓库为 v0.4.0-lab。**仅供测试；不是已验证的 Siri 可用版。** 本指南不要求越狱，不要求云服务器。最重要的是不要把 CA 私钥或真实 DeepSeek API Key 发给任何人，也不要提交到 GitHub。
 
 ## 0. 准备工作
 
@@ -84,11 +87,11 @@ var key = 'REPLACE_WITH_YOUR_DEEPSEEK_API_KEY';
 ## 4. 实验模块接入（并非已验收的“安装成功”）
 
 1. 确认第一阶段 00 阻断生效，记录 Shadowrocket 日志。
-2. 将 \`scripts/sairs_router.js\` 放入 Shadowrocket 能识别的**本地脚本位置**。实验模块里 \`script-path=sairs_router.js\`，**文件名必须能被你的客户端解析**。没有确认本地路径之前，不要把它替换成随时可能变化的第三方远程脚本 URL。
+2. 将 \`scripts/sairs_router.js\` 放入 Shadowrocket 能识别的**本地脚本位置**。当前实验模块中为 \`script-path=Script/sairs_router.js\`，**文件名必须能被你的客户端解析**。没有确认本地路径之前，不要把它替换成随时可能变化的第三方远程脚本 URL。
 3. **不要同时启用 00 和 10 两个模块**。单独启用 \`10-SAIRS-DEEPSEEK-LAB.sgmodule\` 并核实其内的 REJECT 后备规则仍在。
 4. 仅针对需要的主机名启用 MITM，并按第 2 节生成/信任自己的 CA。
-5. 按第 3 节使用一枚临时、低额度 API Key 做测试。
-6. 观测是否有发往 \`api.deepseek.com\` 的 POST、是否确实**没有**向千问发出原始请求正文，以及 Siri 是否接受独立生成的 SSE。
+5. **当前版本禁止本步骤**：因 `providerEnabled:false` 且真实域名隔离未通过，暂时不要录入真实 Key。只有安全评审允许以后才能进行。
+6. **当前不进行真实 Siri/DeepSeek 联调**。先完成 [E0–E2](EXPERIMENT_MATRIX_ZH.md) 的无密钥测试；真实链路的出站监测、SSE 接受和故障演练都属于后续安全评审后的环节。
 7. **若只能看到 REJECT，或 Siri 无法显示回答：视为实验未通过。不要为了让功能可用而直接删除 REJECT 后备保护。** 不同 Shadowrocket 版本可能存在请求脚本与 REJECT 规则执行顺序差异。
 
 ## 5. 如何确认没有泄露？如何卸载？
@@ -124,6 +127,6 @@ var key = 'REPLACE_WITH_YOUR_DEEPSEEK_API_KEY';
 
 ## 8. 维护新版源码与生成安装脚本
 
-v0.2.0-lab 起，开发源码在 src/；Shadowrocket 实际执行的 scripts/sairs_router.js 由 tools/build.js 自动生成。维护时在电脑执行 npm run build 与 npm run check，并将源码与生成产物一并提交到 GitHub。无需在 iPhone 安装 Node.js。
+v0.2.0-lab 起（当前 v0.4.0-lab），开发源码在 src/；Shadowrocket 实际执行的 scripts/sairs_router.js 由 tools/build.js 自动生成。维护时在电脑执行 npm run build 与 npm run check，并将源码与生成产物一并提交到 GitHub。无需在 iPhone 安装 Node.js。
 
 参考 [架构与开发指南](ARCHITECTURE_ZH.md)。请不要因为 CI 通过就假定 iPhone 网络隔离、HTTPS 解密或 Siri SSE 已经通过实际验收。
