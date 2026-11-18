@@ -1,19 +1,11 @@
-# 贡献指南 / Contributing
+# Contributing / 贡献指南
 
-Apple Intelligence Exchange Secure (AIES) is an **unverified Shadowrocket lab**, not a production Siri replacement.
+该项目是安全优先的 Shadowrocket 实验，不是生产级 Siri 插件。
 
-## Ground rules
-
-1. Keep the matching Qwen REJECT safeguard until a real-device proof demonstrates strict isolation. A working model call without privacy isolation is not a pass.
-2. Do not submit a real DeepSeek API Key, certificate private key, CA backup, browser history, actual user prompts, or unredacted packet captures.
-3. Include sanitized reproduction steps and offline tests with all code changes. Specify iOS and Shadowrocket version for any device-validated claim.
-4. Avoid mutable remote JS URLs, public configuration endpoints, arbitrary model endpoints, and broad MITM rules.
-5. Retain the upstream MIT license and boitar attribution. See LICENSE and README.
-6. Report security concerns without sharing secrets or personal content.
-
-Run locally:
-
-    node --check scripts/sairs_router.js
-    node tests/node_harness.js
-
-The GitHub Actions workflow tests JavaScript-level behavior; it **does not** prove client rules, mock responses, or Siri SSE compatibility on iOS.
+1. 仅编辑 src/ 源码，不直接编辑 scripts/sairs_router.js（自动生成）。
+2. 在本地运行 npm run build 和 npm run check，源代码和生成脚本必须同时提交。
+3. 新功能必须加单元测试、负例测试和隐私风险说明。
+4. 不得用删除 REJECT、开启无鉴权面板或不受限 Endpoint 的方式换取可用性。
+5. 不得提交证书私钥、DeepSeek API Key、真实请求抓包及含个人信息日志。
+6. 保留 boitar/sair 原项目的 MIT 版权声明。
+7. 真机验证必须提供 iOS/Shadowrocket 版本、去敏证据和失败场景。

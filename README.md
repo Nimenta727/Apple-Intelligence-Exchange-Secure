@@ -2,10 +2,10 @@
 
 > 基于 [boitar/sair](https://github.com/boitar/sair) 协议研究的 **Shadowrocket / iPhone 本地安全实验项目**。
 >
-> **状态：v0.1.0-lab · Experimental / 未经过真实 iPhone 验收。**
+> **状态：v0.2.0-lab · Experimental / 未经过真实 iPhone 验收。**
 > 目前**不能保证**阻止全部 Apple 智能云端流量，也**不能保证** Siri 接受独立合成的 SSE；严禁将实验版宣传为已验证生产可用。
 
-[简体中文安装与证书指南](docs/CONFIGURATION_ZH.md) · [安全设计](docs/SECURITY_ZH.md) · [真机验收](docs/TEST_PLAN.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
+[简体中文安装与证书指南](docs/CONFIGURATION_ZH.md) · [安全设计](docs/SECURITY_ZH.md) · [真机验收](docs/TEST_PLAN.md) · [架构与维护](docs/ARCHITECTURE_ZH.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
 
 ## 项目简介
 
@@ -21,24 +21,24 @@
 - **无 ChatGPT 订阅接口**：ChatGPT Plus/Pro 不能作为本项目的通用 API Key；当前只适配 DeepSeek 独立 API Key。
 - **仓库公开**：公开代码不等于公开密钥。建议 Fork 或自行保管私有配置，**绝不向仓库提交真实密钥/CA 私钥**。
 
-## 仓库结构
+## 仓库结构（v0.2.0-lab）
 
-```text
-shadowrocket/
-  00-SAIRS-LOCKDOWN.sgmodule    # 独立阻断基线，无证书、无密钥
-  10-SAIRS-DEEPSEEK-LAB.sgmodule # 未验证的请求阶段 DeepSeek 实验
-scripts/
-  sairs_router.js               # 请求拦截、保守解析、DeepSeek 调用、候选 SSE
-  provision_key_ONCE.js         # 手动本地密钥初始化示例（仅含占位符）
-  clear_key_ONCE.js             # 本地密钥清除
-docs/
-  CONFIGURATION_ZH.md           # 证书、API Key、Shadowrocket 分步说明
-  SECURITY_ZH.md                # 威胁模型、限制和应急措施
-  TEST_PLAN.md                  # 真机验收与预期结果
-tests/
-  node_harness.js               # 无网络离线自动化测试
-LICENSE                         # 保留上游 MIT 版权和许可
-```
+维护性源码已拆分为清晰的独立模块；实际导入 Shadowrocket 的脚本仍然只有一个自动构建文件。
+
+    src/config.js             # 固定安全配置、模型和资源上限
+    src/request.js            # URL / 场景 / 文本协议校验
+    src/deepseek.js           # DeepSeek API 调用与响应校验
+    src/sse.js                # 实验性 SSE 格式生成
+    src/core.js               # 状态管理、超时与安全拒绝
+    src/entry.js              # Shadowrocket 运行时适配
+    tools/build.js            # 无依赖确定性构建
+    scripts/sairs_router.js   # 自动生成的单文件插件脚本
+    scripts/provision_key_ONCE.js / clear_key_ONCE.js
+    shadowrocket/             # 阻断模式与实验模式
+    tests/*.test.js           # Node 离线安全回归测试
+    docs/                     # 证书、架构、安全、验收指南
+
+请修改 src/ 后执行 npm run build；切勿只修改生成的 scripts/sairs_router.js。
 
 ## 最短部署路线
 
@@ -46,7 +46,7 @@ LICENSE                         # 保留上游 MIT 版权和许可
 2. **谨慎启用实验模式**：只有确认 Shadowrocket 当前版本支持本地 `script-path` 与请求阶段 mock response，才测试 `10-SAIRS-DEEPSEEK-LAB.sgmodule`。
 3. **本机自行生成 CA**：只为必要的目标主机启用 HTTPS 解密。**证书私钥不需要也不应填写到插件。**
 4. **DeepSeek API Key 本机初始化**：官方创建低额度专用 Key，按 [配置指南](docs/CONFIGURATION_ZH.md) 在本地执行一次初始化脚本，不把 Key 写入 GitHub、URL 或模块配置。
-5. **先运行检查再上真机**：`node --check scripts/sairs_router.js` 及 `node tests/node_harness.js`；按照 [测试计划](docs/TEST_PLAN.md) 观察网络连接和 Siri 行为。
+5. **先运行检查再上真机**：`npm run check` 及 `npm run check`；按照 [测试计划](docs/TEST_PLAN.md) 观察网络连接和 Siri 行为。
 
 **不可跳过的重要门槛**：LAB 模块中的 REJECT 规则可能在脚本之前生效，导致 DeepSeek 不会运行；移除 REJECT 则可能导致异常时原始请求透传。任何情况下，都不要为了“让 Siri 能回答”而牺牲千问隔离验证。
 
@@ -55,8 +55,8 @@ LICENSE                         # 保留上游 MIT 版权和许可
 需要 Node.js（只用于开发电脑上的离线测试；不需要在 iPhone 安装 Node）：
 
 ```bash
-node --check scripts/sairs_router.js
-node tests/node_harness.js
+npm run check
+npm run check
 ```
 
 ## 当前能力 / 未完成
@@ -77,3 +77,8 @@ node tests/node_harness.js
 ## 安全与开源声明
 
 本项目不是 Apple、Shadowrocket、DeepSeek、OpenAI 或原 SAIR 作者的官方产品。系统 HTTPS 解密会引入 CA 信任风险，请阅读 [安全文档](docs/SECURITY_ZH.md)。上游项目版权属于原作者 boitar，MIT License 要求保留原版权及许可文本。未经真实设备验证的能力不得标注为已完成。
+
+
+## 维护与持续优化
+
+第二轮重构将配置、解析、模型调用、SSE 与运行时状态机独立维护，并在 GitHub Actions 中检查生成脚本与源码完全一致。详细模块职责见 [架构与开发指南](docs/ARCHITECTURE_ZH.md)。这并不能取代真实 iPhone 的隔离与协议验收。

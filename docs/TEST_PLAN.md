@@ -33,3 +33,8 @@
 node --check scripts/sairs_router.js
 node tests/node_harness.js
 \`\`\`
+
+
+## 0.2.0-lab 额外回归与设备门槛
+
+Node 测试包括域名伪造、方法/场景白名单、无效内容类型、图片及未知结构、密钥缺失、上游异常、超时、迟到响应、重复回调以及 REJECT 配置校验。请额外在真机确认源脚本路径可解析、请求脚本与 REJECT 顺序、VPN 中断时的实际出站、生成 SSE 兼容性及 Wi-Fi/蜂窝切换行为。任何未通过项均须维持 LAB 未验收状态。
