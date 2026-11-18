@@ -7,7 +7,7 @@
 - 模块：shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule
 - 唯一运行脚本：scripts/aies_siri_deepseek_v06.js
 - 回归测试：tests/siri-deepseek-v06.test.js
-- 历史 40/50/P1 重复部署入口已从当前分支清理；旧研究仍可通过 Git 历史与 PR #9 查找。main 的旧实验架构保持未动，以免破坏既有安全基线。
+- 历史 40/50/P1 重复部署入口已从当前分支清理；旧研究仍可通过 Git 历史与 PR #9 查找。main 现在包含 v0.6 候选与保留的旧实验架构；旧 00 仍是互斥的阻断模式。
 
 ## 目标与请求链路
 
@@ -36,7 +36,7 @@
 
 ## 唯一安装入口
 
-https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/siri-deepseek-v0.6-clean/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule
+https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule
 
 ## 后续
 
