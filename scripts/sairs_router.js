@@ -223,7 +223,7 @@ function run(runtime) {
     if (timerId!==null && runtime.clearTimeout) {
       try { runtime.clearTimeout(timerId); } catch(e) {}
     }
-    trace(status===200 ? "LOCAL_RESPONSE_OK" : "LOCAL_RESPONSE_ERROR");
+    trace(status===200 ? "LOCAL_RESPONSE_ATTEMPTED" : "LOCAL_ERROR_ATTEMPTED");
     try {
       done({response:{status:status,headers:{
         "Content-Type":mime || "application/json; charset=utf-8",
@@ -252,10 +252,11 @@ function run(runtime) {
       fail(503,"KEY_NOT_PROVISIONED");return {started:false,reason:"KEY_NOT_PROVISIONED"};
     }
     if (!runtime.httpClient || typeof runtime.httpClient.post!=="function") {
+      trace("HTTP_CLIENT_MISSING");
       fail(503,"HTTP_CLIENT_MISSING");return {started:false,reason:"HTTP_CLIENT_MISSING"};
     }
     if (typeof runtime.setTimeout==="function") {
-      timerId=runtime.setTimeout(function(){fail(504,"UPSTREAM_TIMEOUT");},C.safetyTimeoutMillis);
+      timerId=runtime.setTimeout(function(){trace("UPSTREAM_TIMEOUT");fail(504,"UPSTREAM_TIMEOUT");},C.safetyTimeoutMillis);
     }
     trace("UPSTREAM_STARTED");
     Provider.callDeepSeek(runtime.httpClient,key.trim(),parsed,function(error,answer){
