@@ -29,3 +29,12 @@
 - 代码、模块路径、测试、安装文档、README_EN 与 CHANGELOG 同步更新。
 - 所有“通过”须区分 **离线模拟、Shadowrocket 实测、真实 Siri UI、DeepSeek API 真实调用、系统回退安全** 五类证据。
 - 不提交 API Key、CA 私钥、用户原话、完整 HTTP body、Authorization、Cookie 或可识别日志。
+
+## 实际操作与开发参考
+
+- [日常使用及首次启用](USER_GUIDE_ZH.md)：集中安装、Key 本机配置、使用边界与回滚。
+- [后续调试与错误码排查](DEBUGGING_ZH.md)：诊断顺序、固定日志标记、错误矩阵和脱敏反馈模板。
+- [v0.6 当前代码架构](ARCHITECTURE_CURRENT_ZH.md)：运行文件、双阶段流程、关联存储、SSE 和安全边界。
+- [升级、维护与发布操作](OPERATIONS_ZH.md)：本地命令、功能修改、版本 pin、测试与发布流程。
+
+上述四份是 v0.6 的实际操作手册，替代在旧历史文档里寻找安装/调试步骤。请先核实所安装的模块和脚本版本，任何 Siri 原生功能仍需要最终设备验收。
