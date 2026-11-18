@@ -21,7 +21,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 1. 备份当前 Shadowrocket 配置。设备上如存在**之前导入的同域 REJECT、旧接管脚本或其他冲突模块**，测试新模式时必须先停用。这些文件虽然已从仓库移除，但不会从设备上自动消失。
 2. Shadowrocket VPN 连接正常。本机生成并按当前 iOS 正规流程信任 Shadowrocket CA，MITM 只对 `prod-yabuli.qianwen.com` 生效。信任根 CA 有安全风险，测试结束后视需要撤销。
 3. 使用自己的 DeepSeek API Key。仅在设备本地支持执行脚本的情况下，复制 [provision_key_ONCE.js](../scripts/provision_key_ONCE.js) 到设备临时位置，将占位符替换为真实 Key，并在本地运行；Key 写入 `$persistentStore` 的 `SAIRS_DEEPSEEK_API_KEY`。执行后删除临时脚本。**绝不在 GitHub、聊天、URL、截图或日志中提交 Key**。
-4. **已知潜在阻塞**：当前运行脚本固定 `model: "deepseek-flash"`，其在 DeepSeek 官方 API 的可用性尚未被真机确认。此问题可能导致模型响应失败，需通过后续受审查的代码更新修复，不能简单归咎于安装错误。
+4. **API 联调状态**：脚本固定 `model: "deepseek-flash"`，此模型名已由 [DeepSeek 官方 API 文档](https://api-docs.deepseek.com/api/create-chat-completion/) 确认支持；但设备上的真实 API Key 调用、账户额度和响应验证仍未完成，不能把未联调误认为安装错误。
 5. 若 Shadowrocket 不提供经确认的本地脚本执行入口，**暂停配置 Key**，不要把它放入远程模块或其他不安全渠道。
 
 ## 第一次集中安装
