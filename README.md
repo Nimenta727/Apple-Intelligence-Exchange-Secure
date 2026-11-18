@@ -86,8 +86,10 @@ npm run check
 
 ## 0.2.1-lab 脚本诊断（仅阶段标记）
 
-本版在 Shadowrocket 支持 `console.log` 时记录 `[AIES_DIAG] ENTER`、`REQUEST_VALIDATED`、`REQUEST_REJECTED`、`KEY_MISSING`、`UPSTREAM_STARTED`、`UPSTREAM_OK`、`UPSTREAM_FAILED`、`LOCAL_RESPONSE_OK`、`LOCAL_RESPONSE_ERROR` 等固定标记。**不记录原始 URL、提问、回答、Authorization 或 API Key。** 日志出现 `LOCAL_RESPONSE_OK` 只说明已尝试调用 `$done({response})`，并不保证 Siri 已接受响应。
+本版在 Shadowrocket 支持 `console.log` 时记录 `[AIES_DIAG] ENTER`、`REQUEST_VALIDATED`、`REQUEST_REJECTED`、`KEY_MISSING`、`UPSTREAM_STARTED`、`UPSTREAM_OK`、`UPSTREAM_FAILED`、`LOCAL_RESPONSE_ATTEMPTED`、`LOCAL_ERROR_ATTEMPTED` 等固定标记。**不记录原始 URL、提问、回答、Authorization 或 API Key。** 日志出现 `LOCAL_RESPONSE_ATTEMPTED` 只说明已尝试调用 `$done({response})`，并不保证 Siri 已接受响应。
 
 **若连接日志只有 REJECT 且没有 `ENTER`**，支持请求未进入 JS 的诊断假设，但 `console.log` 不可用、客户端未显示脚本日志也会造成相同现象；不能单凭缺失日志证明严格执行顺序。
 
 与上游 [boitar/sair](https://github.com/boitar/sair) 的关键区别：原版通过放行请求获得千问 SSE 骨架，再在 `http-response` 阶段替换内容；本安全版不允许原始请求透传千问，因此无法直接移植其双阶段方案。即使独立 mock 在 HTTP/HTTPS 中成功，同域 `REJECT` 仍可能阻止真实请求脚本触发。不要删除保护规则。
+
+诊断标记 `LOCAL_RESPONSE_ATTEMPTED` / `LOCAL_ERROR_ATTEMPTED` 发生在调用 `$done` 之前；`DONE_THROW` 表示 `$done` 同步抛错。**不存在可据此证明 Siri 收到回答的 `SUCCESS` 标记。**
