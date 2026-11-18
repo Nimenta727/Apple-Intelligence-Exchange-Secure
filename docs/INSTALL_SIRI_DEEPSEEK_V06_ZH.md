@@ -14,12 +14,14 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 模块的 HTTP Request 和 Response 两条规则均使用同一个经过固定 Git SHA 引用的脚本。**不要把 GitHub 页面链接当作模块导入 URL**。
 
+**2026-11-19 诊断版升级：** 旧版在真实 Siri 请求捕获阶段返回 `ERROR_UNSUPPORTED_SIRI_REQUEST`。新模块已 pin 到修订脚本。已安装旧 60 的用户请**更新/重新导入模块并让 Shadowrocket 下载新的脚本**；无需重设本地 API Key 或 MITM CA。之后只记录 `REQUEST_DIAG_*` 和 `ERROR_*` 固定码；诊断版未证明 Siri 已修复。
+
 ## 安装前的安全准备
 
 1. 备份当前 Shadowrocket 配置。设备上如存在**之前导入的同域 REJECT、旧接管脚本或其他冲突模块**，测试新模式时必须先停用。这些文件虽然已从仓库移除，但不会从设备上自动消失。
 2. Shadowrocket VPN 连接正常。本机生成并按当前 iOS 正规流程信任 Shadowrocket CA，MITM 只对 `prod-yabuli.qianwen.com` 生效。信任根 CA 有安全风险，测试结束后视需要撤销。
 3. 使用自己的 DeepSeek API Key。仅在设备本地支持执行脚本的情况下，复制 [provision_key_ONCE.js](../scripts/provision_key_ONCE.js) 到设备临时位置，将占位符替换为真实 Key，并在本地运行；Key 写入 `$persistentStore` 的 `SAIRS_DEEPSEEK_API_KEY`。执行后删除临时脚本。**绝不在 GitHub、聊天、URL、截图或日志中提交 Key**。
-4. **已知潜在阻塞**：当前运行脚本固定 `model: "deepseek-flash"`，其在 DeepSeek 官方 API 的可用性尚未被真机确认。此问题可能导致模型响应失败，需通过后续受审查的代码更新修复，不能简单归咎于安装错误。
+4. **API 联调状态**：脚本固定 `model: "deepseek-flash"`，此模型名已由 [DeepSeek 官方 API 文档](https://api-docs.deepseek.com/api/create-chat-completion/) 确认支持；但设备上的真实 API Key 调用、账户额度和响应验证仍未完成，不能把未联调误认为安装错误。
 5. 若 Shadowrocket 不提供经确认的本地脚本执行入口，**暂停配置 Key**，不要把它放入远程模块或其他不安全渠道。
 
 ## 第一次集中安装

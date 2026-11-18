@@ -14,14 +14,14 @@
 
 1. 启用 60 模块并确认 VPN 已连接。
 2. 向 Siri 提一个非隐私的、答案容易核验的文本问题。
-3. 打开 Shadowrocket 日志，仅检查固定阶段码：`REQUEST_CAPTURED`、`DEEPSEEK_STARTED`、`DEEPSEEK_RESPONSE_ATTEMPTED` 或 `ERROR_*`；不要复制原始请求或响应。
+3. 打开 Shadowrocket 日志，仅检查固定阶段码：`REQUEST_CAPTURED`、`DEEPSEEK_STARTED`、`DEEPSEEK_RESPONSE_ATTEMPTED`、`REQUEST_DIAG_*` 或 `ERROR_*`；不要复制原始请求或响应。若出现 `REQUEST_DIAG_*`，参照[调试手册](DEBUGGING_ZH.md)查看原因；不需重新写入已确认有效的 Key。
 4. 查看 **Siri 原生界面**实际显示的文字。若为空、报错、千问回答或与当前问题不对应，记为未通过。
 5. 遇到错误按照 [调试手册](DEBUGGING_ZH.md) 分类，暂停测试；不需要重复无关的网络探针。
 
 ## 目前的能力边界
 
 - 只接受已知的 Siri 文本 POST 与 SSE 事件顺序；未知协议结构会导致失败。
-- DeepSeek 模型 `deepseek-flash` 尚未真实验证可用，因此 API 即使有有效 Key 也可能失败。
+- `deepseek-flash` 已获 DeepSeek 官方文档确认支持，但用户账户、真实 Key、网络/额度及实际 API 返回均尚未真机验证。
 - Shadowrocket 未运行、HTTPS MITM 未命中、网络切换、系统缓存和 Siri 原生回退都可能绕过替换逻辑；**不能保证最终显示内容始终来自 DeepSeek**。
 - 请求文本目前会短期存于设备本地 `$persistentStore`，逻辑到期不一定自动清除物理记录。
 - 只使用自己授权的 API Key，注意 API 配额与调用费用。

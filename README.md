@@ -2,10 +2,12 @@
 
 **让 Siri 原生界面尝试显示 DeepSeek 生成的文本回答。**
 
-> **v0.6.0-beta · 待真机验收**  
+> **v0.6.0-beta · 真机已观察请求钩子命中，端到端仍待验收**  
 > Shadowrocket 脚本及离线模拟测试已完成。真实 Siri SSE、原生界面接受情况、DeepSeek API 实际调用及系统级回退保护**尚未验证**。本项目不是 Apple、Shadowrocket 或 DeepSeek 的官方产品，也不是稳定版。
 
 [English](README_EN.md) · [安装](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [使用](docs/USER_GUIDE_ZH.md) · [调试](docs/DEBUGGING_ZH.md) · [文档中心](docs/README.md)
+
+> **2026-11-19 真机进展**：已观察 Siri POST 被 Request hook 拦截，但脚本返回 `ERROR_UNSUPPORTED_SIRI_REQUEST`，未到 DeepSeek 阶段。本次添加不记录敏感数据的 `REQUEST_DIAG_*` 分类、少量严格纯文本包装兼容和离线回归测试。**真实请求 JSON 格式仍未知，不能认定问题已解决。** 重新导入/刷新 60 模块才能使用新固定脚本，详见[调试文档](docs/DEBUGGING_ZH.md)。
 
 ## 项目目标
 
@@ -34,7 +36,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 4. 启用模块后只用非隐私的测试问题检查 **Siri 原生界面**，而不是根据脚本日志判定成功。
 5. 失败时立即停用模块，恢复备份配置。完整错误码和处理顺序见[调试手册](docs/DEBUGGING_ZH.md)。
 
-**重要兼容性提示**：当前运行脚本的模型标识为 `deepseek-flash`，尚未完成官方 API 可用性核实。即使模块安装成功，模型也可能返回错误；不能称为已经完成端到端适配。
+**重要兼容性提示**：当前运行脚本使用的 `deepseek-flash` 已列在 [DeepSeek 官方 Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/) 支持列表中，但用户账户的实际 API 调用、费用/额度和 Siri 端到端效果仍未验证。
 
 ## 工作原理
 

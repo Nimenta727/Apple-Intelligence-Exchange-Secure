@@ -25,7 +25,7 @@ Siri 文本请求
 |---|---|---|
 | 完全无 `[AIES_V06]` | Script/VPN/MITM 未运行或客户端走其他通路 | 检查模块和实际命中；不能宣称来源保证 |
 | `REQUEST_CAPTURED` 后停止 | Response hook 未运行或响应不可用 | 核对目标网络通路 |
-| `ERROR_UNSUPPORTED_SIRI_REQUEST` | JSON 或 Siri 文本场景不受支持 | 记录不支持，勿传请求正文 |
+| `ERROR_UNSUPPORTED_SIRI_REQUEST` | JSON 或 Siri 文本场景不受支持 | 查看紧邻的 `REQUEST_DIAG_*` 常量码，勿传请求正文 |
 | `ERROR_SESSION_STORE_UNAVAILABLE` | 缺少本地 store | 不用全局最近问题作为替代 |
 | `ERROR_ORIGINAL_RESPONSE_STATUS` | 上游 HTTP 状态不是 200 | 不调用 DeepSeek |
 | `ERROR_SSE_UNAVAILABLE` | body 不可读、分块、压缩或超限 | 停止，不能直接透传原文 |
@@ -34,9 +34,27 @@ Siri 文本请求
 | `ERROR_KEY_NOT_PROVISIONED` | 本地 Key 未写入 | 仅在设备本地配置，不粘贴到 URL |
 | `ERROR_HTTP_CLIENT_UNAVAILABLE` | 运行环境不支持 HTTP 请求 API | 记录环境版本 |
 | `ERROR_MODEL_NETWORK` / `ERROR_MODEL_TIMEOUT` | DeepSeek 网络或超时 | 检查网络和账户额度 |
-| `ERROR_MODEL_RESPONSE_INVALID` | 状态码/JSON/结束原因不符 | 重点检查 `deepseek-flash` 模型是否可用 |
+| `ERROR_MODEL_RESPONSE_INVALID` | 状态码/JSON/结束原因不符 | `deepseek-flash` 模型名官方已支持；检查实际账户、HTTP 状态和回复完整性 |
 | `ERROR_MODEL_EXCEPTION` / `DONE_EXCEPTION` | 运行时或回调异常 | 停止并核对固定脚本版本 |
 | `DEEPSEEK_RESPONSE_ATTEMPTED` 但原生 Siri 显示千问 | 客户端未接受替换、缓存或网络旁路 | 验收失败，不能标成功 |
+
+## 2026-11-19 真机请求解析专项
+
+已观察到 Siri 的 `POST /v1/sessions/responses` 进入 Shadowrocket 的 Request hook，但脚本返回 `ERROR_UNSUPPORTED_SIRI_REQUEST`。这**不代表** DeepSeek API 已调用，也没有证据说明请求 JSON 的具体结构；不能凭猜测放宽 Siri 场景白名单。
+
+本次更新在失败前只输出固定 `REQUEST_DIAG_*` 分类，不打印请求头、问题正文、原始 JSON 或令牌。
+
+| `REQUEST_DIAG_*` 后缀 | 解释 |
+|---|---|
+| `BODY_NOT_TEXT` / `BODY_EMPTY` / `BODY_OVERSIZE` | 请求正文不是可读字符串、为空或超限 |
+| `JSON_INVALID` / `ROOT_UNSUPPORTED` | JSON 无效或顶层不是对象 |
+| `GROUP_MISSING` / `GROUP_UNSUPPORTED` | 不存在或不属于允许的 `siri.tqa` / `siri_tqa` 组 |
+| `INPUT_UNSUPPORTED` | `input` 数组结构或数量不符合限制 |
+| `CONTENT_UNSUPPORTED` / `MEDIA_UNSUPPORTED` | 文本内容包装不支持或包含媒体 |
+| `PROMPT_EMPTY` / `PROMPT_OVERSIZE` | 提取后为空或超长 |
+| `STRUCTURE_UNSUPPORTED` | 其他复杂结构被拒绝 |
+
+**复测流程：** 备份配置，刷新或重新导入 60 模块使双钩子引用新固定 SHA，使用一个非隐私问题测试；只反馈 `REQUEST_DIAG_*`、`ERROR_*` 和 Siri 最终显示类型。没有新诊断码就先检查是否仍在运行旧版脚本。不要再发送完整 PacketTunnel 日志——真实日志可能含 Authorization 和私有访问令牌。若看到千问输出，视为来源验收失败并回滚。
 
 ## 后续验证
 

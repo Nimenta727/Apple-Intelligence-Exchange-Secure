@@ -52,12 +52,14 @@ Siri 原生 UI 是否接受：尚待真机验证
 | 部分 | 当前职责 |
 |---|---|
 | `C` | 固定 URL、模型、Key 名称、长度与超时 |
-| `parseRequest` | 严格提取支持的 Siri 文本输入 |
+| `rawRequest`、`parseRequest`、`textAtom` | 严格提取支持的 Siri 文本输入，只输出固定 `REQUEST_DIAG_*` 失败原因码 |
 | `randomToken`、`storeRead`、`storeWrite` | 每次请求关联与逻辑过期 |
 | `rewriteSse` | 已知事件检查和 DeepSeek 回答字段重建 |
 | `modelReply` | HTTP 200、完整结束原因、非空文本等校验 |
 | `done`、`error` | 一次性响应、超时与尝试 502 错误 |
 | `log` | 固定阶段日志，不主动输出问题和 Key |
+
+2026-11-19 真机实测只证明 HTTP Request hook 命中，随后 `ERROR_UNSUPPORTED_SIRI_REQUEST`；没有真实 JSON 结构证据。因此本次新增的 `textAtom` 只允许受限纯文本内容对象（含 `text.value`），不会放开 Siri 组名、媒体或任意嵌套结构。错误码不包含正文/请求头/Key。是否能适配真实 Siri 仍待下次脱敏复测。
 
 ## 风险边界
 
@@ -66,7 +68,7 @@ Siri 原生 UI 是否接受：尚待真机验证
 - 请求正文在本地 `$persistentStore` 中逻辑缓存约 45 秒；不代表安全擦除。`Math.random` token 也不应被视为密码学强随机凭据。
 - SSE 是基于现有合成事件结构编写，不保证真实流式/压缩的 Siri 接收。
 - 脚本处理失败尝试返回 502，但脚本完全缺席时无法阻止 Siri 的系统级回退。
-- `deepseek-flash` 需要官方 API 可用性核对，不应误称已验证。
+- DeepSeek 官方文档已列出 `deepseek-flash`，但真实账户调用及 Siri 端到端结果仍未验证。
 
 ## 修改原则
 

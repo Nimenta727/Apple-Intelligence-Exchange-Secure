@@ -2,9 +2,11 @@
 
 **Experimental DeepSeek-sourced answers in the native Siri interface, via Shadowrocket.**
 
-> **v0.6.0-beta — device validation pending.** Offline unit tests do not demonstrate real Siri compatibility, a successful live DeepSeek API call, or protection against operating-system fallback. Not affiliated with Apple, Shadowrocket, or DeepSeek.
+> **v0.6.0-beta — request hook observed, end-to-end validation pending.** Offline unit tests do not demonstrate real Siri compatibility, a successful live DeepSeek API call, or protection against operating-system fallback. Not affiliated with Apple, Shadowrocket, or DeepSeek.
 
 [中文](README.md) · [Install (Chinese)](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [Documentation](docs/README.md) · [Security](docs/SECURITY_CURRENT_ZH.md)
+
+> **2026-11-19 device observation:** The target Siri POST reached the HTTP request hook, but parsing failed with `ERROR_UNSUPPORTED_SIRI_REQUEST`. This update adds privacy-safe fixed `REQUEST_DIAG_*` codes and limited strict text-only envelope support. The real request JSON schema is still unknown; this does **not** establish working Siri responses. Refresh the 60 module to load the new pinned script.
 
 ## Purpose
 
@@ -22,7 +24,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 Follow the [installation and rollback guide](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) before enabling it. Back up your config, disable any existing conflicting same-host REJECT rules, provide your own DeepSeek API key **only on the device**, and verify HTTPS MITM is limited to the intended host. Use only nonsensitive Siri questions in testing.
 
-The current script specifies `deepseek-flash`; live availability of that model ID has **not been verified**. Do not interpret importing the module as proof of API compatibility.
+The `deepseek-flash` model ID is documented by the [official DeepSeek Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/), but real calls with the user's account and end-to-end Siri behavior remain **unverified**.
 
 ## Code layout
 

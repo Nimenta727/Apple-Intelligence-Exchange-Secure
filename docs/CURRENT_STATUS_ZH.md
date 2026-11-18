@@ -1,13 +1,15 @@
 # AIES v0.6 当前状态
 
-> **当前版本：v0.6.0-beta（`main`）。候选代码和离线回归已完成；真实 Siri UI 和实际 DeepSeek API 尚未验证。**
+> **当前版本：v0.6.0-beta（`main`）。2026-11-19 真机确认了 Siri 请求钩子命中，但解析失败；原生 UI、DeepSeek API 与响应替换尚未验证。**
+
+本次修订增加 `REQUEST_DIAG_*` 固定诊断码和受限纯文本包装兼容，但在缺少真实请求 JSON 结构的情况下**不能宣称已经修好 Siri**。不收集任何原始报文、私有令牌或真实问题；复测见[调试手册](DEBUGGING_ZH.md)。
 
 | 环节 | 现状 |
 |---|---|
 | 唯一 Shadowrocket 60 模块与双钩子 JS | 已编码 |
-| 文本识别、会话关联、SSE 重建 | 已编码、离线模拟通过 |
-| DeepSeek API 对接 | 已编码；模型 `deepseek-flash` 的实际可用性未核实 |
-| 请求/响应钩子在真实 Siri 上是否触发 | 未验证 |
+| 文本识别、会话关联、SSE 重建 | 离线模拟通过；真实请求解析遇到 `ERROR_UNSUPPORTED_SIRI_REQUEST` |
+| DeepSeek API 对接 | 代码已存在；`deepseek-flash` 官方模型名已核对，但真实 Key / 账户调用尚未实测 |
+| 请求/响应钩子在真实 Siri 上是否触发 | 2026-11-19 已观察 Request hook 命中；Response hook 尚未确认 |
 | Siri 原生界面是否接受重建 SSE | 未验证 |
 | 分块、压缩、超时、并发和快速连续提问 | 需真机验证 |
 | DeepSeek 失败时是否完全没有千问回退 | 脚本内部尝试阻止，系统级未证明 |
