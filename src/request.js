@@ -43,7 +43,7 @@ function parseBody(req) {
     if (!isPlainObject(value)) return false;
     // Text parts only; any other key indicating image/audio/file is rejected.
     var k = Object.keys(value);
-    if (k.some(function(x){return /image|audio|video|file|mime|tool|binary/i.test(x);})) return false;
+    if (k.some(function(x){return ["type","text","input_text","value"].indexOf(x) === -1;})) return false;
     var typ = value.type;
     if (typ && ["text","input_text"].indexOf(typ) < 0) return false;
     var content = typeof value.text === "string" ? value.text :

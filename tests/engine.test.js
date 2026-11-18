@@ -43,6 +43,11 @@ test("never echoes a key or persists user text",()=>{
   assert.ok(!JSON.stringify(a.responses).includes(KEY));
   assert.ok(!JSON.stringify(a.responses).includes("Authorization"));
 });
+test("invalid or oversized API keys never enter HTTP Authorization headers",()=>{
+  for(const key of ["line-one\nAuthorization: fake","space in key","a".repeat(300)]){
+    const a=mock({key});assert.equal(a.sent.length,0);assert.equal(status(a),503);
+  }
+});
 test("missing key and wrong path make no upstream request",()=>{
   for(const opts of [{key:""},{request:{...BASE,url:"https://prod-yabuli.qianwen.com/sair/config"}}]){
     const a=mock(opts);assert.equal(a.sent.length,0);assert.notEqual(status(a),200);

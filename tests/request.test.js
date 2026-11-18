@@ -52,6 +52,11 @@ test("rejects unrecognized content and multimodal payloads",()=>{
     assert.equal(parseBody(x).ok,false,JSON.stringify(part));
   }
 });
+test("rejects unknown fields hidden alongside text parts",()=>{
+  const a=req();const j=JSON.parse(a.body);
+  j.input[0].message.content[0].metadata={hidden:"value"};
+  a.body=JSON.stringify(j);assert.equal(parseBody(a).ok,false);
+});
 test("rejects excessive messages and prompts",()=>{
   const a=req("a".repeat(C.maxPromptChars+1));assert.equal(parseBody(a).ok,false);
   const b=req();const j=JSON.parse(b.body);

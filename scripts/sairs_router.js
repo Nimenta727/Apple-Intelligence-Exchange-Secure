@@ -70,7 +70,7 @@ function parseBody(req) {
     if (!isPlainObject(value)) return false;
     // Text parts only; any other key indicating image/audio/file is rejected.
     var k = Object.keys(value);
-    if (k.some(function(x){return /image|audio|video|file|mime|tool|binary/i.test(x);})) return false;
+    if (k.some(function(x){return ["type","text","input_text","value"].indexOf(x) === -1;})) return false;
     var typ = value.type;
     if (typ && ["text","input_text"].indexOf(typ) < 0) return false;
     var content = typeof value.text === "string" ? value.text :
@@ -235,7 +235,8 @@ function run(runtime) {
     if (!parsed.ok) {fail(422,parsed.code);return {started:false,reason:parsed.code};}
     var store=runtime.store;
     var key=store && typeof store.read==="function" ? store.read(C.keyName) : "";
-    if (typeof key!=="string" || key.trim().length<12 ||
+    if (typeof key!=="string" ||
+        !/^[A-Za-z0-9_-]{12,256}$/.test(key) ||
         /REPLACE_WITH|PLACEHOLDER/i.test(key)) {
       fail(503,"KEY_NOT_PROVISIONED");return {started:false,reason:"KEY_NOT_PROVISIONED"};
     }
