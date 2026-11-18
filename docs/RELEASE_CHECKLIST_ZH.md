@@ -30,3 +30,7 @@
 | 待测 | 待测 | 待测 | VPN/脚本缺席 | 不得宣称绝对来源保证 | 尚未运行 | 未运行 |
 
 严禁上传私密 Siri 提问、Key、证书私钥、完整 HTTP body 和带标识的网络原始记录。
+
+## 验收与维护的执行指引
+
+正式执行 R3–R6 时按照 [调试手册](DEBUGGING_ZH.md) 的分层日志与脱敏反馈进行；安装与回滚按照 [用户使用手册](USER_GUIDE_ZH.md) 执行；修复、重新固定模块脚本 SHA 和发布按 [维护操作流程](OPERATIONS_ZH.md) 执行。结构性风险见 [代码架构](ARCHITECTURE_CURRENT_ZH.md)。
