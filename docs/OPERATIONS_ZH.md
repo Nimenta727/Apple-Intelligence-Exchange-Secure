@@ -1,6 +1,6 @@
 # AIES 版本维护、升级与发布操作流程
 
-> 本文面向维护者。**v0.6 Clean Beta 仍是待真机验收的 Draft 候选**，不是已发布的生产版本；`main` 为旧 v0.4 实验基线。
+> 本文面向维护者。**v0.6 Clean Beta 仍是待真机验收的 Draft 候选**，不是已发布的生产版本；`main` 已包含 v0.6 Beta 候选和旧 v0.4 实验代码。
 
 ## 1. 日常开发循环
 
@@ -8,7 +8,7 @@
 git clone https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure.git
 cd Apple-Intelligence-Exchange-Secure
 git fetch origin
-git switch siri-deepseek-v0.6-clean
+git switch main
 npm run check
 npm run docs:check
 ```
@@ -44,8 +44,8 @@ npm run docs:check
 
 ## 4. 版本和发布策略
 
-- `main` 目前保存旧 v0.4 实验，不应未经批准直接合并全部 v0.6 代码并宣称稳定。
-- v0.6 开发分支与 Draft PR #10 是唯一活跃候选；旧 #7/#8/#9 已关闭但保留历史。
+- 用户已授权将 v0.6 整合进 `main`，但合入代码不是发布稳定版，不得据此宣称 Siri 真机验收通过。
+- v0.6 已进入 `main`；旧 #7/#8/#9 已关闭并保留历史；#10 是合并审计记录。
 - 功能/故障矩阵在 [发布验收表](RELEASE_CHECKLIST_ZH.md) 中记录真实观察；若 Siri 直接显示千问或模型无法调通，标记未通过、暂缓发布。
 - 只有按当前安全标准完成真机与来源回退验收，才决定发布 Tag / Release，并更新唯一现行安装入口。
 - 正式发行时锁定模块、运行脚本与文档到同一不可变版本；升级需保留可回滚的旧安装文件。
