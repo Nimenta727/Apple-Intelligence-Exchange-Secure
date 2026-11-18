@@ -1,47 +1,71 @@
 #!/usr/bin/env node
 "use strict";
-// Static docs/deployment hygiene. This is NOT a substitute for real Siri testing.
+// Current v0.6 repository hygiene checks. Not a real-device Siri test.
 const fs=require("node:fs"),path=require("node:path");
 const root=path.resolve(__dirname,"..");
-const skip=new Set([".git","node_modules"]);
-function files(dir) {
-  const out=[];
-  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
-    if(skip.has(entry.name))continue;
-    const p=path.join(dir,entry.name);
-    if(entry.isDirectory())out.push(...files(p));
-    else out.push(p);
-  }
-  return out;
+let failed=0,checked=0;
+function fail(msg){console.error("[AIES CHECK] "+msg);failed++;}
+function walk(dir){
+ let items=[];
+ for(const e of fs.readdirSync(dir,{withFileTypes:true})){
+  if(e.name===".git"||e.name==="node_modules")continue;
+  const p=path.join(dir,e.name);
+  items.push(...(e.isDirectory()?walk(p):[p]));
+ }
+ return items;
 }
-function fail(message){console.error("Docs/deployment check FAILED: "+message);process.exitCode=1;}
-const markdown=files(root).filter(x=>x.endsWith(".md"));
-let links=0;
-for(const source of markdown){
- const data=fs.readFileSync(source,"utf8");
- // Inline relative markdown links. External URLs and anchors are not local files.
- const re=/!?\[[^\]\n]*\]\(([^)\n]+)\)/g;
- for(const item of data.matchAll(re)){
-  const raw=item[1].trim().replace(/^<|>$/g,"");
-  const dest=raw.split(/\s+"/)[0].split("#")[0].split("?")[0];
-  if(!dest||/^(https?:|mailto:|data:|#)/i.test(dest))continue;
-  const target=path.resolve(path.dirname(source),decodeURIComponent(dest));
-  if(!target.startsWith(root+path.sep)) {fail(path.relative(root,source)+": link leaves repo: "+dest);continue;}
-  links++;
-  if(!fs.existsSync(target)) fail(path.relative(root,source)+": broken link "+dest);
+const relative=p=>path.relative(root,p).replace(/\\/g,"/");
+const all=walk(root),markdown=all.filter(p=>p.endsWith(".md"));
+for(const file of markdown){
+ const text=fs.readFileSync(file,"utf8");
+ for(const match of text.matchAll(/!?\[[^\]\n]*\]\(([^)\n]+)\)/g)){
+  const raw=match[1].trim().replace(/^<|>$/g,"");
+  const target=raw.split(/\s+"/)[0].split("#")[0].split("?")[0];
+  if(!target||/^(?:https?:|mailto:|data:)/i.test(target))continue;
+  let resolved;
+  try{resolved=path.resolve(path.dirname(file),decodeURIComponent(target));}
+  catch(e){fail(relative(file)+" invalid link encoding: "+target);continue;}
+  checked++;
+  if(!resolved.startsWith(root+path.sep)||!fs.existsSync(resolved))
+   fail(relative(file)+" broken relative link: "+target);
  }
 }
-const modulePath=path.join(root,"shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule");
-const scriptPath=path.join(root,"scripts/aies_siri_deepseek_v06.js");
-const moduleText=fs.readFileSync(modulePath,"utf8");
-const deployed=fs.readFileSync(scriptPath,"utf8");
+const activeNames=[
+ "README.md","README_EN.md","CHANGELOG.md","CONTRIBUTING.md",
+ "docs/README.md","docs/CURRENT_STATUS_ZH.md","docs/ISSUES_AND_DECISIONS_ZH.md",
+ "docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md","docs/USER_GUIDE_ZH.md",
+ "docs/DEBUGGING_ZH.md","docs/ARCHITECTURE_CURRENT_ZH.md",
+ "docs/OPERATIONS_ZH.md","docs/SECURITY_CURRENT_ZH.md",
+ "docs/RELEASE_CHECKLIST_ZH.md",
+ "scripts/aies_siri_deepseek_v06.js","scripts/provision_key_ONCE.js",
+ "scripts/clear_key_ONCE.js","shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule",
+ "tests/siri-deepseek-v06.test.js","tests/fixtures/siri-sse.js"
+];
+for(const item of activeNames)if(!fs.existsSync(path.join(root,item)))fail("missing active file: "+item);
+const obsolete=["src","docs/history","docs/MAINTENANCE_ZH.md","docs/PROJECT_HANDOFF_ZH.md",
+ "docs/SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md",
+ "scripts/sairs_router.js","scripts/aies_boundary_probe.js",
+ "tools/build.js","tools/check-boundary.js","tools/evaluate-boundary.js"];
+for(const file of obsolete)if(fs.existsSync(path.join(root,file)))fail("obsolete file still tracked: "+file);
+const modules=all.filter(x=>x.endsWith(".sgmodule")).map(relative);
+if(modules.length!==1||modules[0]!=="shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule")
+ fail("expected exactly one current .sgmodule, got "+modules.join(","));
+const scripts=all.filter(x=>relative(x).startsWith("scripts/")&&x.endsWith(".js")).map(relative);
+if(scripts.length!==3)fail("expected runtime and two local Key scripts only: "+scripts.join(","));
+const tests=all.filter(x=>relative(x).startsWith("tests/")&&x.endsWith(".test.js")).map(relative);
+if(tests.length!==1||tests[0]!=="tests/siri-deepseek-v06.test.js")fail("obsolete unit tests present: "+tests.join(","));
+const moduleText=fs.readFileSync(path.join(root,"shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");
+const js=fs.readFileSync(path.join(root,"scripts/aies_siri_deepseek_v06.js"),"utf8");
 const hooks=moduleText.match(/^AIES60 .+type=http-(?:request|response).+script-path=.+$/gm)||[];
 if(hooks.length!==2||!hooks.some(x=>x.includes("type=http-request"))||
- !hooks.some(x=>x.includes("type=http-response")))fail("v0.6 must have exactly two scoped hooks");
-const urls=hooks.map(x=>(x.match(/script-path=(https:\/\/\S+)/)||[])[1]);
-if(urls.length!==2||!urls[0]||urls[0]!==urls[1])fail("v0.6 hooks must share one script URL");
-if(urls.some(x=>!/^https:\/\/raw\.githubusercontent\.com\/Nimenta727\/Apple-Intelligence-Exchange-Secure\/[0-9a-f]{40}\/scripts\/aies_siri_deepseek_v06\.js$/.test(x)))fail("v0.6 script must be pinned to full commit SHA");
-if(!deployed.includes('version:"0.6.0-beta"'))fail("v0.6 deployed version identifier absent");
-if(/DOMAIN,prod-yabuli\.qianwen\.com,REJECT/.test(moduleText))fail("v0.6 rewrite module must not accidentally contain legacy REJECT");
-if(/api_key=|Authorization:\s*Bearer\s+(?!["']?\+)/i.test(moduleText))fail("sensitive configuration detected in v0.6 module");
-if(!process.exitCode)console.log("Docs/deployment hygiene OK: "+markdown.length+" Markdown files, "+links+" relative links, two pinned hooks.");
+ !hooks.some(x=>x.includes("type=http-response")))fail("require one request and one response hook");
+const urls=hooks.map(x=>x.match(/script-path=(https:\/\/\S+)/)?.[1]);
+if(urls.length!==2||!urls[0]||urls[0]!==urls[1])fail("both hooks must share exactly one version-pinned script");
+if(urls.some(x=>!/^https:\/\/raw\.githubusercontent\.com\/Nimenta727\/Apple-Intelligence-Exchange-Secure\/[0-9a-f]{40}\/scripts\/aies_siri_deepseek_v06\.js$/.test(x)))
+ fail("runtime URL must be pinned to a full immutable commit");
+if(!js.includes('version:"0.6.0-beta"'))fail("script version mismatch");
+if(!fs.readFileSync(path.join(root,"README.md"),"utf8").includes("v0.6.0-beta"))fail("README lacks current version");
+if(/DOMAIN,prod-yabuli\.qianwen\.com,REJECT/.test(moduleText))fail("conflicting reject rule in current module");
+if(/api_key=|Authorization:\s*Bearer\s+(?!["']?\+)/i.test(moduleText))fail("sensitive config in module");
+if(failed)process.exit(1);
+console.log("AIES v0.6 checks passed: "+markdown.length+" Markdown files, "+checked+" links, one current module, pinned dual hooks.");

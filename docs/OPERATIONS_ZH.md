@@ -1,65 +1,50 @@
-# AIES 版本维护、升级与发布操作流程
+# AIES v0.6 维护、升级与发布流程
 
-> 本文面向维护者。**v0.6 Clean Beta 仍是待真机验收的 Draft 候选**，不是已发布的生产版本；`main` 已包含 v0.6 Beta 候选和旧 v0.4 实验代码。
+> `main` 仅维护当前 v0.6 Beta 实验路线；未完成的 Siri 真机验收与来源保证不得因合并代码而标记通过。
 
-## 1. 日常开发循环
+## 日常开发
 
 ```bash
 git clone https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure.git
 cd Apple-Intelligence-Exchange-Secure
-git fetch origin
 git switch main
 npm run check
 npm run docs:check
 ```
 
-必须使用适合项目 `package.json` 的 Node 版本（声明 Node >=20；CI 当前使用 Node 22）。不通过用删除测试解决 CI 失败。
+需要 Node.js 20 或更高版本；CI 当前使用 Node 22。**不需要旧式 build/bundle 生成步骤**。
 
-代码与文档职责：
-- 运行逻辑：`scripts/aies_siri_deepseek_v06.js`。
-- 模块：`shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule`。
-- 自动测试：`tests/siri-deepseek-v06.test.js`。
-- 文档：`docs/` 与根目录 README / README_EN / CHANGELOG / CONTRIBUTING。
-- 旧研究：`src/`、`tools/build.js` 和 `scripts/sairs_router.js`，仅改旧研究时运行 `npm run build` 重新生成。
+维护文件：
+- `scripts/aies_siri_deepseek_v06.js` — 唯一运行脚本。
+- `shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule` — 唯一模块。
+- `tests/siri-deepseek-v06.test.js` 与 `tests/fixtures/siri-sse.js` — 纯模拟回归，不代表真实 Siri。
+- `tools/check-docs.js` — 文档链接、部署钩子、版本与冗余文件检查。
+- 根目录 README、CHANGELOG、CONTRIBUTING 与 `docs/` — 现行文档。
 
-## 2. 修改脚本后的正确顺序
+## 改动与回归步骤
 
-1. 从候选基准创建新功能分支。限制变更范围，新增或更新至少一个正常测试与一个相关失败/安全测试。
-2. 先在 JS 与模拟测试中修改行为；检查是否把用户问题、模型回复、Key、Authorization 或原始 SSE 记录到控制台。
-3. `npm run check` 和 `npm run docs:check` 必须通过；包含旧 REJECT 静态规则和文档引用检查。
-4. **固定提交再更新模块**：先提交已审查的 JS，并取得真实 40 位 commit SHA；将 60 模块中 Request 和 Response 两条 `script-path` 都更新为该 SHA；再提交更新后的模块并重新跑 CI。绝不能用随分支漂移的脚本链接替换固定 pin。
-5. 如果模块跟随新提交而变化，检查本地 Shadowrocket 导入版本与实际远端脚本匹配。不要只更新 README 版本号。
-6. 同步 README、README_EN、CHANGELOG、安装/架构/安全/调试/维护/发布核对表。
-7. 真机仅用非隐私问题做最终集中验收，记录操作系统和 Shadowrocket 版本、是否命中钩子、客户端显示、失败来源和回滚结果。
+1. 从 `main` 创建开发分支；明确当前修改解决的错误码和验收前提。
+2. 修改运行脚本时一并补充正向和失败测试，禁止将真实问题、Authorization 或 Key 写进测试 fixture。
+3. `npm run check` 检查语法、自动测试与文档/安装文件一致性；对安全扫描出现的异常必须修复，不能关掉检查。
+4. **固定脚本版本**：先提交已测试的 JS，获得真实 40 位提交 SHA；将模块的 Request 和 Response 两条 `script-path` 都修改为该提交，再跑 CI 并提交模块。
+5. 同步更新中英文 README、CHANGELOG、安装、调试、安全与发布记录；版本说明只写真正得到证据的功能。
+6. 真实设备用非隐私问题验收，记录 Shadowrocket / OS 版本和脱敏错误码。没有设备证据就保持 Beta。
 
-## 3. 可执行的审查清单
+## 代码审查重点
 
-- URL 白名单未放宽、仅支持 Siri 文本 POST；MITM Host 没有扩大。
-- Key 不在 URL、源码常量、日志或公共配置；本地清理脚本不打印 Key。
-- 原始千问正文在解析失败时不会被脚本成功返回；未知 SSE 必须安全报错。
-- 异步回调至多一次；超时、网络错误、非法 model reply、并发错配被覆盖。
-- 持久化问题是否可以减少，是否有过期清除和崩溃后残留。
-- 新模型名来自官方信息且当前账户权限已在本机验证。
-- 不以单次正常 Siri 输出推断 VPN 失效后的来源保证。
+- 固定 URL/path、方法、Siri 文本类型，未知 SSE 不透传千问。
+- DeepSeek API 仅访问固定 HTTPS 地址；Key 只在设备本地，不写日志或远端配置。
+- 超时、HTTP 错误、异常与重复回调只能尝试安全失败；不要增加自动千问回退。
+- 每次请求关联必须避免串话；注意目前 `$persistentStore` 中问题原文可能残留。
+- 现有 `deepseek-flash` 模型标识需要用官方信息和真实 API 核验。
+- 系统级绕过不受脚本控制，不得宣传无条件 DeepSeek-only。
 
-## 4. 版本和发布策略
+## 发布与升级纪律
 
-- 用户已授权将 v0.6 整合进 `main`，但合入代码不是发布稳定版，不得据此宣称 Siri 真机验收通过。
-- v0.6 已进入 `main`；旧 #7/#8/#9 已关闭并保留历史；#10 是合并审计记录。
-- 功能/故障矩阵在 [发布验收表](RELEASE_CHECKLIST_ZH.md) 中记录真实观察；若 Siri 直接显示千问或模型无法调通，标记未通过、暂缓发布。
-- 只有按当前安全标准完成真机与来源回退验收，才决定发布 Tag / Release，并更新唯一现行安装入口。
-- 正式发行时锁定模块、运行脚本与文档到同一不可变版本；升级需保留可回滚的旧安装文件。
+- 通过 [发布验收表](RELEASE_CHECKLIST_ZH.md) 才能考虑稳定版；合并 `main` 不是发布证明。
+- 任何正式发布须锁定安装模块、脚本 commit、说明文档与测试结果；提供回滚方式。
+- 避免直接覆盖运行中的远程脚本，以免用户安装配置在不知情情况下改变。
+- 每次修复后保留当前模块原件的可回滚来源；不能泄露真实 Siri 问题及网络抓包。
+- 如果脚本未运行就会直接返回千问，必须在文档中明确此系统级限制。
 
-## 5. 发生故障时维护者怎么处理
-
-1. 立即区分宿主钩子没执行、SSE 格式不符、DeepSeek 认证/网络、Siri 不接受输出。
-2. 只收集固定阶段码、版本、请求是否命中、原生界面结果；**不请求用户上传真实问题或完整响应**。
-3. 优先编写合成 fixture 重现，再修订解析/错误处理，禁止直接把千问原文透传当作“兼容性修复”。
-4. 修复版本走独立提交和 pinned script 更新，保留旧配置回滚路径。
-5. 更新 [当前状态](CURRENT_STATUS_ZH.md)、[问题台账](ISSUES_AND_DECISIONS_ZH.md)、CHANGELOG 与 [调试手册](DEBUGGING_ZH.md)，防止相同故障被反复测试。
-
-## 6. 定期维护建议
-
-每次修改前检查最新 PR、CI 结果、文档链接、API 模型 ID 可用性与脚本 SHA。每次发布候选后检查测试覆盖、日志敏感性、模块冲突和是否存在用户上下文留存。维护记录只写可核实事实，不把计划写成已经完成的功能。
-
-[代码结构](ARCHITECTURE_CURRENT_ZH.md) · [安装使用](USER_GUIDE_ZH.md) · [调试](DEBUGGING_ZH.md) · [安全](SECURITY_CURRENT_ZH.md)。
+参考 [架构](ARCHITECTURE_CURRENT_ZH.md)、[调试](DEBUGGING_ZH.md)、[安全](SECURITY_CURRENT_ZH.md)。

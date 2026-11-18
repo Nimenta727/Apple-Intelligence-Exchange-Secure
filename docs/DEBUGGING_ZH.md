@@ -1,76 +1,58 @@
-# AIES v0.6 后续调试与故障排查手册
+# AIES v0.6 调试与错误码
 
-> 目标：**一次集中、可回滚的真机验收**，不再要求重复旧 30/31/40 Safari 探针。所有记录必须脱敏；不要上传真实 Siri 问题、DeepSeek Key、原始 SSE 或完整 HTTP 报文。离线 CI 通过不代表真实 Siri 可以响应。
+> 仅用于受控 Beta 真机测试。不要上传真实问题、API Key、Authorization、完整 SSE、CA 私钥或抓包。日志不是 Siri 客户端成功显示的证据。
 
-## 1. 诊断分层：先定位在哪一环节失败
-
-```text
-Siri 发起请求
-   ↓
-Shadowrocket HTTP Request hook [AIES_V06] REQUEST_CAPTURED
-   ↓ 原请求可发千问（这是用户接受的新目标）
-千问返回候选 SSE → HTTP Response hook
-   ↓ 校验状态、会话上下文与 SSE
-[AIES_V06] DEEPSEEK_STARTED
-   ↓ 固定 DeepSeek API、设备本地 Key
-[AIES_V06] DEEPSEEK_RESPONSE_ATTEMPTED
-   ↓ 尝试替换 $response.body
-Siri 原生 UI 实际展示 → 只有这一层才能最终验证
-```
-
-每个日志标签只是**脚本行为证据**，不等于上一层或下一层已成功。查看日志只关注固定 `[AIES_V06]` 阶段码和有无对应请求命中，避免展示请求头、正文和响应内容。
-
-## 2. 第一次完整测试的推荐流程
-
-1. 记录软件版本、模块版本、固定运行脚本 SHA、VPN 和 MITM 是否启用。备份旧配置。
-2. 在本机配置已授权的低风险 DeepSeek API Key，明确原问题可能被千问与 DeepSeek 同时处理。
-3. 启用 60 并停用旧 00/10/20/21/30/31/40/50，确认无重复接管规则。
-4. 发出一个**非隐私** Siri 文本问答。记下是否有 `REQUEST_CAPTURED`、`DEEPSEEK_STARTED`、`DEEPSEEK_RESPONSE_ATTEMPTED` 或 `ERROR_*`，再记录 Siri 原生界面最终展示“DeepSeek/千问/无内容/系统错误/未知”。
-5. 如果成功，只能记“正常路径一次通过”；继续做来源与回退故障验收之前，不能宣布产品已满足“答案一定来自 DeepSeek”。
-6. 如果失败，**不重复无目的切换规则**，先对照下面的分支定位；若多次出现回退千问或私人信息风险，停止并恢复旧配置。
-
-## 3. 错误码与处理矩阵
-
-| 固定日志或症状 | 可能阶段 | 优先检查 | 预期处理 |
-|---|---|---|---|
-| 完全没有 `[AIES_V06]` | 宿主钩子未运行 | 模块导入、VPN、MITM Host、脚本下载、目标路径和版本 | 记为宿主未验证；不得声称不回退千问 |
-| `REQUEST_CAPTURED`，无模型阶段 | 请求已捕获，响应钩子或预检未完成 | 是否存在对应响应阶段、原 SSE 状态与压缩/流式可见性 | 记录错误码；不得主动修改为千问透传 |
-| `ERROR_UNSUPPORTED_SIRI_REQUEST` | 请求解析 | 仅支持固定 Siri 文本 POST、`siri.tqa` 或 `siri_tqa` 配置 | 记不支持，勿提交原始 body |
-| `ERROR_SESSION_STORE_UNAVAILABLE` | 会话存储 | Shadowrocket 是否暴露 `$persistentStore.write` | 禁止绕过存储直接全局复用最近问题 |
-| `ERROR_ORIGINAL_RESPONSE_STATUS` | 千问响应状态 | 本次原响应是否为 HTTP 200 | 不调用 DeepSeek，保留错误结果 |
-| `ERROR_SSE_UNAVAILABLE` | 响应体 | `$response.body` 是否可读、上限/流式/压缩限制 | 不通过强行放行原 SSE 来绕过 |
-| `ERROR_PROMPT_UNAVAILABLE` / `ERROR_CORRELATION_MISMATCH` | 关联 | `X-AIES-Request-ID` 是否跨两钩子可见；`$request.body` 是否仍可读 | 不以全局最近提问补救 |
-| `ERROR_SSE_REWRITE_UNSUPPORTED` | 协议 | SSE 事件数量/顺序/字段和已支持版本是否一致 | 需要脱敏结构分析，不上传响应正文 |
-| `ERROR_KEY_NOT_PROVISIONED` | 认证准备 | 本地 Key 键名、脚本执行成功与否 | 不把 Key 粘贴进 module 或 URL |
-| `ERROR_HTTP_CLIENT_UNAVAILABLE` | 宿主 API | 当前运行环境是否支持 `$httpClient.post` | 记录环境差异，不假定跨版本兼容 |
-| `ERROR_MODEL_NETWORK` / `ERROR_MODEL_TIMEOUT` | DeepSeek 网络 | HTTPS、网络连接、端点与超时 | 失败而非回退千问；必要时停止测试 |
-| `ERROR_MODEL_RESPONSE_INVALID` | DeepSeek 返回 | HTTP 非 200、模型 ID、`finish_reason`、回答为空或超长 | 核对官方模型名称与账户权限，**勿上传原始响应** |
-| `ERROR_MODEL_EXCEPTION` / `DONE_EXCEPTION` | 脚本内部或宿主调用 | 固定版本、运行时语法和异常路径 | 停止测试；可能存在未被改写的原生回退 |
-| `DEEPSEEK_RESPONSE_ATTEMPTED` 但 Siri 仍显示千问 | 客户端/钩子边界 | Response rewrite 是否被 Siri 接受、是否存在别的连接/缓存 | **产品验收失败**，不是成功 |
-
-`ERROR_*` 的 502 是**尝试替换响应**，不保证系统不显示千问。当前脚本没有设置“绝对禁止系统回退”的能力。
-
-## 4. 最小故障注入与来源验证
-
-只有正常链路成功之后才考虑（不要为了制造错误把私人问题发送千问）：
-- 删除/清除本地测试 Key 或使用专用测试 Key 的可撤销配置，观察是否出现千问回答。
-- 有限次数的 DeepSeek 网络错误/超时路径；预期脚本错误，而不是混合或千问 AI 文本。
-- 两个非隐私问题连续/快速提出，核对没有交叉答案。
-- VPN 断开、MITM 关闭或脚本缺席属于**宿主无法保证**的路径，不建议为了验证而持续在无保护状态下提敏感问题；如果 Siri 展示千问，即说明“任何时候只显示 DeepSeek”不成立。
-- 结构变化、分块与压缩问题应优先用离线合成数据，在得到脱敏字段结构之前不得增加盲目透传容错。
-
-## 5. 提交 Bug 前的信息格式
+## 定位顺序
 
 ```text
-AIES version: v0.6 Clean Beta
-Script commit: b143280fe95e85fec197366afd735f1d46359e39
-OS / Shadowrocket version: （只填版本）
-Enabled modules: 60 on; 00/10/20/21/30/31/40/50 off
-Hook result: REQUEST_CAPTURED / DEEPSEEK_STARTED / ERROR_CODE / no log
-Native Siri output: DeepSeek / Qwen / none / error / unknown
-Repro frequency: 1/1 or N/M (仅计数)
-Rollback: yes/no
-Secrets / raw prompts / headers / SSE: NOT INCLUDED
+Siri 文本请求
+  → [AIES_V06] REQUEST_CAPTURED
+  → 上游响应 SSE 结构检查
+  → [AIES_V06] DEEPSEEK_STARTED
+  → DeepSeek 官方 API
+  → [AIES_V06] DEEPSEEK_RESPONSE_ATTEMPTED
+  → Siri 原生界面实际显示
 ```
 
-参阅：[用户使用](USER_GUIDE_ZH.md) · [源码架构](ARCHITECTURE_CURRENT_ZH.md) · [发布核对表](RELEASE_CHECKLIST_ZH.md)。
+1. 记录操作系统、Shadowrocket 和 AIES 版本；确认 VPN、MITM、60 模块均开启，设备上无其他同域冲突规则。
+2. 用非隐私文本问 Siri 一次，记录固定日志阶段和最终显示类别：DeepSeek / 千问 / 空 / 错误 / 不明。
+3. 如果显示千问或混合内容，视为产品来源验收失败，停止测试、关闭模块并恢复备份配置。
+4. 只向开发者反馈错误码与版本，不分享敏感请求或完整响应。
+
+## 错误定位表
+
+| 阶段/错误码 | 含义 | 优先措施 |
+|---|---|---|
+| 完全无 `[AIES_V06]` | Script/VPN/MITM 未运行或客户端走其他通路 | 检查模块和实际命中；不能宣称来源保证 |
+| `REQUEST_CAPTURED` 后停止 | Response hook 未运行或响应不可用 | 核对目标网络通路 |
+| `ERROR_UNSUPPORTED_SIRI_REQUEST` | JSON 或 Siri 文本场景不受支持 | 记录不支持，勿传请求正文 |
+| `ERROR_SESSION_STORE_UNAVAILABLE` | 缺少本地 store | 不用全局最近问题作为替代 |
+| `ERROR_ORIGINAL_RESPONSE_STATUS` | 上游 HTTP 状态不是 200 | 不调用 DeepSeek |
+| `ERROR_SSE_UNAVAILABLE` | body 不可读、分块、压缩或超限 | 停止，不能直接透传原文 |
+| `ERROR_PROMPT_UNAVAILABLE` / `ERROR_CORRELATION_MISMATCH` | 请求响应无法对应或串话风险 | 核对跨钩子 token 和请求体可见性 |
+| `ERROR_SSE_REWRITE_UNSUPPORTED` | 事件顺序/结构不符合已知模型 | 使用合成 fixture 定位，不传真实 SSE |
+| `ERROR_KEY_NOT_PROVISIONED` | 本地 Key 未写入 | 仅在设备本地配置，不粘贴到 URL |
+| `ERROR_HTTP_CLIENT_UNAVAILABLE` | 运行环境不支持 HTTP 请求 API | 记录环境版本 |
+| `ERROR_MODEL_NETWORK` / `ERROR_MODEL_TIMEOUT` | DeepSeek 网络或超时 | 检查网络和账户额度 |
+| `ERROR_MODEL_RESPONSE_INVALID` | 状态码/JSON/结束原因不符 | 重点检查 `deepseek-flash` 模型是否可用 |
+| `ERROR_MODEL_EXCEPTION` / `DONE_EXCEPTION` | 运行时或回调异常 | 停止并核对固定脚本版本 |
+| `DEEPSEEK_RESPONSE_ATTEMPTED` 但原生 Siri 显示千问 | 客户端未接受替换、缓存或网络旁路 | 验收失败，不能标成功 |
+
+## 后续验证
+
+只有正常显示可确认时，才使用非隐私文本检查失败路径、重复请求、网络切换和脚本缺席时是否发生千问回退。脚本错误处理不等于系统级控制能力。
+
+## 脱敏报告模板
+
+```text
+AIES: v0.6.0-beta
+OS / Shadowrocket: 仅版本号
+模块和 VPN/MITM: on / off / unknown
+日志阶段: REQUEST_CAPTURED / DEEPSEEK_STARTED / ERROR_XXX / none
+Siri 结果: DeepSeek / Qwen / empty / error / unknown
+复现次数: N/M
+已恢复原配置: yes/no
+附带凭据、headers、真实问题或 SSE: NO
+```
+
+参阅 [安装](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [架构](ARCHITECTURE_CURRENT_ZH.md) · [安全](SECURITY_CURRENT_ZH.md)。
