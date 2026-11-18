@@ -17,3 +17,10 @@
 ## 发布规则
 
 在 P4 真机来源失败矩阵和 P5 重构审查完成前，PR 保持 Draft / Experimental。不能为了 CI 绿灯删除测试、扩大 MITM 或宣称已完成真实 Siri 验收。参见[发布核对表](docs/RELEASE_CHECKLIST_ZH.md)。
+
+## 后续操作资料（v0.6）
+
+- [首次使用及集中验收](docs/USER_GUIDE_ZH.md)
+- [真机调试、错误码和脱敏反馈](docs/DEBUGGING_ZH.md)
+- [当前脚本结构和双阶段数据流](docs/ARCHITECTURE_CURRENT_ZH.md)
+- [升级、维护、版本 pin 和发布流程](docs/OPERATIONS_ZH.md)
