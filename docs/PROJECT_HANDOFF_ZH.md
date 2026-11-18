@@ -40,3 +40,10 @@
 ## 工作入口
 
 [当前状态](CURRENT_STATUS_ZH.md) · [v0.6 安装](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全](SECURITY_CURRENT_ZH.md) · [项目计划](SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md) · [维护](MAINTENANCE_ZH.md) · [发布核对表](RELEASE_CHECKLIST_ZH.md) · [决策台账](ISSUES_AND_DECISIONS_ZH.md)。
+
+## 后续操作资料（v0.6）
+
+- [首次使用及集中验收](USER_GUIDE_ZH.md)
+- [真机调试、错误码和脱敏反馈](DEBUGGING_ZH.md)
+- [当前脚本结构和双阶段数据流](ARCHITECTURE_CURRENT_ZH.md)
+- [升级、维护、版本 pin 和发布流程](OPERATIONS_ZH.md)
