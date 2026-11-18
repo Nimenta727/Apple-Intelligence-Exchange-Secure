@@ -129,4 +129,4 @@ var key = 'REPLACE_WITH_YOUR_DEEPSEEK_API_KEY';
 
 v0.2.0-lab 起（当前 v0.4.0-lab），开发源码在 src/；Shadowrocket 实际执行的 scripts/sairs_router.js 由 tools/build.js 自动生成。维护时在电脑执行 npm run build 与 npm run check，并将源码与生成产物一并提交到 GitHub。无需在 iPhone 安装 Node.js。
 
-参考 [架构与开发指南](../ARCHITECTURE_ZH.md)。请不要因为 CI 通过就假定 iPhone 网络隔离、HTTPS 解密或 Siri SSE 已经通过实际验收。
+参考 [架构与开发指南](ARCHITECTURE_ZH.md)。请不要因为 CI 通过就假定 iPhone 网络隔离、HTTPS 解密或 Siri SSE 已经通过实际验收。
