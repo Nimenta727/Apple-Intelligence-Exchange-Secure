@@ -79,3 +79,37 @@ test("the SSE encoder never invokes a provider by itself",()=>{
   const s=SSE.candidateSse("synthetic","synthetic","siri",clock);
   assert.equal(SSE.validateCandidateSse(s,"siri").ok,true);
 });
+
+test("rejects inconsistent choice_index in SSE events", () => {
+  const stream = SSE.candidateSse(
+    "FAKE_ANSWER_001",
+    "FAKE_QUESTION_001",
+    "siri",
+    clock
+  );
+
+  // 正常 SSE 应当通过
+  assert.equal(
+    SSE.validateCandidateSse(stream, "siri").ok,
+    true
+  );
+
+  // 只篡改一个事件的 choice_index
+  const frames = stream.trimEnd().split("\n\n");
+  const lines = frames[3].split("\n");
+  const event = JSON.parse(lines[1].slice(6));
+  const name = event.type;
+
+  event[name].choice_index = 1;
+
+  lines[1] = "data: " + JSON.stringify(event);
+  frames[3] = lines.join("\n");
+
+  const corrupted = frames.join("\n\n") + "\n\n";
+
+  // 错误 SSE 必须被拒绝
+  assert.equal(
+    SSE.validateCandidateSse(corrupted, "siri").ok,
+    false
+  );
+});
