@@ -81,7 +81,7 @@ function modelReply(resp,body){
  if(statusCode(resp)!==200||typeof body!=="string"||body.length>900000)return null;
  try{
   var obj=JSON.parse(body),choice=obj.choices&&obj.choices[0];
-  if(!choice||choice.finish_reason==="length"||choice.finish_reason==="content_filter")return null;
+  if(!choice||choice.finish_reason!=="stop")return null;
   var a=choice.message&&choice.message.content;
   if(typeof a!=="string"||!a.trim()||a.length>C.maxAnswer)return null;
   return a.trim();
@@ -133,7 +133,9 @@ function rewriteSse(original,answer){
  for(i=5;i<names.length-6;i++)if(names[i]!==E.delta)return null;
  if(names.length<12)return null;
  var s=entries[0].payload,r=entries[1].payload;
- if(!s||!r||!validId(s.id)||!validId(r.id)||r.session_id!==s.id)return null;
+ if(!s||!r||!validId(s.id)||!validId(r.id)||r.session_id!==s.id||
+    typeof s.expires_at!=="number"||!isFinite(s.expires_at)||
+    s.expires_at<0||Math.floor(s.expires_at)!==s.expires_at)return null;
  var ids={s:s.id,r:r.id},choice=0,item=0,content=0;
  // No Qwen answer strings or arbitrary keys are preserved. Recreate event
  // payloads from verified IDs + DeepSeek output only.
