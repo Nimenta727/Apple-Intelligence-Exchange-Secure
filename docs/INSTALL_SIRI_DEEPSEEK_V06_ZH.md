@@ -44,3 +44,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 
 脚本版本固定 SHA：b143280fe95e85fec197366afd735f1d46359e39；两条 hook 均指向此 commit 的原始脚本。
+
+## 补充操作文档
+
+首次使用和集中验收：[用户使用手册](USER_GUIDE_ZH.md)。发生错误请先参阅 [调试及错误码矩阵](DEBUGGING_ZH.md)，不要盲目反复启用旧探针；需要理解运行机制请看 [当前结构说明](ARCHITECTURE_CURRENT_ZH.md)。后续版本更新与安全维护参阅 [维护操作流程](OPERATIONS_ZH.md)。
