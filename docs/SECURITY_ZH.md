@@ -1,6 +1,6 @@
 # 安全模型和部署边界
 
-> **实验性质：未通过 iPhone 真机验证。** 请先阅读 [安装配置教程](CONFIGURATION_ZH.md)。
+> **实验性质：未通过 iPhone 真机验证。** 请先阅读 [当前安装规划](INSTALLATION_ROADMAP_ZH.md)。
 
 ## 设计目标
 
