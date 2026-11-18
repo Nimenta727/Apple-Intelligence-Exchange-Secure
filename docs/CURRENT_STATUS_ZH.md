@@ -33,7 +33,7 @@
 3. 整理状态管理、减少本地用户问题明文持久化，进一步重构和审查；锁定发布版本。
 4. 通过 [发布核对表](RELEASE_CHECKLIST_ZH.md) 后，再决定合并与发布。
 
-[文档中心](README.md) · [安装](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全](SECURITY_CURRENT_ZH.md) · [维护](MAINTENANCE_ZH.md) · [历史实验](EXPERIMENT_MATRIX_ZH.md)。
+[文档中心](README.md) · [安装](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全](SECURITY_CURRENT_ZH.md) · [维护](MAINTENANCE_ZH.md) · [历史实验](history/EXPERIMENT_MATRIX_ZH.md)。
 
 ## 后续操作资料（v0.6）
 
