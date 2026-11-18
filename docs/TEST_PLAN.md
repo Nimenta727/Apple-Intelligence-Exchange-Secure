@@ -1,6 +1,6 @@
 # Shadowrocket 真实设备验证计划（实验版本）
 
-当前仅通过离线 JavaScript 测试。**本计划全部属于“待人工执行”，不是通过记录。**
+历史 T01–T14 发布验收清单；当前优先采用 [E0–E6 实验矩阵](EXPERIMENT_MATRIX_ZH.md)，其中 10 模块及真实 Key 相关项目**尚不可执行**。现有项目仅通过离线 JavaScript 测试。**本计划全部属于“待人工执行”，不是通过记录。**
 
 | 编号 | 测试 | 通过条件 |
 |---|---|---|
@@ -29,10 +29,10 @@
 
 可先在电脑离线执行：
 
-\`\`\`bash
-node --check scripts/sairs_router.js
-node tests/node_harness.js
-\`\`\`
+```bash
+npm run build
+npm run check
+```
 
 
 ## 0.2.0-lab 额外回归与设备门槛
