@@ -31,3 +31,9 @@
 ## 0.1.0-lab — 2026-11-18
 
 - Initial lockdown module and unverified DeepSeek request-phase experiment.
+
+### Documentation maintenance — 2026-11-19
+
+- Add detailed Chinese guides for end-user usage, debugging, error codes, actual v0.6 architecture, upgrades and repository maintenance.
+- Link all guides from READMEs, docs index, installation, maintenance and release checklist.
+- Keep native Siri acceptance, actual DeepSeek connectivity and fallback guarantee explicitly unverified.
