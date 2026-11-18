@@ -1,5 +1,8 @@
 # 本次会话的问题台账与技术决策
 
+> **最新决策（覆盖旧版阻断要求）**：用户现在允许原始 Siri 文本请求到千问，但要求最终 Siri 原生 AI 答复来自 DeepSeek。最新候选 v0.6 已在 [开发分支](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/tree/siri-deepseek-v0.6-clean) 提交，真机 Siri 和失败回退仍未验证；旧 D-01/D-02/D-10 仅是历史实验决定，不能当成新的产品要求。参考 [最新问题台账](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/ISSUES_AND_DECISIONS_ZH.md)。
+
+
 > 时间范围：截至 2026-11-18。严格区分“用户报告/复现实验”“代码已实现”“未证实的推断”。本文件不包含真实用户请求正文、凭据或抓包。
 
 | 编号 | 问题 / 症状 | 已掌握证据 | 当前结论 / 处理 | 状态 |
