@@ -92,6 +92,55 @@ test("missing key, missing request correlation and unsupported body fail closed"
  assert.equal(invalid.returned[0].response.status,502);
  assert.match(invalid.returned[0].response.body,/UNSUPPORTED_SIRI_REQUEST/);
 });
+
+test("safe parser reason codes identify failures without logging request secrets",()=>{
+ const cases=[
+  {body:undefined,stage:"BODY_NOT_TEXT"},
+  {body:"",stage:"BODY_EMPTY"},
+  {body:"PRIVATE_NOT_JSON",stage:"JSON_INVALID"},
+  {body:"[]",stage:"ROOT_UNSUPPORTED"},
+  {body:JSON.stringify({input:[{content:"Hello"}]}),stage:"GROUP_MISSING"},
+  {body:JSON.stringify({configuration:{response_configuration_group_id:"other"},input:[{content:"Hello"}]}),stage:"GROUP_UNSUPPORTED"},
+  {body:JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:{content:"Hello"}}),stage:"INPUT_UNSUPPORTED"},
+  {body:JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:[{content:[{type:"image",data:"PRIVATE_ATTACHMENT"}]}]}),stage:"CONTENT_UNSUPPORTED"},
+  {body:JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:[{content:"data:image/png;base64,PRIVATE"}]}),stage:"MEDIA_UNSUPPORTED"},
+  {body:JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:[{content:"   "}]}),stage:"PROMPT_EMPTY"}
+ ];
+ for(const item of cases){
+  const e=env(),r=e.invoke({...e.request,body:item.body,headers:{Authorization:"Bearer PRIVATE_AUTHORIZATION_TOKEN"}});
+  assert.equal(r.returned[0].response.status,502,item.stage);
+  assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_"+item.stage),item.stage);
+  assert.ok(e.logs.includes("[AIES_V06] ERROR_UNSUPPORTED_SIRI_REQUEST"));
+  assert.equal(e.requests.length,0);
+  assert.ok(e.logs.every(x=>!x.includes("PRIVATE")&&!x.includes("Bearer")&&!x.includes("Hello")));
+ }
+});
+test("strict single-object text wrappers and nested text.value are supported",()=>{
+ const accepted=[
+  {type:"text",text:"TEXT_OBJECT"},
+  {type:"input_text",text:{value:"NESTED_TEXT"}},
+  {type:"text",value:"VALUE_TEXT"}
+ ];
+ for(const content of accepted){
+  const e=env();
+  const body=JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:[{message:{content}}]});
+  const r=e.invoke({...e.request,body});
+  assert.ok(r.returned[0].headers["X-AIES-Request-ID"]);
+  assert.ok(e.logs.includes("[AIES_V06] REQUEST_CAPTURED"));
+  assert.equal(e.logs.some(x=>x.includes("REQUEST_DIAG_")),false);
+ }
+ const e=env();
+ const r=e.invoke({...e.request,body:JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:[{content:{type:"text",text:{value:"x",private:"secret"}}}]})});
+ assert.equal(r.returned[0].response.status,502);
+ assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_CONTENT_UNSUPPORTED"));
+});
+test("oversized body rejection is bounded and does not echo input",()=>{
+ const e=env(),r=e.invoke({...e.request,body:"S".repeat(300001)});
+ assert.equal(r.returned[0].response.status,502);
+ assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_BODY_OVERSIZE"));
+ assert.ok(e.logs.every(x=>x.length<100));
+});
+
 test("out-of-scope URL is untouched",()=>{
  const e=env();
  const r=e.invoke({url:"https://unrelated.example/test",method:"GET",headers:{}},undefined);
@@ -135,7 +184,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/b143280fe95e85fec197366afd735f1d46359e39/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/c1eb3bcb908311bc16790e73ca7da7194f3f97e8/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
