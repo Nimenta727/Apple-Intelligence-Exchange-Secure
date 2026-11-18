@@ -40,4 +40,4 @@
 
 main 为最新集成事实来源。开发可用短期分支+PR 做隔离和 CI，但阶段通过后应合并到 main；不要让项目长期散落在多个分支。提交文档、代码与测试时保留真实状态；CI 红色时先修复，不得把 draft/实验写成正式可用。
 
-相关文档：[问题与决定记录](ISSUES_AND_DECISIONS_ZH.md) · [当前状态](CURRENT_STATUS_ZH.md) · [实验矩阵](EXPERIMENT_MATRIX_ZH.md) · [安装规划](INSTALLATION_ROADMAP_ZH.md) · [现有安全边界](NETWORK_BOUNDARY_ZH.md) · [候选协议](PROTOCOL_LAB_ZH.md)。
+相关文档：[问题与决定记录](ISSUES_AND_DECISIONS_ZH.md) · [当前状态](CURRENT_STATUS_ZH.md) · [实验矩阵](EXPERIMENT_MATRIX_ZH.md) · [安装规划](INSTALLATION_ROADMAP_ZH.md) · [现有安全边界](history/NETWORK_BOUNDARY_ZH.md) · [候选协议](history/PROTOCOL_LAB_ZH.md)。
