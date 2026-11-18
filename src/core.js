@@ -72,6 +72,8 @@ function run(runtime) {
       trace("UPSTREAM_OK");
       try {
         var sse=Sse.candidateSse(answer,parsed.prompt,parsed.scenario,runtime.clock);
+        var verified=Sse.validateCandidateSse(sse,parsed.scenario);
+        if (!verified.ok) {trace("SSE_VALIDATION_FAILED");fail(502,"SSE_VALIDATION_FAILED");return;}
         finish(200,sse,"text/event-stream; charset=utf-8");
       } catch(e) {fail(502,"SSE_BUILD_FAILED");}
     });
