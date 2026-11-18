@@ -40,3 +40,14 @@
 4. 立即停用 40，继续保留 00，不将 40 用在真实 Siri。仍需 P1-B 真机 Siri SSE 与用户授权。
 
 **当前未完成：** 这一步只验证一个普通 text/plain HTTPS response 的整体 body 改写。尚未验证真正 SSE body、streaming 的缓冲/分块、response 无法取得时的透传、跨阶段数据关联以及 Siri 原生 UI。实验成功后应继续设计受控合成 SSE fixture，再考虑真实 Siri。
+
+
+## 2026-11-18：按用户要求跳过阶段性手工探针，交付集中安装的 50 Beta
+
+用户明确要求不要逐项做 40/Safari 测试，要一次实现后再集中安装。研发侧据此新增：
+- scripts/aies_siri_deepseek_beta.js：同一脚本的 HTTP Request 捕获 + HTTP Response 模型调用与 SSE 重建；不存在“模型失败→千问回答”的脚本级回退。
+- shadowrocket/50-AIES-SIRI-DEEPSEEK-BETA.sgmodule：单模块安装，双钩子。
+- tests/siri-deepseek-beta.test.js：可运行的双阶段 VM 和故障注入测试。
+- docs/INSTALL_SIRI_DEEPSEEK_BETA_ZH.md：完整安装、密钥初始化和回滚说明。
+
+原 P1-A 的 40 探针仍保留为研究文件，但**不是 Beta 安装前的必经步骤**。50 Beta 没有对真实 Siri 做过真机确认，且 Shadowrocket 脚本缺席/绕过时仍可能显示千问内容，因此只能作为安装后验收的实验候选，不能宣传为安全性已完全保证的成品。此前 P5 计划中的功能后重构仍是发布前必要工作；当前单文件脚本是为了提高 Shadowrocket 兼容性与部署简单性。
