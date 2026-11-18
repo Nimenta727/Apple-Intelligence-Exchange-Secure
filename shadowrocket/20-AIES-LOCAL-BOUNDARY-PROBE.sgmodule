@@ -1,0 +1,21 @@
+#!name=AIES 20 - Isolated Local Boundary Probe (UNVERIFIED)
+#!desc=Only aies-probe.invalid -> loopback. Experimental request mock. NEVER for real Siri or private data.
+#!author=Apple Intelligence Exchange Secure contributors
+#!system=ios
+
+# RFC 2606 reserved .invalid test name. No routable real-world origin.
+[Host]
+aies-probe.invalid = 127.0.0.1
+
+# DIRECT applies ONLY to the synthetic reserved host; never to Qwen.
+# If the request script does not intercept, loopback should fail closed.
+[Rule]
+DOMAIN,aies-probe.invalid,DIRECT
+
+[MITM]
+hostname = %APPEND% aies-probe.invalid
+
+[Script]
+# Install scripts/aies_boundary_probe.js in Shadowrocket's Script folder.
+# Relative path was confirmed for this user's test device with Script/ prefix.
+AIES Boundary Probe = type=http-request,pattern=^https:\/\/aies-probe\.invalid\/__aies_probe(?:\?.*)?$,requires-body=false,timeout=10,engine=jsc,script-path=Script/aies_boundary_probe.js
