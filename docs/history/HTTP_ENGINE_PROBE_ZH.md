@@ -1,5 +1,7 @@
 # 第五阶段：HTTP Engine / Fake-IP 隔离对照实验
 
+> **历史研究记录（不适用于最新 v0.6 安装）**：本文为旧 v0.4 阻断千问路线的研究材料，可能包含已废弃的配置步骤。新需求允许请求到千问，要求 Siri 最终 AI 回答来自 DeepSeek；真实 Siri 尚未验收。请优先查看 [当前文档](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/README.md)、[v0.6 安装](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) 和 [安全限制](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/SECURITY_CURRENT_ZH.md)。
+
 目的：确认 Shadowrocket 是否存在既能本地合成 HTTPS 响应，又能在脚本失败时不连接任何真实原始服务器的路径。
 
 两个模块都仅处理 RFC2606 保留域名 aies-probe.invalid，且共用不含用户数据和 API Key 的固定响应脚本。
