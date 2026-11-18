@@ -1,5 +1,8 @@
 # Apple Intelligence Exchange Secure
 
+> **当前候选版本：v0.6 Clean Beta（未经过真实 Siri 验收）**。唯一安装入口：[60 模块](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，安装与回滚说明：[docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md)。旧 00/10/20/21 和实验 40/50 是历史研究用途，不参与 v0.6 部署。允许 Siri 原问题到千问；只在脚本确实执行时尝试用 DeepSeek 替换最终 AI 回答。**不保证 Shadowrocket 被绕过时禁止 Siri 回退千问。**
+
+
 > **2026-11-18 最新方向调整（新功能尚未实现）**：Siri 原生界面继续使用，允许原请求经过千问，**但最终 AI 回答只接受 DeepSeek 来源**，失败不可静默回退千问。详细工程计划（含功能开发、安全验收和完成后的代码优化/结构简化）：[docs/SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md](docs/SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md)。本 README 后续旧“必须阻断千问”条款是 v0.4.0-lab 的历史研究说明，**不能作为新目标的要求或当前已实现功能**。新路线尚无可用发布版本；当前设备上的旧 00 阻断配置未经新的隔离测试授权不应直接撤销。
 
 > 基于 [boitar/sair](https://github.com/boitar/sair) 协议研究的 **Shadowrocket / iPhone 本地安全实验项目**。
