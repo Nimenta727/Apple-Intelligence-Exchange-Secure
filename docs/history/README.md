@@ -2,6 +2,12 @@
 
 > **本目录全部为旧版研究档案，不能作为 v0.6 安装或当前安全承诺。** 旧要求是“千问零出站”，已被用户更新为“允许请求到千问，但最终 Siri AI 回答必须来自 DeepSeek”。仓库保留原始研究证据与失败案例，用于避免重复实验。
 
+## 新归档的旧版实施和实验记录
+
+- [INSTALLATION_ROADMAP_ZH.md](INSTALLATION_ROADMAP_ZH.md)：旧 v0.4 阻断安装路线，已从 docs 根目录迁入。
+- [EXPERIMENT_MATRIX_ZH.md](EXPERIMENT_MATRIX_ZH.md)：E0–E6 旧安全实验矩阵，已从 docs 根目录迁入。
+- [ISSUES_AND_DECISIONS_ZH.md](ISSUES_AND_DECISIONS_ZH.md)：旧完整问题与决策台账，当前有效决策另见 [当前决策记录](../ISSUES_AND_DECISIONS_ZH.md)。
+
 ## 资料目录
 
 - [CONFIGURATION_ZH.md](CONFIGURATION_ZH.md)：旧 Shadowrocket、证书和 Key 操作说明。
