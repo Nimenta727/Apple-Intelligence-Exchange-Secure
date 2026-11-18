@@ -40,38 +40,59 @@ function header(headers,name){
  for(var i=0;i<ks.length;i++)if(ks[i].toLowerCase()===name.toLowerCase())return String(headers[ks[i]]);
  return "";
 }
+// Only fixed diagnostic codes are logged: never request data, keys or headers.
+var requestDiagnostic="UNSET";
 function rawRequest(){
- if(!req||typeof req.body!=="string"||req.body.length>C.maxRequest)return "";
+ if(!req||typeof req.body!=="string"){requestDiagnostic="BODY_NOT_TEXT";return "";}
+ if(!req.body.length){requestDiagnostic="BODY_EMPTY";return "";}
+ if(req.body.length>C.maxRequest){requestDiagnostic="BODY_OVERSIZE";return "";}
  return req.body;
 }
+function textAtom(v){
+ if(typeof v==="string")return v;
+ if(!v||typeof v!=="object"||Array.isArray(v))return null;
+ var keys=Object.keys(v);
+ if(!keys.length||!keys.every(function(k){return /^(type|text|input_text|value)$/.test(k);}))return null;
+ if(v.type&&!/^(text|input_text)$/.test(v.type))return null;
+ var t=typeof v.text!=="undefined"?v.text:typeof v.input_text!=="undefined"?v.input_text:v.value;
+ if(typeof t==="string")return t;
+ // Restrict nested text containers to a single pure-text value.
+ if(t&&typeof t==="object"&&!Array.isArray(t)&&
+    Object.keys(t).length===1&&typeof t.value==="string")return t.value;
+ return null;
+}
 function parseRequest(raw){
- if(!raw||raw.length>C.maxRequest)return null;
+ if(!raw){if(requestDiagnostic==="UNSET")requestDiagnostic="BODY_EMPTY";return null;}
+ if(raw.length>C.maxRequest){requestDiagnostic="BODY_OVERSIZE";return null;}
+ var o;
+ try{o=JSON.parse(raw);}catch(e){requestDiagnostic="JSON_INVALID";return null;}
+ if(!o||typeof o!=="object"||Array.isArray(o)){requestDiagnostic="ROOT_UNSUPPORTED";return null;}
  try{
- var o=JSON.parse(raw);
- var g=o&&o.configuration&&o.configuration.response_configuration_group_id;
- if(typeof g!=="string"||!/^(siri\.tqa|siri_tqa)$/i.test(g))return null;
- if(!Array.isArray(o.input)||o.input.length<1||o.input.length>12)return null;
- var parts=[];
- for(var i=0;i<o.input.length;i++){
-  var it=o.input[i],m=it&&it.message&&typeof it.message==="object"?it.message:it;
-  var content=m&&m.content;
-  var list=typeof content==="string"?[content]:content;
-  if(!Array.isArray(list)||list.length<1||list.length>64)return null;
-  for(var j=0;j<list.length;j++){
-    var v=list[j],str;
-    if(typeof v==="string")str=v;
-    else if(v&&typeof v==="object"&&!Array.isArray(v)&&
-      Object.keys(v).every(function(k){return /^(type|text|input_text|value)$/.test(k);})&&
-      (!v.type||/^(text|input_text)$/.test(v.type)))
-      str=typeof v.text==="string"?v.text:typeof v.input_text==="string"?v.input_text:typeof v.value==="string"?v.value:null;
-    else return null;
-    if(typeof str!=="string"||/data:(image|audio|video)\//i.test(str))return null;
-    if(str.trim())parts.push(str.trim());
+  var g=o.configuration&&o.configuration.response_configuration_group_id;
+  if(typeof g!=="string"){requestDiagnostic="GROUP_MISSING";return null;}
+  if(!/^(siri\.tqa|siri_tqa)$/i.test(g)){requestDiagnostic="GROUP_UNSUPPORTED";return null;}
+  if(!Array.isArray(o.input)||o.input.length<1||o.input.length>12){
+   requestDiagnostic="INPUT_UNSUPPORTED";return null;
   }
- }
- var prompt=parts.join("\n\n");
- return prompt&&prompt.length<=C.maxPrompt?prompt:null;
- }catch(e){return null;}
+  var parts=[];
+  for(var i=0;i<o.input.length;i++){
+   var it=o.input[i],m=it&&it.message&&typeof it.message==="object"?it.message:it;
+   var content=m&&m.content;
+   var list=Array.isArray(content)?content:[content];
+   if(list.length<1||list.length>64){requestDiagnostic="CONTENT_UNSUPPORTED";return null;}
+   for(var j=0;j<list.length;j++){
+    var str=textAtom(list[j]);
+    if(typeof str!=="string"){requestDiagnostic="CONTENT_UNSUPPORTED";return null;}
+    if(/data:(image|audio|video)\//i.test(str)){requestDiagnostic="MEDIA_UNSUPPORTED";return null;}
+    if(str.trim())parts.push(str.trim());
+   }
+  }
+  var prompt=parts.join("\n\n");
+  if(!prompt){requestDiagnostic="PROMPT_EMPTY";return null;}
+  if(prompt.length>C.maxPrompt){requestDiagnostic="PROMPT_OVERSIZE";return null;}
+  requestDiagnostic="OK";
+  return prompt;
+ }catch(e){requestDiagnostic="STRUCTURE_UNSUPPORTED";return null;}
 }
 function validKey(k){return typeof k==="string"&&/^[A-Za-z0-9_-]{12,256}$/.test(k)&&!/REPLACE_WITH|PLACEHOLDER/i.test(k);}
 function statusCode(resp){
@@ -174,7 +195,7 @@ if(!res){
  // Phase 1: capture a prompt and explicitly couple request/response using
  // an opaque ID. Unlike "latest prompt", concurrent requests never share a slot.
  var prompt=parseRequest(rawRequest());
- if(!prompt){error("UNSUPPORTED_SIRI_REQUEST");return;}
+ if(!prompt){log("REQUEST_DIAG_"+requestDiagnostic);error("UNSUPPORTED_SIRI_REQUEST");return;}
  if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){error("INVALID_METHOD");return;}
  var token=randomToken();
  if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,exp:Date.now()+C.sessionTtlMs}))){
