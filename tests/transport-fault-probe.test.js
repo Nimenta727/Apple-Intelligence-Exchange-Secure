@@ -28,7 +28,7 @@ test("synthetic probe produces fixed local successful and error responses",()=>{
 });
 test("deliberate failures never call done or any network client",()=>{
   const thrown=run(url("throw"));assert.equal(thrown.responses.length,0);
-  assert.match(String(thrown.error),"AIES_SYNTHETIC_THROW");
+  assert.match(String(thrown.error),/AIES_SYNTHETIC_THROW/);
   const hung=run(url("nodone"));assert.equal(hung.error,null);
   assert.equal(hung.responses.length,0);
 });
