@@ -1,5 +1,8 @@
 # 真机实验矩阵与验收流程（仅限安全实验）
 
+> **旧 v0.4 网络阻断实验矩阵（历史，不适用于新版）。** 这些 E0–E6 用例仍可用于研究 REJECT 和零上游出站，但不再是 v0.6 的安装前提；用户也已决定不再重复旧探针。新版正确验收请读 [v0.6 发布核对表](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/siri-deepseek-v0.6-clean/docs/RELEASE_CHECKLIST_ZH.md)。
+
+
 > 测试环境目标：之前记录的 iOS/iPadOS 27.3 beta 2、Shadowrocket 2.2.93 (3488)。如果设备更新，先记录新版本。**以下步骤不是通过记录，所有未做的项目一律标为未运行。**
 
 ## 测试原则
