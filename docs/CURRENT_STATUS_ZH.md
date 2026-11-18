@@ -8,7 +8,7 @@
 |---|---|
 | 唯一 Shadowrocket 60 模块与双钩子 JS | 已编码 |
 | 文本识别、会话关联、SSE 重建 | 离线模拟通过；真实请求解析遇到 `ERROR_UNSUPPORTED_SIRI_REQUEST` |
-| DeepSeek API 对接 | 已编码；模型 `deepseek-flash` 的实际可用性未核实 |
+| DeepSeek API 对接 | 代码已存在；`deepseek-flash` 官方模型名已核对，但真实 Key / 账户调用尚未实测 |
 | 请求/响应钩子在真实 Siri 上是否触发 | 2026-11-19 已观察 Request hook 命中；Response hook 尚未确认 |
 | Siri 原生界面是否接受重建 SSE | 未验证 |
 | 分块、压缩、超时、并发和快速连续提问 | 需真机验证 |
