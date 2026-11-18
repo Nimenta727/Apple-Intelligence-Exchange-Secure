@@ -1,13 +1,23 @@
 # Changelog
 
-## 0.2.0-lab — 2026-11-18
+## v0.6 Clean Beta — 2026-11-18 (candidate on separate branch)
 
-- Refactor monolithic script into config, request, DeepSeek, SSE, core and Shadowrocket entry modules.
-- Add deterministic offline bundling and source/artifact consistency check.
-- Expand tests for hostile URLs, unexpected scenarios, missing API Key, malformed responses, timeouts, double callbacks and REJECT rules.
-- Improve code review boundaries while retaining a single-file deployment artifact.
-- Add architecture documentation; no native Siri or VPN isolation validation claimed.
+- The product goal changed: requests may reach Qwen, while the intended final Siri AI response comes from DeepSeek.
+- The [v0.6 development branch](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/tree/siri-deepseek-v0.6-clean) holds one Shadowrocket 60 module, a single dual-stage script, pinned deployment hooks, tests and current documentation.
+- Older 40/50 experimental entrypoints were cleaned up on the candidate branch.
+- The current branch is still Draft PR #10; **offline checks passed, native Siri UI and system-level fallback not validated**.
+- main retains historical v0.4 research code and modules rather than claiming a production release.
 
-## 0.1.0-lab — 2026-11-18
+## v0.4.0-lab — 2026-11-18
 
-- Initial Shadowrocket lockdown and unverified DeepSeek request-phase experiment.
+- Original strict request validation, experimental local SSE generation, DeepSeek adapter, static REJECT checks and offline tests.
+- The 20/21 loopback/Fake-IP experiments remained research only.
+
+## v0.2.0-lab — 2026-11-18
+
+- Refactor early experimental script into config, request, DeepSeek, SSE, core and entry modules.
+- Add deterministic bundling and test infrastructure.
+
+## v0.1.0-lab — 2026-11-18
+
+- Initial Shadowrocket lockdown and unverified request-phase experiment.
