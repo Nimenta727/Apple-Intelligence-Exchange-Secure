@@ -130,3 +130,18 @@ test("unknown SSE blocks API billing before provider is called",()=>{
  assert.equal(result.returned[0].status,502);
  assert.equal(e.requests.length,0);
 });
+
+
+test("v0.6 module references an immutable reviewed script commit",()=>{
+ const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
+ assert.equal(scripts.length,2);
+ assert.ok(scripts.every(x=>x.includes("/b143280fe95e85fec197366afd735f1d46359e39/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
+});
+test("unsupported response never triggers the model and never returns Qwen text",()=>{
+ const e=env(),a=e.invoke(e.request);
+ const b=e.invoke({...e.request,headers:a.returned[0].headers},{status:200,body:"QWEN_PLAIN_UNSUPPORTED"});
+ assert.equal(e.requests.length,0);
+ assert.equal(b.returned[0].status,502);
+ assert.ok(!JSON.stringify(b.returned[0]).includes("QWEN_PLAIN_UNSUPPORTED"));
+});
