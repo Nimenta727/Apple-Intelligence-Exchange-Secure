@@ -1,0 +1,15 @@
+#!name=AIES 31 - Synthetic Transport Fault REJECT
+#!desc=Experimental .invalid same-host REJECT conflict only. Cannot be used on real Siri host.
+#!system=ios
+
+[Host]
+aies-probe.invalid = 127.0.0.1
+
+[Rule]
+DOMAIN,aies-probe.invalid,REJECT
+
+[MITM]
+hostname = %APPEND% aies-probe.invalid
+
+[Script]
+AIES Synthetic Fault Reject = type=http-request,pattern=^https:\/\/aies-probe\.invalid\/__aies_fault\?case=(?:ok|deny|throw|nodone)$,requires-body=false,timeout=10,engine=jsc,script-path=Script/aies_transport_fault_probe.js
