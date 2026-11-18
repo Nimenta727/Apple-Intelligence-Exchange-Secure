@@ -40,4 +40,4 @@ B3：只有 B1/B2 经审计通过后，才能设计受控的真实 DeepSeek 调�
 
 代码检查通过 != 浏览器探针成功 != 真实域名无上游流量 != Siri 接受 SSE != 产品可用。发布前需要各门槛**分别**拿到可以复现的证据，并审查脚本失效时是否存在透传。
 
-参考：[交接总览](PROJECT_HANDOFF_ZH.md) · [历史问题](ISSUES_AND_DECISIONS_ZH.md) · [真机测试](TEST_PLAN.md)。
+参考：[交接总览](PROJECT_HANDOFF_ZH.md) · [历史问题](ISSUES_AND_DECISIONS_ZH.md) · [历史验收清单](../history/TEST_PLAN.md)。
