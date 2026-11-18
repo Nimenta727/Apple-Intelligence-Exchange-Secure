@@ -5,7 +5,7 @@
 > **状态：v0.4.0-lab · Experimental / 未经过真实 iPhone 验收。**
 > 目前**不能保证**阻止全部 Apple 智能云端流量，也**不能保证** Siri 接受独立合成的 SSE；严禁将实验版宣传为已验证生产可用。
 
-[交接总览](docs/PROJECT_HANDOFF_ZH.md) · [遇到的问题](docs/ISSUES_AND_DECISIONS_ZH.md) · [项目现状](docs/CURRENT_STATUS_ZH.md) · [安装规划](docs/INSTALLATION_ROADMAP_ZH.md) · [实验矩阵](docs/EXPERIMENT_MATRIX_ZH.md) · [证书及历史配置](docs/CONFIGURATION_ZH.md) · [安全设计](docs/SECURITY_ZH.md) · [真机验收](docs/TEST_PLAN.md) · [架构与维护](docs/ARCHITECTURE_ZH.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
+[交接总览](docs/PROJECT_HANDOFF_ZH.md) · [遇到的问题](docs/ISSUES_AND_DECISIONS_ZH.md) · [项目现状](docs/CURRENT_STATUS_ZH.md) · [安装规划](docs/INSTALLATION_ROADMAP_ZH.md) · [实验矩阵](docs/EXPERIMENT_MATRIX_ZH.md) · [历史文档](history/README.md) · [安全设计](docs/SECURITY_ZH.md) · [旧验收清单](history/TEST_PLAN.md) · [架构与维护](docs/ARCHITECTURE_ZH.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
 
 ## 当前阶段从这里开始（2026-11-18）
 
@@ -61,7 +61,7 @@
 2. **先做无密钥实验**：只在虚构域名上分别测试 `20-AIES-LOCAL-BOUNDARY-PROBE.sgmodule` 和 `21-AIES-HTTP-ENGINE-PROBE.sgmodule`（不得同时启用），**不要直接启用 10 进行真实 Siri→DeepSeek 联调**。
 3. **本机自行生成 CA**：只为必要的目标主机启用 HTTPS 解密。**证书私钥不需要也不应填写到插件。**
 4. **DeepSeek API Key 暂不配置**：当前真实域名安全隔离和 SSE 尚未证明可行；只有通过 [实验矩阵](docs/EXPERIMENT_MATRIX_ZH.md) 中相应安全门槛后，才进行后续授权联调。
-5. **先运行检查再上真机**：`npm run build` 及 `npm run check`；按照 [测试计划](docs/TEST_PLAN.md) 观察网络连接和 Siri 行为。
+5. **先运行检查再上真机**：`npm run build` 及 `npm run check`；按照 [实验矩阵](docs/EXPERIMENT_MATRIX_ZH.md) 观察网络连接和 Siri 行为。
 
 **不可跳过的重要门槛**：LAB 模块中的 REJECT 规则可能在脚本之前生效，导致 DeepSeek 不会运行；移除 REJECT 则可能导致异常时原始请求透传。任何情况下，都不要为了“让 Siri 能回答”而牺牲千问隔离验证。
 
