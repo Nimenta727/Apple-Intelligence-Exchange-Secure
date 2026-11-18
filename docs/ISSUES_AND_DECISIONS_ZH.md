@@ -48,3 +48,10 @@
 - D-07：最小可行路线只解决两个阻塞点：请求不会透传的独立接管、Siri 原生 SSE 的真实接受；DeepSeek 适配已有代码可复用。
 - D-08：下一轮独立开发分支仅做 `aies-probe.invalid` 的故障注入对照（正常、脚本不返回、脚本故意抛错等），**绝不放行真实千问域名**。故障行为仍需独立网络观察才可宣称安全。
 - D-09：当用户暂不进行独立出站核验时，可以继续编码和虚构域名测试，但不得将 10 真实接管模块作为“可用产品”启用，不得打开 `providerEnabled`。
+
+## I-19 / D-10：30/31 最小实验结果及架构转向（2026-11-18）
+
+- **I-19（已复现的兼容冲突）**：00+30/DIRECT 下 `ok` 返回 `AIES_FAULT_OK`，`deny` 返回 `AIES_FAULT_DENIED`；`throw`、`nodone` 产生客户端连接错误。00+31/REJECT 下相同 `ok` 请求在连接详情中显示 `DOMAIN,aies-probe.invalid,REJECT`，PacketTunnel 明确出现 `tcp rule => REJECT`、`proxy stream ... reject`，Safari 无法获得本地模拟响应。
+- **证据边界**：日志截图证明匹配并执行 REJECT；未提供完整脚本日志和独立出口观测，不能断言精确引擎执行优先级，更不能推出全局无上游透传。
+- **D-10**：不再为同域 REJECT + HTTP Request Mock 方案继续进行重复排列组合；下一步研究能否由具备独立 fail-closed 出站保护的接管层合成响应。评估前不启动真实域名、不配置 Key、不打开 provider 开关。
+- **MVP 范围不变**：只处理 Siri 原生文本 → DeepSeek → Siri 原生输出，写作/视觉/泛化 SSE 测试暂停。PR #8 为留档的研究性 Draft，不是可部署 Siri 模块。
