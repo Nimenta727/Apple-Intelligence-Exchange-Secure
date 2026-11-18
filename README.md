@@ -2,7 +2,7 @@
 
 > 基于 [boitar/sair](https://github.com/boitar/sair) 协议研究的 **Shadowrocket / iPhone 本地安全实验项目**。
 >
-> **状态：v0.2.0-lab · Experimental / 未经过真实 iPhone 验收。**
+> **状态：v0.2.1-lab · Experimental / 未经过真实 iPhone 验收。**
 > 目前**不能保证**阻止全部 Apple 智能云端流量，也**不能保证** Siri 接受独立合成的 SSE；严禁将实验版宣传为已验证生产可用。
 
 [简体中文安装与证书指南](docs/CONFIGURATION_ZH.md) · [安全设计](docs/SECURITY_ZH.md) · [真机验收](docs/TEST_PLAN.md) · [架构与维护](docs/ARCHITECTURE_ZH.md) · [English](README_EN.md) · [上游 MIT 许可证](LICENSE)
@@ -82,3 +82,12 @@ npm run check
 ## 维护与持续优化
 
 第二轮重构将配置、解析、模型调用、SSE 与运行时状态机独立维护，并在 GitHub Actions 中检查生成脚本与源码完全一致。详细模块职责见 [架构与开发指南](docs/ARCHITECTURE_ZH.md)。这并不能取代真实 iPhone 的隔离与协议验收。
+
+
+## 0.2.1-lab 脚本诊断（仅阶段标记）
+
+本版在 Shadowrocket 支持 `console.log` 时记录 `[AIES_DIAG] ENTER`、`REQUEST_VALIDATED`、`REQUEST_REJECTED`、`KEY_MISSING`、`UPSTREAM_STARTED`、`UPSTREAM_OK`、`UPSTREAM_FAILED`、`LOCAL_RESPONSE_OK`、`LOCAL_RESPONSE_ERROR` 等固定标记。**不记录原始 URL、提问、回答、Authorization 或 API Key。** 日志出现 `LOCAL_RESPONSE_OK` 只说明已尝试调用 `$done({response})`，并不保证 Siri 已接受响应。
+
+**若连接日志只有 REJECT 且没有 `ENTER`**，支持请求未进入 JS 的诊断假设，但 `console.log` 不可用、客户端未显示脚本日志也会造成相同现象；不能单凭缺失日志证明严格执行顺序。
+
+与上游 [boitar/sair](https://github.com/boitar/sair) 的关键区别：原版通过放行请求获得千问 SSE 骨架，再在 `http-response` 阶段替换内容；本安全版不允许原始请求透传千问，因此无法直接移植其双阶段方案。即使独立 mock 在 HTTP/HTTPS 中成功，同域 `REJECT` 仍可能阻止真实请求脚本触发。不要删除保护规则。
