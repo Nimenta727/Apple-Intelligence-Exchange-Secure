@@ -1,5 +1,7 @@
 # 当前项目状态与未完成工作（2026-11-18）
 
+> **最新目标优先级更新**：请先阅读 [Siri → DeepSeek 响应替换实施计划](SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md)。允许原始 Siri 文本请求到千问，但最终 Siri 原生界面所展示的 AI 回答必须来自 DeepSeek；如果不能在失败/回退时保证这一点，则不能发布为“必定 DeepSeek”。本页旧表格和旧 B1–B3 属于“零千问原文出站”阶段的历史记录，不再是新目标的阻塞顺序。
+
 ## 版本与判定
 
 - 仓库：Nimenta727/Apple-Intelligence-Exchange-Secure。
@@ -74,3 +76,18 @@ B3：只有 B1/B2 经审计通过后，才能设计受控的真实 DeepSeek 调�
 - **阶段性决策**：当前设备配置中同域 REJECT 与成功返回本地 Mock 存在实测冲突；停止同类 Shadowrocket 规则排列组合测试，转为评估独立网络接管架构的可行性和成本。
 - 实验后用户报告已关闭 31，恢复 00 基线（其他实验模块保持关闭）。持续保持真实千问域名 REJECT、`providerEnabled:false`、真实 10 关闭、DeepSeek Key 未投入联调。
 - **未解决**：独立出口隔离证明、真实 Siri 请求的安全接管、Siri 是否接受自主生成 SSE、真实 DeepSeek 端到端。任何现有浏览器成功页面均不得宣传为完整功能可用。
+
+
+## 最新待办与状态：Response Rewrite MVP
+
+| 阶段 | 状态 | 主要验收 |
+|---|---|---|
+| P0 详细计划与需求变更 | **已记录** | 见 [Siri → DeepSeek 响应替换实施计划](SIRI_DEEPSEEK_RESPONSE_REWRITE_PLAN_ZH.md) |
+| P1 Shadowrocket 请求/响应关联与 Siri 固定答案替换 | 未开始 | 原生 Siri 界面展示固定替换文本 |
+| P2 DeepSeek 调用适配 | 未开始（旧 Adapter 可复用） | Key 安全、错误分类、模型响应来源核对 |
+| P3 DeepSeek→Siri 联调 | 未开始 | 连续提问答案来自 DeepSeek、无串话 |
+| P4 失败与来源保证 | 未开始 | 任何失败不得显示千问 AI 答案，否则不达标 |
+| P5 代码重构/结构简化 | 未开始、**必做** | 保持功能不变、统一配置、清理旧部署路径 |
+| P6 最终安全审查与发布 | 未开始 | CI、真机、回滚、文档和风险验收 |
+
+注意：**P0 只完成文档计划，不代表实现已开工或完成**。旧 00 阻断仍保留在当前用户设备和 main，直到另行评审新的隔离测试配置。
