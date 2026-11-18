@@ -1,6 +1,6 @@
 # AIES 当前项目状态（2026-11-18）
 
-> **这是当前状态的权威入口。** 活跃候选为 [v0.6 Clean Beta](INSTALL_SIRI_DEEPSEEK_V06_ZH.md)，开发分支 `siri-deepseek-v0.6-clean`，Draft [PR #10](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/10)。`main` 仍为 v0.4.0-lab 旧阻断研究基线。**v0.6 离线自动检查通过，但尚未完成 Siri 原生界面和 DeepSeek 真实 API 验收。**
+> **这是当前状态的权威入口。** 活跃候选为 [v0.6 Clean Beta](INSTALL_SIRI_DEEPSEEK_V06_ZH.md)，目前已合入 `main`；原 [PR #10](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/10) 和开发分支可供追溯。`main` 同时保留旧 v0.4.0-lab 阻断研究文件。**v0.6 离线自动检查通过，但尚未完成 Siri 原生界面和 DeepSeek 真实 API 验收。**
 
 ## 目标与验收
 
@@ -18,12 +18,12 @@
 | 使用用户自己的 DeepSeek Key 的实际联调 | 没有真实结果 | **未运行** |
 | Shadowrocket 失效 / Siri 回退 | 无系统级阻断证明 | **未解决** |
 | 隐私生命周期 / 安全审计 | 暂存用户问题于本机 store，逻辑 TTL 不能保证物理清除 | 待加强 |
-| 正式发布 | Draft PR，尚未合并 main 或发布稳定 Tag | **未发布** |
+| 正式发布 | 已合并 main，但未发布稳定 Tag | **未发布** |
 
 ## 仓库代码分层
 
 - **当前 v0.6**：`shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule` → `scripts/aies_siri_deepseek_v06.js`；它们就是安装部署入口。
-- **v0.4 历史**：`src/`、`tools/build.js`、`scripts/sairs_router.js`、00/10/20/21，继续在 CI 中维护，但不能当作新版本部署脚本。
+- **v0.4 历史文件（main 内保留）**：`src/`、`tools/build.js`、`scripts/sairs_router.js`、00/10/20/21，继续在 CI 中维护，但不能当作新版本部署脚本。
 - 旧 30/31、40、50 原型位于历史分支和 PR，当前安装不需要。
 
 ## 接下来按顺序
