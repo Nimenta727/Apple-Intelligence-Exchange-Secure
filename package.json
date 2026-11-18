@@ -1,6 +1,6 @@
 {
   "name": "apple-intelligence-exchange-secure",
-  "version": "0.2.2-lab",
+  "version": "0.4.0-lab",
   "private": true,
   "description": "Safety-first Shadowrocket and DeepSeek protocol research lab; not production validated.",
   "scripts": {
