@@ -116,3 +116,8 @@ npm run check
 独立生成器 `src/sse.js` 现在对 Siri 的 `content/suggestions/summary`、写作工具的 `body/refinements` 执行受限结构化输出处理；较长文本被切分为多个 delta，所有 `done` 节点复用相同最终数据。`validateCandidateSse` 逐事件校验完整性、顺序、会话 ID、delta 汇总和场景 Schema，核心代码在尝试返回前进行自检。`tests/protocol-synthetic.test.js` 仅用虚构请求和模拟 DeepSeek HTTP 响应验证全链路，不发送任何真实请求。
 
 这仍是**协议候选实现**：原作者 SAIR 依赖真正的千问 SSE 骨架，公开协议说明不等于完整、经过验证的 Apple 协议规范。测试通过不意味着 iOS 接受 SSE。**保持 `providerEnabled: false` 与目标域名 REJECT，直到独立网络接管被证实安全。** 导入脚本路径在实验模块中写为 `Script/sairs_router.js`；路径仍须依真机环境核实。
+
+
+## v0.5 实验：本地 HTTP 引擎 / Fake-IP 对照
+
+新增独立的 21 实验模块，仅对 RFC2606 虚构域名 aies-probe.invalid 进行 198.18.41.221 的映射，并尝试 force-http-engine-hosts。与 20 loopback 方案相互独立、**不得同时开启**；不影响正式 Siri/千问路由和 REJECT。本方案还没有获得真机安全证据，不能作为真实 Siri 替换模块部署。详细见 docs/HTTP_ENGINE_PROBE_ZH.md。
