@@ -68,7 +68,7 @@ Siri 原生 UI 是否接受：尚待真机验证
 - 请求正文在本地 `$persistentStore` 中逻辑缓存约 45 秒；不代表安全擦除。`Math.random` token 也不应被视为密码学强随机凭据。
 - SSE 是基于现有合成事件结构编写，不保证真实流式/压缩的 Siri 接收。
 - 脚本处理失败尝试返回 502，但脚本完全缺席时无法阻止 Siri 的系统级回退。
-- `deepseek-flash` 需要官方 API 可用性核对，不应误称已验证。
+- DeepSeek 官方文档已列出 `deepseek-flash`，但真实账户调用及 Siri 端到端结果仍未验证。
 
 ## 修改原则
 
