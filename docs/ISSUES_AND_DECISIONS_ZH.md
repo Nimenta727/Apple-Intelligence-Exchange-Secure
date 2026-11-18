@@ -30,3 +30,21 @@
 - GitHub CI：Actions #17、#19、#23、#24（历史通过）；PR #6 合并累计代码到 main。
 - 现有实验方法与约束详见 [网络边界](history/NETWORK_BOUNDARY_ZH.md) 和 [实验矩阵](EXPERIMENT_MATRIX_ZH.md)。
 - 历史口述 A–B–A 记录不是可独立验证的原始抓包证据；不得转写为“零透传已通过”。
+
+## 2026-11-18 本轮新证据与已解决问题
+
+| 编号 | 实际证据 | 本轮判定 | 状态 |
+|---|---|---|---|
+| I-13 | 00 模块启用后，目标千问域名连接日志显示 REJECT | 规则级阻断命中；非全机隔离证据 | E0 已观测 |
+| I-14 | 00+20、Safari case=1/2 返回 `AIES_BOUNDARY_PROBE_OK`；日志包含 `MOCK_ATTEMPTED`、`send early response to client` | 20 在该真机环境可以执行 JS 并提前返回虚构 HTTPS 响应 | **本地 Mock 已解决**；零出站未证实 |
+| I-15 | 00+21、Safari case=3 同样成功；21 源文件含 Fake-IP/HTTP Engine 设置 | 21 环境本地 Mock 成功，但没有证据能区分其底层路径或确认 `198.18.41.221` 实际连通 | **本地 Mock 已解决**；HTTP Engine 未确认 |
+| I-16 | Shadowrocket 普通连接详情只显示 HTTP-REQUEST / DOMAIN,DIRECT 等规则，运行日志不等于路由器出口抓包 | DIRECT/loopback 字样不能证明零公网出站 | E2-N 用户主动暂缓 |
+| I-17 | e4-sse-hardening 先触发 Bundle drift；后提交 `6b44eb9` 重新同步自动生成脚本；Actions #74 quality 成功 | 修复构建产物与源码不一致，choice_index 错误注入检查通过 | **分支已修复，尚未并入 main** |
+| I-18 | 用户选定唯一 MVP：Siri 原生文本 → DeepSeek → Siri 原生界面 | 停止泛化 SSE/写作/多模型工作，先解决真实网络接管证明，再评估客户端 SSE | 决策已明确，产品未完成 |
+
+### 更新后的决策
+
+- D-06：E1/E2 的“Safari 本地 Mock 成功”不再重复测试，但 E2-N 被跳过而不是通过；文档不允许把它误写成“独立零出站证明”。
+- D-07：最小可行路线只解决两个阻塞点：请求不会透传的独立接管、Siri 原生 SSE 的真实接受；DeepSeek 适配已有代码可复用。
+- D-08：下一轮独立开发分支仅做 `aies-probe.invalid` 的故障注入对照（正常、脚本不返回、脚本故意抛错等），**绝不放行真实千问域名**。故障行为仍需独立网络观察才可宣称安全。
+- D-09：当用户暂不进行独立出站核验时，可以继续编码和虚构域名测试，但不得将 10 真实接管模块作为“可用产品”启用，不得打开 `providerEnabled`。
