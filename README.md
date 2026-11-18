@@ -67,3 +67,12 @@
 ## 安全、隐私与法律声明
 
 问题可能同时被千问和 DeepSeek 处理；当前脚本会短期将用户问题写入 Shadowrocket 的本地持久存储，存储加密与中断后的擦除尚未证明。脚本并不提供系统级零千问回答或网络出口保证。不要把生产和个人隐私请求用于未验证版本。任何 CA 私钥、真实 Key、Authorization、原始请求/完整抓包均不得提交。保留上游 MIT 归属；详见 [LICENSE](LICENSE) 与 [安全文档](docs/SECURITY_CURRENT_ZH.md)。
+
+## 使用、调试与维护指南
+
+- [使用与首次启用](docs/USER_GUIDE_ZH.md)
+- [集中调试、错误码与反馈模板](docs/DEBUGGING_ZH.md)
+- [当前 v0.6 架构与目录职责](docs/ARCHITECTURE_CURRENT_ZH.md)
+- [开发、升级和维护流程](docs/OPERATIONS_ZH.md)
+
+这些指南描述的是可安装候选版，**不是已证明 Siri 原生功能成功或系统级不回退千问的承诺**。
