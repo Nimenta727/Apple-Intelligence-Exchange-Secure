@@ -14,6 +14,8 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 模块的 HTTP Request 和 Response 两条规则均使用同一个经过固定 Git SHA 引用的脚本。**不要把 GitHub 页面链接当作模块导入 URL**。
 
+**2026-11-19 诊断版升级：** 旧版在真实 Siri 请求捕获阶段返回 `ERROR_UNSUPPORTED_SIRI_REQUEST`。新模块已 pin 到修订脚本。已安装旧 60 的用户请**更新/重新导入模块并让 Shadowrocket 下载新的脚本**；无需重设本地 API Key 或 MITM CA。之后只记录 `REQUEST_DIAG_*` 和 `ERROR_*` 固定码；诊断版未证明 Siri 已修复。
+
 ## 安装前的安全准备
 
 1. 备份当前 Shadowrocket 配置。设备上如存在**之前导入的同域 REJECT、旧接管脚本或其他冲突模块**，测试新模式时必须先停用。这些文件虽然已从仓库移除，但不会从设备上自动消失。
