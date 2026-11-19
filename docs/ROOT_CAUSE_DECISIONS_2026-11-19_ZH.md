@@ -67,7 +67,7 @@
 
 - 不读取/记录认证 Header 的实际值、DeepSeek API Key、私人请求上下文、Qwen 的答案文本到调试日志。
 - 允许的本机手动原文探针须先经用户明确开启；其产出只用于用户选择的非隐私问题，日志可被本地持久化，不能等同物理擦除。
-- WritingTools 仍按原来的旁路逻辑；未确认的其他 Siri 场景、音频、图像、工具调用不会被无条件送到 DeepSeek。
+- **历史更新**：WritingTools 原来是全量旁路（`WRITINGTOOLS_SKIPPED`）；现在仅针对 SAIR 逆向得到的 `compose_selectedAndAllText` 用户纯文本组提供 **Beta** 适配，并生成 `body/refinements`。未知 WritingTools 操作、未确认的其他 Siri 场景、音频、图像、工具调用仍不会被无条件送 DeepSeek。请区分**原始故障根因**和**当前实验代码能力**；真机尚未验收。
 - 模型超时、HTTP 失败、空内容、非 `finish_reason=stop`、未知 SSE 和关联缺失都由 60 生成固定错误；**不把未经确认的 Qwen 文字默默放出作为 DeepSeek 回答**。
 
 ## 4. 故障阶段与诊断码矩阵
