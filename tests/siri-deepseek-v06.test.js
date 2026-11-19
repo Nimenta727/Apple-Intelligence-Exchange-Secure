@@ -497,7 +497,7 @@ test("schema key screening hides identifiers and secret-looking field names",()=
  schemaBadRequest(e,{
   Authorization:"PRIVATE_ACCESS",
   session_id:"PRIVATE_SESSION_VALUE",
-  "A".repeat(26):"PRIVATE_DANGEROUS_VALUE"
+  ["A".repeat(26)]:"PRIVATE_DANGEROUS_VALUE"
  });
  const st=schemaState(e);
  assert.ok(st.root.some(x=>x.name==="REDACTED"));
