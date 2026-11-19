@@ -6,6 +6,8 @@ const helper=fs.readFileSync(path.join(root,"scripts/qwen_passive_probe_ONCE.js"
 const stop=fs.readFileSync(path.join(root,"scripts/qwen_passive_probe_STOP_ONCE.js"),"utf8");
 const moduleText=fs.readFileSync(path.join(root,"shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule"),"utf8");
 const Sse=require("./fixtures/siri-sse");
+const nativeReader=fs.readFileSync(path.join(root,"scripts/ab_native_trace_ONCE.js"),"utf8");
+const nativeStop=fs.readFileSync(path.join(root,"scripts/ab_native_trace_STOP_ONCE.js"),"utf8");
 const TARGET="https://prod-yabuli.qianwen.com/v1/sessions/responses";
 const KEY="AIES_QWEN_PASSIVE_V1_STATE",SECRET="PRIVATE_PERSONAL_PROMPT_OR_TOKEN";
 function env(){
@@ -48,7 +50,11 @@ function unpack(logs,label){
 test("module is isolated, immutable, pass-through and has two matching passive hooks",()=>{
  assert.ok(moduleText.includes("#!name=AIES 61"));
  const hooks=moduleText.match(/^AIES61 Passive (?:Request|Response) = .*$/gm)||[];
- assert.equal(hooks.length,2);
+ assert.equal(hooks.length,2); // original structure-only hooks remain intact
+ const abHooks=moduleText.match(/^AIES61 Passive Followup (?:Request|Response) = .*$/gm)||[];
+ assert.equal(abHooks.length,2);
+ assert.ok(abHooks.some(x=>x.includes("type=http-request")));
+ assert.ok(abHooks.some(x=>x.includes("type=http-response")));
  assert.ok(hooks.some(x=>x.includes("type=http-request")));
  assert.ok(hooks.some(x=>x.includes("type=http-response")));
  const paths=hooks.map(x=>x.match(/script-path=(\S+)/)?.[1]);
@@ -59,6 +65,59 @@ test("module is isolated, immutable, pass-through and has two matching passive h
  assert.ok(!runtime.includes("http.post("));
  assert.ok(!runtime.includes("error("));
 });
+test("native Qwen A/B opt-in records only controlled client-visible answer and response structures, not tokens",()=>{
+ const e=env(),now=Date.now(),key="AIES_AB_NATIVE_V1_STATE";
+ e.data[key]=JSON.stringify({v:1,phase:"armed",createdAt:now,expiresAt:now+600000,records:[]});
+ const req=e.request(),r=e.invoke(req);
+ assert.equal(value(r.returned[0]),"{}");
+ const body=Sse.candidateSse("QWEN_USER_VISIBLE_ANSWER",SECRET,"siri");
+ const res=e.invoke(req,{status:200,headers:{"Content-Type":"text/event-stream"},body});
+ assert.equal(value(res.returned[0]),"{}");
+ const records=JSON.parse(e.data[key]).records;
+ assert.equal(records.length,2);
+ assert.equal(records[0].stage,"NATIVE_REQUEST");
+ assert.equal(records[0].shape.bodyStatus,"JSON_OBJECT");
+ assert.equal(records[1].stage,"NATIVE_RESPONSE");
+ assert.equal(records[1].route,"MAIN");
+ assert.equal(records[1].shape.format,"SSE");
+ assert.equal(records[1].shape.strict60Preflight,"MATCHES_60_PREFLIGHT");
+ assert.ok(records[1].answerChars>0);
+ assert.ok(records[1].answerText.includes("QWEN_USER_VISIBLE_ANSWER"));
+ assert.ok(!value(records).includes(SECRET));
+ assert.ok(!value(records).includes("Bearer"));
+ assert.ok(!value(records).includes("Authorization"));
+ const read=e.local(nativeReader).prints;
+ assert.ok(read.some(x=>x.includes("CAPTURED_LOCAL_READOUT")));
+ assert.ok(read.some(x=>x.includes("CAPTURE_CLEARED")));
+ assert.equal(e.data[key],"");
+});
+test("native Qwen A/B records same-question session follow-up without modifying its SSE",()=>{
+ const e=env(),now=Date.now(),key="AIES_AB_NATIVE_V1_STATE";
+ e.data[key]=JSON.stringify({v:1,phase:"armed",createdAt:now,expiresAt:now+600000,records:[]});
+ const req=e.request({url:"https://prod-yabuli.qianwen.com/v1/sessions/PRIVATE_SESSION_UUID/responses"});
+ const r=e.invoke(req,{status:200,headers:{"Content-Type":"text/event-stream"},
+  body:Sse.candidateSse("FOLLOWUP_PUBLIC_TEST_ANSWER",SECRET,"siri")});
+ assert.equal(value(r.returned[0]),"{}");
+ const reports=JSON.parse(e.data[key]).records;
+ assert.equal(reports.length,1);
+ assert.equal(reports[0].route,"SESSION_FOLLOWUP");
+ assert.ok(reports[0].answerText.includes("FOLLOWUP_PUBLIC_TEST_ANSWER"));
+ assert.ok(!value(reports).includes("PRIVATE_SESSION_UUID"));
+ assert.equal(e.sent.length,0);
+});
+test("native AB capture is fully disabled unless explicitly armed; standalone STOP keeps DeepSeek key",()=>{
+ const e=env(),key="AIES_AB_NATIVE_V1_STATE";
+ e.invoke(e.request(),{status:200,body:Sse.candidateSse("PUBLIC",SECRET,"siri")});
+ assert.equal(e.data[key],undefined);
+ const read=e.local(nativeReader).prints;
+ assert.ok(read.includes("[AIES_AB_NATIVE_LOCAL] ARMED_600_SECONDS"));
+ assert.ok(read.includes("[AIES_AB_NATIVE_LOCAL] PERSISTENCE_ROUNDTRIP_OK"));
+ const stop=e.local(nativeStop).prints;
+ assert.ok(stop.includes("[AIES_AB_NATIVE_LOCAL] STOPPED_AND_CLEARED"));
+ assert.equal(e.data[key],"");
+ assert.equal(e.data.SAIRS_DEEPSEEK_API_KEY,"PRIVATE_DEEPSEEK_API_KEY");
+});
+
 test("default unarmed mode always passes original Qwen traffic without observing body",()=>{
  const e=env();
  const request=e.request();
