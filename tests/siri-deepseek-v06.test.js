@@ -210,6 +210,16 @@ test("armed probe never captures WritingTools or suspicious identifiers",()=>{
  assert.ok(!e.logs.some(x=>x.includes(badId)));
  assert.deepEqual(runLocalProbe(e).logs,["[AIES_SIRI_GROUP_LOCAL] ARMED_180_SECONDS"]);
 });
+test("response hook cannot consume local probe opt-in",()=>{
+ const e=env();
+ runLocalProbe(e);
+ const body=JSON.stringify({configuration:{response_configuration_group_id:"siri.unrecognized"},input:[{content:"SAFE"}]});
+ const result=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body},{status:200,body:fixture});
+ assert.equal(result.returned[0].status,502);
+ assert.ok(e.data.AIES_SIRI_GROUP_PROBE_ARM);
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
+});
+
 test("expired and malformed opt-in state never stores Siri group",()=>{
  const e=env();
  for(const value of ['not-json',JSON.stringify({expiresAt:Date.now()-1000}),JSON.stringify({expiresAt:Date.now()+900000})]){
@@ -265,7 +275,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/f94a2711ccf96457dbb7e532295666bf5dc31ddb/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/ca1842345ea90ce9b2d97e69675852614275404f/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
