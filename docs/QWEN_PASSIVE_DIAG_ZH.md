@@ -1,4 +1,4 @@
-# Qwen 原生通行 + Siri SSE 被动协议诊断
+# Qwen 原生通行 + Siri / WritingTools 请求与 SSE 被动诊断
 
 **2026-11-19 同题实验更新：** 61 模块现在包括两条原主接口 Hook 和两条会话级 Followup Hook，**全部原样放行**；原有 `qwen_passive_probe_ONCE.js` 仍按原方式采集主接口结构。想在同一道普通测试问题上同时采集 Qwen 客户端可见文字和会话级 SSE，请改用 [同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md) 的 `ab_native_trace_ONCE.js`。两种探针的本机状态互不干扰，但不建议同时开启。
 
@@ -13,9 +13,9 @@
    
    `https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule`
 
-   模块中的两条脚本路径都应固定到 `955fe4f7cec2471042469cdb7de740015db850bf`。
+   模块中的四条脚本路径都应固定到 `955fe4f7cec2471042469cdb7de740015db850bf`。
 
-4. 61 模块只对 `https://prod-yabuli.qianwen.com/v1/sessions/responses` 的 HTTP POST 启用 Request 和 Response 诊断钩子，仅允许 User-Agent 以 `Siri (` 开头。仍需在用户设备上对目标主机启用 HTTPS MITM，**不要将 MITM 扩展到更多域名**。HTTP 脚本可能影响流式响应缓冲与时间，故“代码不改写”**不等于**与完全关闭 MITM 的连接行为完全相同。首次测试后如 Qwen 失败，停用 61 并恢复基线。
+4. 61 模块对已观察的主接口及会话级响应路径启用四条 HTTP 钩子。旧的 Siri 结构探针仍只认 `Siri (`；额外的 WritingTools 结构探针仅在独立手动授权后工作，不混用采样数据。仍需在用户设备上对目标主机启用 HTTPS MITM，**不要将 MITM 扩展到更多域名**。HTTP 脚本可能影响流式响应缓冲与时间，故“代码不改写”**不等于**与完全关闭 MITM 的连接行为完全相同。首次测试后如 Qwen 失败，停用 61 并恢复基线。
 
 ## 二、手动采集一次真实协议结构
 
@@ -88,3 +88,20 @@
 | `STREAM_UNAVAILABLE` | 非有效长度的原始响应文本 |
 
 此字段出现在手动读取的 `RESPONSE_SSE_PART_*` 拼接 JSON 里；正常 Hook 日志仍只出现 `RESPONSE_SSE_SCHEMA_CAPTURED_LOCAL`。只需刷新 **61 模块到固定提交 `955fe4f7cec2471042469cdb7de740015db850bf`**，再次手动启动十分钟窗口、用 Siri 问一个非隐私问题、手动读取；**保持 60 停用**。没有泄露问题、回答、ID 或 Headers。一次采集满足当前检查，不代表其他 Siri 问答同样兼容；如果预检通过但 DeepSeek 改写后原生 Siri 仍显示失败，则主要需审查**合成 SSE 内部字段结构与真实 Qwen Schema 的差异**。
+
+## 四、可选：只采集 WritingTools Compose 的字段/类型（不保存选中文本）
+
+> **用于研究未知写作分组，默认完全关闭。** 原生 Apple 写作工具可能传递用户选中的整段文字，所以仅使用本人编写的、完全不涉及隐私的一小段测试文本。
+
+1. **关闭 60，仅启用本 61 模块**。确认四条脚本运行路径均固定到 `955fe4f7cec2471042469cdb7de740015db850bf`，旧的 `00 REJECT` 和同域 Rewrite 关闭。
+2. 将 [`writing_schema_probe_ONCE.js`](../scripts/writing_schema_probe_ONCE.js) 保存到 Shadowrocket 本地 Script，只在**脚本测试**中执行一次，确认：
+
+   ```text
+   [AIES_WRITING_SCHEMA_LOCAL] ARMED_600_SECONDS
+   [AIES_WRITING_SCHEMA_LOCAL] PERSISTENCE_ROUNDTRIP_OK
+   ```
+3. 10 分钟内打开系统写作工具，从“千问创作”输入简单、无隐私的测试文本。等待该次操作结束。
+4. 再次手动执行**同一个** `writing_schema_probe_ONCE.js`，读取 `CAPTURED_LOCAL_PROTOCOL_SCHEMA`、`TRACE_PART_001` 等消息。输出只包含 `group`、请求的 JSON 字段名/数据类型、SSE 事件名称/顺序/类型、HTTP 状态。**不包含真实选中文字、原生 Qwen 答案、认证 Header、Cookie 或 API Key**。
+5. 本地检查输出后再选择性分享。如显示 `STILL_ARMED`，说明探针仍未看到符合条件的 `WritingTools` 请求，不等于写作工具本身没有执行。必要时手动运行 [`writing_schema_probe_STOP_ONCE.js`](../scripts/writing_schema_probe_STOP_ONCE.js) 取消采集。
+
+此探针只用于核实原 SAIR 对 `compose_selectedAndAllText` 的逆向推断是否符合你的设备。如果真实组名或输入形状不同，60 将按 `REQUEST_DIAG_WRITING_*` 失败关闭；不要通过关掉纯文本安全校验来猜测未知模式。其他 Apple 写作工具功能（校对、摘要、改写）可能使用系统内部模型而不访问此网关，**不能据此保证全部用 DeepSeek**。
