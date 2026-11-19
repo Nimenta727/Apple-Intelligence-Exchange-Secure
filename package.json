@@ -5,7 +5,7 @@
   "description": "Experimental Shadowrocket Siri text-response rewrite using DeepSeek; native Siri unverified.",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node --check scripts/aies_siri_deepseek_v06.js && node --check scripts/siri_group_probe_ONCE.js && node --check scripts/siri_group_probe_STOP_ONCE.js && node --check scripts/siri_schema_probe_ONCE.js && node --check scripts/siri_schema_probe_STOP_ONCE.js && node --test tests/*.test.js && node tools/check-docs.js",
+    "check": "node --check scripts/aies_siri_deepseek_v06.js && node --check scripts/siri_group_probe_ONCE.js && node --check scripts/siri_group_probe_STOP_ONCE.js && node --check scripts/siri_schema_probe_ONCE.js && node --check scripts/siri_schema_probe_STOP_ONCE.js && node --check scripts/siri_qwen_body_probe_ONCE.js && node --check scripts/siri_qwen_body_probe_STOP_ONCE.js && node --test tests/*.test.js && node tools/check-docs.js",
     "docs:check": "node tools/check-docs.js"
   },
   "engines": {
