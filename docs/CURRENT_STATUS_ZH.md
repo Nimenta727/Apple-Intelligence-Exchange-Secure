@@ -54,3 +54,7 @@
 ## 17:04 三条复杂请求的新协议变体
 
 原始 Qwen 上游均为 HTTP 200，SSE 事件数约 26/24/24，新增 `text.annotations[].added`（引用注释）。第一条 `RESPONSE_TAG_MISSING` + `ERROR_PROMPT_UNAVAILABLE`，另两条 `ERROR_SSE_REWRITE_UNSUPPORTED`；**没有任何一次进入 `DEEPSEEK_API`**。因此问题首先发生在 AIES 的关联与预检阶段。新代码将处于已观测合法位置的注释事件丢弃后合成 DeepSeek SSE，防止 Qwen 注释文本泄漏，仍待 Siri 真机验证。3 份 PacketTunnel 中，实验1 是未执行 AIES 的基线，实验2 实际启用 61，实验3 实际启用 60（而所开启的采集脚本是 61 原生探针）；因此**还没有合格的 A' 与 B 同题答案文本对照**。详见 [routine 日志](routine/2026-11-19-17-12-Siri-complex-annotations-ab-diagnosis.md)。
+
+## WritingTools Compose Beta：外部技术社区逆向适配（2026-11-19）
+
+之前两份日志确定 UA 为 `WritingTools`，但旧 60 输出 `WRITINGTOOLS_SKIPPED`，不会进入模型。根据 SAIR 公开逆向的场景识别与 `{body,refinements}` 输出，新增**精确 `compose_selectedAndAllText`、纯文本、WritingTools UA** 分支；Siri 使用既有 `{content,suggestions,summary}`。两种客户端的本地请求关联增加 `scene`，严禁混用。**当前仅有外部逆向和离线测试条件，尚未通过此用户设备的 WritingTools 完整 JSON/SSE 或真实 UI 验收**。跨站社区分析详见 [研究表](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。
