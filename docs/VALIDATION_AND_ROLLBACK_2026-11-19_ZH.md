@@ -82,3 +82,11 @@ AIES 固定诊断码（只写名称，按时间排序）:
 升级到“端到端已验证”之前，必须有至少一条真实 iPad Siri 完整闭环（包括原生界面显示带来源前缀的 DeepSeek 文本）；对生产可靠性则需要更多轮独立测试，特别是请求转发待发路径和并发场景。若 `RESPONSE_TAG_MISSING` 重复出现且没有 Request body，按 [根因决策](ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)继续维持失败关闭，直到找到可验证的跨 Hook 关联能力。
 
 相关：[全部调试历史](DEBUG_HISTORY_2026-11-19_ZH.md)、[请求协议](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)、[SSE 响应协议](OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)。
+
+## 2026-11-20 新版 60 四 Hook 多轮验收（替代历史 Guard-only 检查）
+
+当前 60 是主 Request / Response 加 session followup Request / Response **四条 Hook**，共同 pin `7a698fbaadeb37431d9bd1d43df359292ee78ba0`。此前“只需三 Hook、followup 永远返回 502”的测试流程描述属于旧版本。先保证 61/旧 REJECT 同域规则关闭。
+
+最小验收：**同一次 Siri 交互中连续问两次普通纯文本问题，再验证三轮**。每轮都应在 Siri UI 实际显示 `【DeepSeek · AIES】`；仅见 `DEEPSEEK_RESPONSE_ATTEMPTED` 不算通过。验证每轮固定日志 `REQUEST_CAPTURED`、`SSE_PREFLIGHT_PASSED`、`DEEPSEEK_STARTED`、`DEEPSEEK_RESPONSE_ATTEMPTED`；第一轮应有 `SIRI_CONTEXT_STORED`，后续若 `FOLLOWUP_CONTEXT_UNAVAILABLE`，优先检查前轮 DeepSeek choice 与 followup previous_choice_id 是否在**同一 session** 正确关联，而不是打印任何原始 ID。若后续只显示原生 Qwen、错误或无答案，**立即关闭 60 并恢复原生基线**，不要以未知 Qwen 数据透传代替修复。
+
+隐私：新版为保障连续对话，会将少量原始问题和已验证的 DeepSeek 回答临时存于本机 `$persistentStore`，逻辑 TTL 5 分钟，不保证物理擦除；最多三轮历史随续答发往 DeepSeek。不要用私人问答开展这一轮 Beta 真机测试。
