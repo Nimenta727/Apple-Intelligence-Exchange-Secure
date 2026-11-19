@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 2026-11-19 — noRTI 真机输入结构细分诊断
+
+- Siri 组名已匹配，但新日志连续两次出现 `REQUEST_DIAG_INPUT_UNSUPPORTED`，并没有进入 DeepSeek。
+- `NORTI_SHAPE_*` 将顶层字段、input 数组和消息包装异常拆分为固定分类码；严格拒绝行为保持不变，不记录字段名、字段值、Header、正文或 Key。
+- 新增离线回归测试，模块双 Hook 固定到新的已审查脚本提交；下次只需问 Siri 一次并报告固定分类码。
+
+
 ## 2026-11-19 — 真机 Siri noRTI 标识确认与纯文本分支
 
 - 用户通过 v2 本地探针确认真机 Siri 的 `response_configuration_group_id=siri.multimodal.noRTI`；主脚本原本返回 `REQUEST_DIAG_GROUP_UNSUPPORTED`，这是已证实的第一道阻塞。
