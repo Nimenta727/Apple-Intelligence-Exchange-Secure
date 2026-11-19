@@ -982,7 +982,7 @@ test("opaque Qwen choices and continuation URLs never introduce a foreign endpoi
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/60c0fd9bf0816ac1c7ffbd2ab901f4aff8a12e51/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/91fc2c2b32a9e6e0849722728f24a936bc30c9a1/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
