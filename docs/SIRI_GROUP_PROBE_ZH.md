@@ -81,3 +81,7 @@
 - 精确的 `siri.multimodal.noRTI` 现在仅在 Siri UA、POST 和严格纯文本输入结构符合时通过第一关；未知 Siri 场景组仍被拒绝，**不必为这个已确认的组名再次运行探针**。真实 API、SSE 重建、Siri 原生 UI、系统级千问回退都尚未通过验收。
 
 其他：[调试手册](DEBUGGING_ZH.md) · [当前状态](CURRENT_STATUS_ZH.md) · [安装与回滚](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全边界](SECURITY_CURRENT_ZH.md)。
+
+## 真机组名已确认后的下一步
+
+目前 iPad 已确认 `siri.multimodal.noRTI`；如遇 `NORTI_SHAPE_ROOT_FIELDS`、`NORTI_SHAPE_ITEM_WRAPPER_FIELDS`，**无需再重复本组名探针**，请使用**单独的**[Siri 结构字段探针](SIRI_SCHEMA_PROBE_ZH.md)。
