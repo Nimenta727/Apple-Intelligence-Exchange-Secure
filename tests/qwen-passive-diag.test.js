@@ -10,6 +10,8 @@ const nativeReader=fs.readFileSync(path.join(root,"scripts/ab_native_trace_ONCE.
 const nativeStop=fs.readFileSync(path.join(root,"scripts/ab_native_trace_STOP_ONCE.js"),"utf8");
 const writingReader=fs.readFileSync(path.join(root,"scripts/writing_schema_probe_ONCE.js"),"utf8");
 const writingStop=fs.readFileSync(path.join(root,"scripts/writing_schema_probe_STOP_ONCE.js"),"utf8");
+const followupReader=fs.readFileSync(path.join(root,"scripts/siri_followup_schema_probe_ONCE.js"),"utf8");
+const followupStop=fs.readFileSync(path.join(root,"scripts/siri_followup_schema_probe_STOP_ONCE.js"),"utf8");
 const TARGET="https://prod-yabuli.qianwen.com/v1/sessions/responses";
 const KEY="AIES_QWEN_PASSIVE_V1_STATE",SECRET="PRIVATE_PERSONAL_PROMPT_OR_TOKEN";
 function env(){
@@ -216,6 +218,57 @@ test("WritingTools probe refuses non-WritingTools caller and STOP clears state w
  assert.equal(e.data.SAIRS_DEEPSEEK_API_KEY,"PRIVATE_DEEPSEEK_API_KEY");
 });
 
+test("Siri followup diagnostic is OFF until manually armed; pass-through never triggers provider",()=>{
+ const e=env(),req=e.request({url:"https://prod-yabuli.qianwen.com/v1/sessions/PRIVATE_SESSION_UUID/responses"});
+ assert.equal(value(e.invoke(req).returned[0]),"{}");
+ assert.equal(value(e.invoke(req,{status:200,body:Sse.candidateSse(SECRET,SECRET,"siri")}).returned[0]),"{}");
+ assert.equal(e.data.AIES_SIRI_FOLLOWUP_SCHEMA_V1,undefined);
+ assert.equal(e.sent.length,0);
+});
+test("Siri followup schema-only capture records independent request and response shapes without user data",()=>{
+ const e=env(),key="AIES_SIRI_FOLLOWUP_SCHEMA_V1";
+ const armed=e.local(followupReader).prints;
+ assert.ok(armed.includes("[AIES_SIRI_FOLLOWUP_SCHEMA_LOCAL] ARMED_600_SECONDS"));
+ assert.ok(armed.includes("[AIES_SIRI_FOLLOWUP_SCHEMA_LOCAL] PERSISTENCE_ROUNDTRIP_OK"));
+ const req=e.request({url:"https://prod-yabuli.qianwen.com/v1/sessions/PRIVATE_SESSION_UUID/responses"});
+ assert.equal(value(e.invoke(req).returned[0]),"{}");
+ const resp=e.invoke(req,{status:200,headers:{"Set-Cookie":SECRET},body:Sse.candidateSse("PRIVATE_QWEN_ANSWER",SECRET,"siri")});
+ assert.equal(value(resp.returned[0]),"{}");
+ const st=JSON.parse(e.data[key]);
+ assert.equal(st.records.length,2);
+ assert.equal(st.records[0].stage,"FOLLOWUP_REQUEST");
+ assert.equal(st.records[1].stage,"FOLLOWUP_RESPONSE");
+ assert.equal(st.records[0].route,"SESSION_FOLLOWUP");
+ assert.equal(st.records[1].shape.format,"SSE");
+ assert.ok(st.records[1].shape.orderFirst.includes("session.created"));
+ assert.equal(st.records[1].shape.strict60Preflight,"MATCHES_60_PREFLIGHT");
+ assert.ok(!("answerText" in st.records[1]));
+ for(const sensitive of [SECRET,"PRIVATE_SESSION_UUID","PRIVATE_QWEN_ANSWER","Bearer","Set-Cookie"]){
+  assert.ok(!value(st).includes(sensitive),"no raw content/credentials/session ID");
+ }
+ assert.equal(e.sent.length,0);
+ const report=e.local(followupReader).prints;
+ assert.ok(report.includes("[AIES_SIRI_FOLLOWUP_SCHEMA_LOCAL] CAPTURED_LOCAL_PROTOCOL_SCHEMA"));
+ assert.ok(report.includes("[AIES_SIRI_FOLLOWUP_SCHEMA_LOCAL] CAPTURE_CLEARED"));
+ assert.ok(report.some(s=>s.includes("TRACE_PART_001=")));
+ assert.equal(e.data[key],"");
+});
+test("Siri followup schema probe excludes main URL and WritingTools and STOP does not touch DeepSeek Key",()=>{
+ const e=env(),key="AIES_SIRI_FOLLOWUP_SCHEMA_V1";
+ e.local(followupReader);
+ e.invoke(e.request());
+ const writing=e.request({url:"https://prod-yabuli.qianwen.com/v1/sessions/PRIVATE_ID/responses",
+  headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)"}});
+ e.invoke(writing,{status:200,body:Sse.candidateSse(SECRET,SECRET,"siri")});
+ const bad=e.request({url:"https://prod-yabuli.qianwen.com/v1/sessions/PRIVATE_ID/responses",
+  method:"GET"});
+ e.invoke(bad);
+ assert.equal(JSON.parse(e.data[key]).records.length,0);
+ const stop=e.local(followupStop).prints;
+ assert.ok(stop.includes("[AIES_SIRI_FOLLOWUP_SCHEMA_LOCAL] STOPPED_AND_CLEARED"));
+ assert.equal(e.data[key],"");
+ assert.equal(e.data.SAIRS_DEEPSEEK_API_KEY,"PRIVATE_DEEPSEEK_API_KEY");
+});
 test("default unarmed mode always passes original Qwen traffic without observing body",()=>{
  const e=env();
  const request=e.request();
