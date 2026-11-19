@@ -210,12 +210,19 @@ function captureNortiSchemaLocally(o){
  else log("NORTI_SCHEMA_STORE_FAILED");
 }
 function observedSiriTextEnvelopeReasons(o){
- // Report *only* fixed categories, never unknown field names or field values.
- // Check independent layers even after one failure, so a single Siri request
- // can distinguish multiple shape mismatches without exposing its JSON.
+ // Exact field names and field TYPES confirmed by the local iPad schema probe.
+ // Root metadata is not forwarded to DeepSeek. Unknown keys, tool calls, media
+ // and unsupported message types remain blocked by this and textAtom().
  var reasons=[],top=Object.keys(o);
- if(top.length!==2||top.indexOf("configuration")<0||top.indexOf("input")<0)
+ var allowedRoot=["configuration","input","client_tools","response_format","server_tools","stream"];
+ if(top.some(function(k){return allowedRoot.indexOf(k)<0;}))
   reasons.push("ROOT_FIELDS");
+ if((Object.prototype.hasOwnProperty.call(o,"client_tools")&&!Array.isArray(o.client_tools))||
+    (Object.prototype.hasOwnProperty.call(o,"server_tools")&&!Array.isArray(o.server_tools))||
+    (Object.prototype.hasOwnProperty.call(o,"response_format")&&
+      (!o.response_format||typeof o.response_format!=="object"||Array.isArray(o.response_format)))||
+    (Object.prototype.hasOwnProperty.call(o,"stream")&&typeof o.stream!=="boolean"))
+  reasons.push("ROOT_FIELD_TYPES");
  if(!Object.prototype.hasOwnProperty.call(o,"input")){
   reasons.push("INPUT_MISSING");return reasons;
  }
@@ -232,8 +239,13 @@ function observedSiriTextEnvelopeReasons(o){
   }
   var keys=Object.keys(it),nested=Object.prototype.hasOwnProperty.call(it,"message");
   if(nested){
-   if(keys.length!==1||keys[0]!=="message"){
+   // Real Siri's wrapper contains "message" and "type"; require the
+   // documented text-message discriminator. Never accept tool-call types.
+   if(keys.some(function(k){return k!=="message"&&k!=="type";})){
     reasons.push("ITEM_WRAPPER_FIELDS");break;
+   }
+   if(Object.prototype.hasOwnProperty.call(it,"type")&&it.type!=="message"){
+    reasons.push("WRAPPER_TYPE_UNSUPPORTED");break;
    }
    it=it.message;
    if(!it||typeof it!=="object"||Array.isArray(it)){
