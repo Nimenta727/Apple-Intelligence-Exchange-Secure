@@ -18,6 +18,9 @@ var C={
   maxRequest:300000,maxPrompt:14000,maxSse:900000,maxAnswer:12000,
   timeoutMs:11000,sessionTtlMs:45000
 };
+// Only add this human-visible source label to successfully validated DeepSeek
+// replies. Siri/Qwen service branding is controlled upstream and may not change.
+var DEEPSEEK_SOURCE_LABEL="【DeepSeek · AIES】";
 var req=typeof $request!=="undefined" ? $request : null;
 var res=typeof $response!=="undefined" ? $response : null;
 var store=typeof $persistentStore!=="undefined" ? $persistentStore : null;
@@ -428,6 +431,13 @@ function modelReply(resp,body){
   return a.trim();
  }catch(e){return null;}
 }
+function verifiedDeepSeekAnswerWithLabel(answer){
+ // Never infer provenance from Siri UI. This function is called exclusively
+ // after modelReply has verified a successful DeepSeek API completion.
+ if(typeof answer!=="string"||!answer.trim())return null;
+ var result=DEEPSEEK_SOURCE_LABEL+"\n"+answer.trim();
+ return result.length<=C.maxAnswer?result:null;
+}
 function safeJson(v){return JSON.stringify(v);}
 function event(name,data){
  var o={type:name};o[name]=data;
@@ -536,19 +546,28 @@ if(!res){
 if(statusCode(res)!==200){error("ORIGINAL_RESPONSE_STATUS");return;}
 if(!res||typeof res.body!=="string"||res.body.length>C.maxSse){error("SSE_UNAVAILABLE");return;}
 var tag=header(req.headers,"X-AIES-Request-ID"),current=null,prompt2=null;
+if(!tag)log("RESPONSE_TAG_MISSING");
+else if(!/^aies_[a-z0-9_]{12,90}$/.test(tag))log("RESPONSE_TAG_INVALID");
+else log("RESPONSE_TAG_PRESENT");
 if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
  var raw=storeRead("AIES_R1_"+tag);
  try{current=raw&&JSON.parse(raw);}catch(e){}
  storeWrite("AIES_R1_"+tag,""); // consume once, even if invalid
  if(current&&current.exp>Date.now()&&current.exp<=Date.now()+C.sessionTtlMs&&
     typeof current.p==="string"&&current.p.length<=C.maxPrompt)prompt2=current.p;
+ if(prompt2)log("RESPONSE_PROMPT_FROM_STORE");
+ else log("RESPONSE_PROMPT_STORE_MISSING");
 }
 var fromReq=parseRequest(rawRequest());
 if(prompt2&&fromReq&&prompt2!==fromReq){error("CORRELATION_MISMATCH");return;}
-if(!prompt2)prompt2=fromReq;
+if(!prompt2){
+ if(fromReq){prompt2=fromReq;log("RESPONSE_PROMPT_FROM_BODY");}
+ else log("RESPONSE_PROMPT_BODY_UNAVAILABLE");
+}
 if(!prompt2){error("PROMPT_UNAVAILABLE");return;}
 // Fail before billing DeepSeek if this upstream stream cannot be rewritten.
 if(!rewriteSse(res.body,"AIES_VALIDATION_ONLY")){error("SSE_REWRITE_UNSUPPORTED");return;}
+log("SSE_PREFLIGHT_PASSED");
 var key=storeRead(C.keyName);
 if(!validKey(key)){error("KEY_NOT_PROVISIONED");return;}
 if(!http||typeof http.post!=="function"){error("HTTP_CLIENT_UNAVAILABLE");return;}
@@ -561,7 +580,7 @@ try{
   body:safeJson({
    model:C.model,stream:false,max_tokens:500,
    messages:[
-    {role:"system",content:"你是简洁准确的中文 Siri 问答助手。只给出直接回答，避免寒暄与动作描写。"},
+    {role:"system",content:"你是通过 AIES 提供回答的 DeepSeek 中文问答助手。回答应简短准确，不要自称千问或 Qwen；用户询问回答来源时，如实说明答案由 DeepSeek API 生成、经 AIES 转发。不要自行在答案里重复添加固定来源标签，代理脚本会统一添加。"},
     {role:"user",content:prompt2}
    ]
   })
@@ -570,8 +589,11 @@ try{
   if(err){error("MODEL_NETWORK");return;}
   var answer=modelReply(reply,bodyText);
   if(!answer){error("MODEL_RESPONSE_INVALID");return;}
-  var rewritten=rewriteSse(res.body,answer);
+  var labeledAnswer=verifiedDeepSeekAnswerWithLabel(answer);
+  if(!labeledAnswer){error("MODEL_RESPONSE_INVALID");return;}
+  var rewritten=rewriteSse(res.body,labeledAnswer);
   if(!rewritten){error("SSE_REWRITE_UNSUPPORTED");return;}
+  log("DEEPSEEK_LABEL_APPLIED");
   log("DEEPSEEK_RESPONSE_ATTEMPTED");
   done({status:200,headers:{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-store","X-AIES-Answer-Source":"deepseek"},body:rewritten});
  });
