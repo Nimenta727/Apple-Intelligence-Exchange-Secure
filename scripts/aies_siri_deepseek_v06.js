@@ -904,6 +904,12 @@ else log("RESPONSE_TAG_PRESENT");
 if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
  var raw=storeRead("AIES_R1_"+tag);
  try{current=raw&&JSON.parse(raw);}catch(e){}
+ // A mismatched transaction tag is never rescued by reading the current
+ // request body: it may belong to an unrelated Siri/WritingTools operation.
+ if(current&&typeof current.scene==="string"&&current.scene!==activeScene){
+  storeWrite("AIES_R1_"+tag,"");
+  error("CORRELATION_MISMATCH");return;
+ }
  storeWrite("AIES_R1_"+tag,""); // consume once, even if invalid
  if(current&&current.exp>Date.now()&&current.exp<=Date.now()+C.sessionTtlMs&&
     current.scene===activeScene&&typeof current.p==="string"&&current.p.length<=C.maxPrompt)prompt2=current.p;
