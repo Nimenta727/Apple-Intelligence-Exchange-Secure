@@ -953,7 +953,10 @@ test("live Qwen notices/moderation/tool-call outputs fail closed before invoking
  const cases=[
   changeNativeEvent(fixture,"session.response.created",v=>{v.notices=[{text:"QWEN_PRIVATE_WARNING"}];}),
   changeNativeEvent(fixture,"session.response.choices[].done",v=>{v.choice.moderation=[{text:"QWEN_PRIVATE_MODERATION"}];}),
-  changeNativeEvent(fixture,"session.response.choices[].items[].added",v=>{v.item.type="function_call";})
+  changeNativeEvent(fixture,"session.response.choices[].items[].added",v=>{v.item.type="function_call";}),
+  changeNativeEvent(fixture,"session.response.choices[].items[].done",v=>{v.item.type="function_call";}),
+  changeNativeEvent(fixture,"session.response.choices[].completed",v=>{v.choice.output=[{type:"image",data:"QWEN_PRIVATE_MEDIA"}];}),
+  changeNativeEvent(fixture,"session.response.choices[].items[].message.content[].added",v=>{v.content.type="audio";})
  ];
  for(const upstream of cases){
   const e=env(),req=e.invoke(e.request);
@@ -962,6 +965,22 @@ test("live Qwen notices/moderation/tool-call outputs fail closed before invoking
   assert.ok(e.logs.includes("[AIES_V06] ERROR_SSE_REWRITE_UNSUPPORTED"));
   assert.equal(e.requests.length,0);
   assert.ok(!JSON.stringify(r.returned[0]).includes("QWEN_PRIVATE"));
+ }
+});
+test("native text annotations or a non-text content completion fail closed",()=>{
+ for(const upstream of [
+  changeNativeEvent(fixture,"session.response.choices[].items[].message.content[].done",v=>{
+   v.content.type="image";
+  }),
+  changeNativeEvent(fixture,"session.response.choices[].items[].done",v=>{
+   v.item.message.content[0].type="audio";
+  })
+ ]){
+  const e=env(),a=e.invoke(e.request);
+  const r=e.invoke({...e.request,headers:a.returned[0].headers},{status:200,body:upstream});
+  assert.equal(r.returned[0].status,502);
+  assert.equal(e.requests.length,0);
+  assert.ok(!JSON.stringify(r.returned[0]).includes("QWEN_ORIGINAL_ANSWER_TEST"));
  }
 });
 test("opaque Qwen choices and continuation URLs never introduce a foreign endpoint into DeepSeek SSE",()=>{
@@ -982,7 +1001,7 @@ test("opaque Qwen choices and continuation URLs never introduce a foreign endpoi
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/91fc2c2b32a9e6e0849722728f24a936bc30c9a1/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/b0994a5b30b69ef8d67dd96a2f6c36577f81c946/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
