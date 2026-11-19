@@ -79,3 +79,11 @@
 - 未收集或保存真实原始 SSE、Qwen 文本/ID 值、认证 Headers。
 
 相关：[请求协议](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)、[修复与风险决策](ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)。
+
+## 17:04 新增实证：复杂回答的 SSE 带引用注释
+
+**用户 2026-11-19 17:04 手动读取的 60 诊断**中，三条相同长度的复杂 Siri 请求都收到了 Qwen HTTP 200：SSE 事件量分别约 **26、24、24**，文本 delta **10、8、8**，文本完成值 347 / 285 / 290 字符。与此前只含 13 事件的简短回答不同，复杂回答在 `text.value.done` 后、`content.done` 前新增 `session.response.choices[].items[].message.content[].text.annotations[].added` 引用注释事件。三条请求因关联丢失或严格 SSE 校验失败**均未调用 DeepSeek**；不能将结果归因于模型输出变化。
+
+**新版 60 的可控支持范围**：只接受上述精准事件名和已观测的插入位置，允许一定数量且是对象外壳的注释；**直接丢弃全部来自 Qwen 的注释内容和 URL**，并从 DeepSeek 答案重建完整无引用信息的 SSE。上游最终纯文本消息中的 `text.annotations` 可为有界数组，同样不会原样输出。不扩展对工具、图片、音频、审核分支的支持。新版 61 `strict60Preflight` 做了同样的安全位置判断。若注释值与 Siri UI 的未知内部校验存在额外约束，仍需真机确认；这不是官方协议保证。
+
+详见 [2026-11-19 17:12 维护记录](routine/2026-11-19-17-12-Siri-complex-annotations-ab-diagnosis.md)。
