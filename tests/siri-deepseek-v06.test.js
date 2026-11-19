@@ -220,6 +220,92 @@ test("observed iPadOS noRTI Siri group supports strict text through both hooks i
  assert.deepEqual(JSON.parse(e.requests[0].body).messages[1].content,"Why is the sky blue?");
  assert.ok(e.logs.every(x=>!x.includes("Why is the sky blue?")));
 });
+test("confirmed real noRTI root fields and message wrapper allow text-only capture with no metadata forwarded",()=>{
+ const e=env();
+ const body=JSON.stringify({
+  configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},
+  client_tools:[{name:"UNTRUSTED_TOOL_SPEC",description:"NEVER_SEND_TO_MODEL"}],
+  server_tools:[{name:"UNTRUSTED_SERVER_TOOL"}],
+  response_format:{kind:"SIRI_PRIVATE_METADATA"},
+  stream:true,
+  input:[{type:"message",message:{role:"user",content:[
+   {type:"text",text:{value:"Why does sunlight warm Earth?"}}
+  ]}}]
+ });
+ const request={...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body};
+ const first=e.invoke(request);
+ assert.ok(first.returned[0].headers["X-AIES-Request-ID"]);
+ assert.ok(e.logs.includes("[AIES_V06] REQUEST_CAPTURED"));
+ assert.equal(e.requests.length,0);
+ const second=e.invoke({...request,headers:{...request.headers,...first.returned[0].headers}},
+  {status:200,body:fixture});
+ assert.equal(second.returned[0].status,200);
+ assert.equal(e.requests.length,1);
+ assert.equal(JSON.parse(e.requests[0].body).messages[1].content,"Why does sunlight warm Earth?");
+ const api=e.requests[0].body;
+ assert.ok(!api.includes("UNTRUSTED_TOOL_SPEC"));
+ assert.ok(!api.includes("UNTRUSTED_SERVER_TOOL"));
+ assert.ok(!api.includes("SIRI_PRIVATE_METADATA"));
+ assert.ok(!e.logs.some(x=>x.includes("Why does sunlight")||x.includes("NEVER_SEND")));
+});
+test("confirmed noRTI root field names require exact type, unknown root fields remain denied",()=>{
+ const group="siri.multimodal.noRTI";
+ const base={configuration:{response_configuration_group_id:group},input:[{type:"message",message:{role:"user",content:"SAFE"}}]};
+ const bads=[
+  {obj:{...base,client_tools:{type:"tool"}},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
+  {obj:{...base,server_tools:"TOOL_LIST"},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
+  {obj:{...base,response_format:[]},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
+  {obj:{...base,stream:"true"},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
+  {obj:{...base,attachments:["PRIVATE_MEDIA"]},stage:"NORTI_SHAPE_ROOT_FIELDS"},
+  {obj:{...base,media:{data:"PRIVATE_MEDIA"}},stage:"NORTI_SHAPE_ROOT_FIELDS"}
+ ];
+ for(const x of bads){
+  const e=env();
+  const r=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body:JSON.stringify(x.obj)});
+  assert.equal(r.returned[0].response.status,502);
+  assert.ok(e.logs.includes("[AIES_V06] "+x.stage));
+  assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_INPUT_UNSUPPORTED"));
+  assert.equal(e.requests.length,0);
+  assert.ok(e.logs.every(l=>!l.includes("PRIVATE_MEDIA")&&!l.includes("TOOL_LIST")));
+ }
+});
+test("confirmed noRTI wrapper only accepts message discriminator and refuses tool calls",()=>{
+ const group="siri.multimodal.noRTI";
+ for(const [wrap,stage] of [
+  [{type:"function_call",message:{role:"user",content:"SAFE"}},"NORTI_SHAPE_WRAPPER_TYPE_UNSUPPORTED"],
+  [{type:"audio",message:{role:"user",content:"SAFE"}},"NORTI_SHAPE_WRAPPER_TYPE_UNSUPPORTED"],
+  [{type:"message",message:{role:"tool",content:"SAFE"}},"NORTI_SHAPE_ROLE_UNSUPPORTED"],
+  [{type:"message",message:{role:"user",content:"SAFE"},call_id:"PRIVATE_ID"},"NORTI_SHAPE_ITEM_WRAPPER_FIELDS"]
+ ]){
+  const e=env();
+  const body=JSON.stringify({configuration:{response_configuration_group_id:group},input:[wrap]});
+  const r=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body});
+  assert.equal(r.returned[0].response.status,502);
+  assert.ok(e.logs.includes("[AIES_V06] "+stage));
+  assert.equal(e.requests.length,0);
+  assert.ok(e.logs.every(l=>!l.includes("PRIVATE_ID")));
+ }
+});
+test("noRTI unsupported nested content types produce only fixed diagnostics",()=>{
+ const group="siri.multimodal.noRTI";
+ const values=[
+  [{type:"image",data:"PRIVATE_IMAGE"}],
+  [["PRIVATE_NESTED_ARRAY"]],
+  [42]
+ ];
+ for(const content of values){
+  const e=env();
+  const body=JSON.stringify({configuration:{response_configuration_group_id:group},
+   input:[{type:"message",message:{role:"user",content}}]});
+  const r=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body});
+  assert.equal(r.returned[0].response.status,502);
+  assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_CONTENT_UNSUPPORTED"));
+  assert.ok(e.logs.some(x=>x.startsWith("[AIES_V06] NORTI_CONTENT_")));
+  assert.equal(e.requests.length,0);
+  assert.ok(e.logs.every(l=>l.length<100&&!l.includes("PRIVATE")));
+ }
+});
+
 test("noRTI is denied for non-Siri clients and WritingTools remains bypassed",()=>{
  const body=JSON.stringify({
   configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},
@@ -606,7 +692,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/a9912de69bc4ced1b6ccdd3d1de7360d807335cf/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/bf11ab5bdb6d039d0f68d528676eaf2f3986f891/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
