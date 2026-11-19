@@ -75,3 +75,7 @@ npm test
 ```
 
 `npm run check` 包含脚本语法、Node mock、隐私/并发/SSE 用例及文档链接、固定脚本 SHA 校验。**仓库当前的两个安装模块只可择一启用。**
+
+### WritingTools 真机协议校验
+
+当前 60 只对原 SAIR 已逆向描述的 `compose_selectedAndAllText` 写作创作子场景开放 **Beta**；其他校对、摘要/多模态请求尚未由本机 Qwen JSON 样本证实。为避免再次上传原始抓包，61 已内置默认关闭的 [WritingTools 一次性字段类型探针](docs/QWEN_PASSIVE_DIAG_ZH.md)，只需手动开启 600 秒，用一段无隐私测试文本即可观察软件分组及响应事件结构。61 与 60 必须互斥启用。
