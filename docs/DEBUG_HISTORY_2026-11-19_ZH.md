@@ -53,6 +53,16 @@
 - **不偷换关联**：偶发 `RESPONSE_TAG_MISSING` 没有安全通用的“最近问题”补偿。没有相同事务的 Header 或 Request body 时，必须继续失败关闭，不能把另一问题的回答显示出来。
 - **没有做过的事**：未获得完整原始 Qwen SSE/服务器提示词；未验证真实 DeepSeek 的所有模型枚举或套餐规则；未跑跨 iOS 版本大样本；未验证改写后的 Siri 卡片一定能显示。
 
+## 3A. 15:51 以后新增证据：有成功显示，但仍有穿透
+
+新增 `PacketTunnel-20261119155107.log`（1,135 行）和 `proxy-2026-11-19-155107.db`（40 条代理记录）。日志主接口五次 Siri 请求：15:51:27 和 15:52:14 的两次请求经过 `save data to pending data`，响应阶段均 `RESPONSE_TAG_MISSING`、`PROMPT_UNAVAILABLE`；15:51:41 和 15:52:30 两次直接发往远端，响应阶段完成 `DEEPSEEK_LABEL_APPLIED`、`DEEPSEEK_RESPONSE_ATTEMPTED`；15:53:24 的第五次虽关联成功，但被 `SSE_REWRITE_UNSUPPORTED` 拒绝。
+
+用户截图首次确认 Siri 正文显示 `【DeepSeek · AIES】`，因此过去“从未验证 Siri UI 可见 DeepSeek”的结论需要修正为“至少一次成功、复杂问答和稳定性未通过”。底部依然是系统 Qwen 服务标识，不能通过提示词更改。
+
+代理数据库的七条目标域记录包括**五条主接口、两条额外的 `/v1/sessions/{id}/responses`**（15:52:47、15:53:06）；没有保留任何 ID、请求内容或代理数据库原文。额外路径以前不在 60 匹配范围内，构成一次**可能的** Qwen 原文穿透渠道，但尚无完整响应证据证明每次 Qwen 显示都来自这里。
+
+基于此，后续 60 版本添加第三条**仅对 Siri 会话级 SSE**生效的响应保护规则、固定 DeepSeek 来源标记、较宽容的标准 SSE 分帧和 1000 token/15 秒复杂问答预算。安全关联失败仍保留 502；用户明确要求这轮不再做人工测试。
+
 ## 4. GitHub 修改历史与用途
 
 | PR | 核心目的 | 状态 |
