@@ -114,4 +114,4 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 
 针对这些已确认的键名和 JSON 类型，主脚本已做**精确允许**，但不会将根级工具列表、格式配置等元数据传给 DeepSeek。外层 `type` 的具体值仍**未知**，代码仅允许 `message`；如果真实 Siri 使用其他值，将输出 `NORTI_SHAPE_WRAPPER_TYPE_UNSUPPORTED`。如果消息内容数组元素不是受支持纯文本，将输出固定的 `NORTI_CONTENT_TEXT_OBJECT_UNSUPPORTED`、`NORTI_CONTENT_NESTED_ARRAY_UNSUPPORTED` 或 `NORTI_CONTENT_PRIMITIVE_UNSUPPORTED`，同时仍出现 `REQUEST_DIAG_CONTENT_UNSUPPORTED`。这些日志**不包含任何真实值**。
 
-下次复测：刷新 60 模块至固定脚本 SHA `bf11ab5bdb6d039d0f68d528676eaf2f3986f891`，直接向 Siri 提一次**非私密文本问题**；只报告 `[AIES_V06]` 固定日志行和 Siri 原生界面表现。**无需重复结构探针，也不要发送 PacketTunnel 全文**。
+下次复测：刷新 60 模块至固定脚本 SHA `13dab6261fc5bf834e286b4e1878faca2941867e`，直接向 Siri 提一次**非私密文本问题**；只报告 `[AIES_V06]` 固定日志行和 Siri 原生界面表现。**无需重复结构探针，也不要发送 PacketTunnel 全文**。
