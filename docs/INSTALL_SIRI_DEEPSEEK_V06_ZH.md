@@ -26,7 +26,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 诊断版更新（2026-11-19）
 
-如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `e79d05c3b8ef788abc92d3f1626426914c9dc7ce`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
+如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `bc726e60bdbf810d1edf1dbb62d8e6dc79b69d2d`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
 
 额外的 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) **仅供手动 Script Test**，不是模块自动安装的第三条钩子。**必须在 iPad 本地把旧版同名 JS 覆盖为最新版**；仅刷新远程 60 模块不够。手动运行一次开启 **600 秒**，问一次非隐私 Siri 问题，再运行同一个脚本查看结果、剩余时间和命中次数；重复检查**不自动取消**。需要停止时专门手动运行 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js)。不要把任何辅助脚本放入启用的 `event`、`cron` 或 HTTP 自动规则。详见[完整步骤](SIRI_GROUP_PROBE_ZH.md)。
 
@@ -55,3 +55,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 - 只有 [发布验收清单](RELEASE_CHECKLIST_ZH.md) 所列条件才决定是否可以标为稳定版本。
 
 其他材料：[使用手册](USER_GUIDE_ZH.md) · [当前架构](ARCHITECTURE_CURRENT_ZH.md) · [安全说明](SECURITY_CURRENT_ZH.md)。
+
+### 真实 Siri 输入结构诊断更新（2026-11-19）
+
+如已看到 `REQUEST_DIAG_INPUT_UNSUPPORTED`，新 60 模块仅在 noRTI 严格输入校验失败时输出附加的 `NORTI_SHAPE_*` 安全分类。**继续保留严格拒绝，不代表已修好 Siri。** 设备只需刷新 60 模块，**不需要重装本地组名探针、DeepSeek API Key 或 CA**。问一次非隐私问题后，分享固定 AIES 错误码即可，不能发送原始 PacketTunnel 日志。
