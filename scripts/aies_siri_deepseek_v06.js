@@ -545,8 +545,10 @@ function safeContinueUrl(v){
   (v===""||/^https:\/\/prod-yabuli\.qianwen\.com(?:\/|$)/i.test(v))?v:"";
 }
 function emptyOrMissing(v){return typeof v==="undefined"||(Array.isArray(v)&&v.length===0);}
-function rewriteSse(original,answer,scene){
+function rewriteSse(original,answer,scene,route,expectedSession){
  if(scene!=="writing")scene="siri";
+ route=route==="followup"?"followup":"main";
+ if(route==="followup"&&(scene!=="siri"||!validId(expectedSession)))return null;
  // Exact event sequence known from native Siri/Qwen. Unknown frames or tool
  // variants fail CLOSED. Never copy a full original SSE payload.
  if(typeof original!=="string"||original.length>C.maxSse||!original.length||
@@ -577,7 +579,7 @@ function rewriteSse(original,answer,scene){
  // content.done. Never copy their source URLs, IDs, snippets or other Qwen
  // content into a synthetic DeepSeek reply. Preserve only the text event
  // skeleton, and fail closed for annotations outside this verified interval.
- if(entries.length<12||entries.length>256)return null;
+ if(entries.length<(route==="followup"?11:12)||entries.length>256)return null;
  var clean=[],seenTextDone=false,seenContentDone=false,annotationCount=0;
  for(i=0;i<entries.length;i++){
   var row=entries[i];
@@ -596,25 +598,30 @@ function rewriteSse(original,answer,scene){
   clean.push(row);
  }
  entries=clean;
- if(entries.length<12||entries.length>256)return null;
+ if(entries.length<(route==="followup"?11:12)||entries.length>256)return null;
  var names=entries.map(function(x){return x.name;});
- var prefix=[E.session,E.created,E.choice,E.item,E.added];
+ var prefix=route==="followup"?[E.created,E.choice,E.item,E.added]:
+  [E.session,E.created,E.choice,E.item,E.added];
  var suffix=[E.textDone,E.contentDone,E.itemDone,E.completed,E.choiceDone,E.responseDone];
- for(i=0;i<5;i++)if(names[i]!==prefix[i])return null;
+ for(i=0;i<prefix.length;i++)if(names[i]!==prefix[i])return null;
  for(i=0;i<6;i++)if(names[names.length-6+i]!==suffix[i])return null;
- for(i=5;i<names.length-6;i++)if(names[i]!==E.delta)return null;
- var s=entries[0].payload,r=entries[1].payload;
+ for(i=prefix.length;i<names.length-6;i++)if(names[i]!==E.delta)return null;
+ var r=entries[route==="followup"?0:1].payload;
+ var s=route==="followup"?{id:expectedSession,expires_at:Math.floor(Date.now()/1000)+120}:
+   entries[0].payload;
  if(!s||!r||!validId(s.id)||!validId(r.id)||r.session_id!==s.id||
     !validEpoch(s.expires_at))return null;
  // Modality / safety: never synthesize an answer for active tool executions,
  // notices, moderation decisions or unexpected non-message output.
- var choiceAdded=entries[2].payload&&entries[2].payload.choice;
- var itemAdded=entries[3].payload&&entries[3].payload.item;
+ var offset=route==="followup"?-1:0;
+ var choiceAdded=entries[2+offset].payload&&entries[2+offset].payload.choice;
+ var itemAdded=entries[3+offset].payload&&entries[3+offset].payload.item;
  var choiceCompleted=entries[entries.length-3].payload&&entries[entries.length-3].payload.choice;
  var choiceDone=entries[entries.length-2].payload&&entries[entries.length-2].payload.choice;
  var lastResponse=entries[entries.length-1].payload;
  var lastChoice=lastResponse&&Array.isArray(lastResponse.choices)&&lastResponse.choices[0];
- if(!emptyOrMissing(r.notices)||!emptyOrMissing(lastResponse&&lastResponse.notices)||
+ if(!lastResponse||lastResponse.id!==r.id||lastResponse.session_id!==s.id||
+    !emptyOrMissing(r.notices)||!emptyOrMissing(lastResponse&&lastResponse.notices)||
     !emptyOrMissing(choiceCompleted&&choiceCompleted.moderation)||
     !emptyOrMissing(choiceDone&&choiceDone.moderation)||
     !emptyOrMissing(lastChoice&&lastChoice.moderation))return null;
@@ -646,7 +653,7 @@ function rewriteSse(original,answer,scene){
   return false;
  }
  var itemDone=entries[entries.length-4].payload&&entries[entries.length-4].payload.item;
- var contentAdded=entries[4].payload&&entries[4].payload.content;
+ var contentAdded=entries[4+offset].payload&&entries[4+offset].payload.content;
  var contentDone=entries[entries.length-5].payload&&entries[entries.length-5].payload.content;
  if(hasToolOutput(choiceCompleted)||hasToolOutput(choiceDone)||hasToolOutput(lastChoice)||
     choiceAdded&&!emptyOrMissing(choiceAdded.output)||
@@ -693,9 +700,10 @@ function rewriteSse(original,answer,scene){
   {item_index:0,choice_index:0,index:0,
    content:{text:{annotations:[],value:""},type:"text"}}
  ];
+ if(route==="followup")start.shift(); // No session.created in observed followup SSE.
  var out=[],n=start.slice();
- for(i=5;i<names.length-6;i++)
-  n.push({item_index:0,choice_index:0,content_index:0,delta:i===5?content:""});
+ for(i=start.length;i<names.length-6;i++)
+  n.push({item_index:0,choice_index:0,content_index:0,delta:i===start.length?content:""});
  n.push(
   {item_index:0,choice_index:0,content_index:0,value:content},
   {item_index:0,choice_index:0,index:0,content:textContent},
