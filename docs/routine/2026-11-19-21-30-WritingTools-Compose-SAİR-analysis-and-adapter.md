@@ -29,3 +29,16 @@
 - 用 Siri 的 `content/suggestions/summary` 替代写作工具的 `body/refinements`，或向未知组套用一个“通用”写作结构。
 
 **状态**：研究与开发分支进行中，尚未合并到 `main`；生产设备上 60 仍沿用原行为。
+
+## 21:45 追加：补齐可复验的 WritingTools 请求字段/类型探针
+
+**原因**：原 SAIR 给出了 `compose_selectedAndAllText` 逆向分组，但本项目的 61 原结构探针只认 Siri UA，无法在真实 iPad 写作工具上验证这一假设；直接放开全部 `WritingTools` 会有敏感选中文字与不兼容答案结构风险。
+
+**已修改**：
+1. 在 `scripts/aies_qwen_passive_diag.js` 添加 `writingShapeProbe()`，只识别目标主/会话级 Qwen URL、`WritingTools` UA、POST 且本机手动开启的 600 秒窗口，保存安全过滤的 group ID、请求 JSON **键/数据类型**与 SSE **键/数据类型和事件名/状态**。不保存选中文字、生成答案或原始 HTTP 包，所有四条 HTTP Hook 仍 `$done({})` 放行。
+2. 新增 `scripts/writing_schema_probe_ONCE.js` / `scripts/writing_schema_probe_STOP_ONCE.js`。第一运行手动 ARMED，第二读取并逻辑清理；STOP 单独取消且不会修改 DeepSeek Key。
+3. `tests/qwen-passive-diag.test.js` 增加未授权不采集、授权时不泄漏正文/答案/认证、仅 WritingTools 命中和 STOP 保护密钥等回归；`package.json` 与 `tools/check-docs.js` 将脚本计数更新为 18 并纳入语法检测。
+4. 四条 61 HTTP Hook 已重新固定到 `955fe4f7cec2471042469cdb7de740015db850bf`；60 Siri + WritingTools Compose 的三条规则仍使用各自固定脚本版本，不与 61 同时启用。
+5. `docs/QWEN_PASSIVE_DIAG_ZH.md`、`docs/COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md`、安装、安全、维护和 README 解释如何安全采集无隐私场景结构，不误称 Apple 官方协议。
+
+**下一步规划**：等全部 GitHub CI（尤其 61 不改写、Siri 原回归、WritingTools 失败关闭与双场景隔离）通过，再合并 PR #29。设备上先停 60、只启用 61 手动读取一次 WritingTools 非隐私 Compose 请求真实 group 和 SSE 结构；随后仅启用 60 验证 Compose Beta 是否实际调用 DeepSeek，最后回归 Siri。未知校对/摘要/视觉操作继续不宣称已支持；Request-ID 丢失场景仍失败关闭，不使用最近请求猜测。
