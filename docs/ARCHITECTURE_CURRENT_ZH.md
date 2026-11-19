@@ -13,6 +13,7 @@ scripts/
   aies_siri_deepseek_v06.js                当前唯一请求/响应重写脚本
   provision_key_ONCE.js                    本机一次性 Key 设置模板
   clear_key_ONCE.js                        本机 Key 清空模板
+  siri_group_probe_ONCE.js                手动一次性 Siri 场景组名诊断
 tests/
   siri-deepseek-v06.test.js                当前脚本模拟回归
   fixtures/siri-sse.js                     测试专用合成 SSE
@@ -60,6 +61,14 @@ Siri 原生 UI 是否接受：尚待真机验证
 | `log` | 固定阶段日志，不主动输出问题和 Key |
 
 2026-11-19 真机实测只证明 HTTP Request hook 命中，随后 `ERROR_UNSUPPORTED_SIRI_REQUEST`；没有真实 JSON 结构证据。因此本次新增的 `textAtom` 只允许受限纯文本内容对象（含 `text.value`），不会放开 Siri 组名、媒体或任意嵌套结构。错误码不包含正文/请求头/Key。是否能适配真实 Siri 仍待下次脱敏复测。
+
+## 真机组名诊断（2026-11-19）
+
+用户日志确认 Siri 与 WritingTools 共用目标路径；请求钩子对两类请求都曾返回 `GROUP_UNSUPPORTED`。现在新增 `isWritingTools`，明确识别为 WritingTools 时无论 Request/Response 阶段均调用 `$done({})` 旁路，避免错误接管不支持的写作工具。
+
+`captureUnknownSiriGroup` **不会改变解析结果**，且只有在本机通过 `siri_group_probe_ONCE.js` 事先开启、用户代理符合 Siri、HTTP POST 请求阶段、组名格式经严格过滤时才暂存一个组名；读取后应及时清空。主运行脚本只打印固定码。探针不是自动运行的 Hook，也不要求填写 API Key。
+
+新版模块仍只有两个 HTTP Hook 且 pin 到同一个不可变提交，辅助脚本单独放在 `scripts/` 中供 Script Test。详情见 [诊断指南](SIRI_GROUP_PROBE_ZH.md)。
 
 ## 风险边界
 
