@@ -23,3 +23,9 @@
 3. 只提一个不涉及隐私的 Siri 问题，观察是否首次出现 `[AIES_V06] REQUEST_CAPTURED` 或固定的 `ERROR_*`；缺失则继续只针对本机文件路径和模块 Hook 命中排查。
 4. 只有本地 HTTP Hook 加载成功后，才重启两轮/三轮 DeepSeek SSE 验收；每轮需用户实际观察 `【DeepSeek · AIES】` 前缀。
 5. 如果 iCloud 目录与下载状态正常仍然 `not found`，整理 Shadowrocket 具体版本与文件存储模式，形成经过真机确认的独立路径兼容变更；不能靠猜测添加路径前缀。
+
+## PR #35 合并及 CI 核验
+
+- [PR #35](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/35) 已成功合并至 `main`，merge commit `c1e87ef316ec70fa8dc4d7ef3840373ad223c04c`。
+- [GitHub Actions](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44573294518)：**107/107 tests passed, 0 failed**。本轮仅更新 62 模块内说明和安装/维护文档，没有修改任何实际请求/响应 Hook 或 DeepSeek 模型交互代码。
+- 下一步由用户先确认 iCloud 云盘实际目录和已下载的 JS 存在，再仅启用 62 并检查 **HTTP Hook** 是否出现 `[AIES_V06]` 固定码。如果文件确实存在仍报告 cloud driver `not found`，再针对 Shadowrocket 当前版本做具体路径适配，不重新采集 Siri 协议或推断模型出错。
