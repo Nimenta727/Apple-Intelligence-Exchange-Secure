@@ -207,6 +207,79 @@ function responseSummary(){
  out.framing=framing;
  return out;
 }
+// Additional manually armed A/B native-Qwen comparison. Main 61 remains
+// read-only and its older structure-only probe is completely independent.
+// A controlled, NON-PRIVATE test answer may be shown at manual readout.
+var AB_NATIVE_KEY="AIES_AB_NATIVE_V1_STATE",AB_NATIVE_TTL=600000;
+function abNativeTarget(){
+ return req&&typeof req.url==="string"&&
+  (/^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?[^#]*)?$/i.test(req.url)||
+   /^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?[^#]*)?$/i.test(req.url));
+}
+function abNativeRoute(){
+ return isTarget()?"MAIN":"SESSION_FOLLOWUP";
+}
+function abNativeAnswer(raw){
+ if(typeof raw!=="string"||raw.length>MAX_SSE)return {text:"",chars:0,truncated:false};
+ var frames=raw.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n\n"),
+  found="",parts=[];
+ for(var i=0;i<frames.length&&i<400;i++){
+  var name="",data=[],lines=frames[i].split("\n");
+  for(var j=0;j<lines.length;j++){
+   if(lines[j].slice(0,6)==="event:")name=lines[j].slice(6).trim();
+   if(lines[j].slice(0,5)==="data:")data.push(lines[j].slice(5).replace(/^ /,""));
+  }
+  if(!/\.text\.value\.(?:done|delta)$/.test(name))continue;
+  try{
+   var envelope=JSON.parse(data.join("\n")),payload=envelope&&envelope[name];
+   if(name.slice(-5)===".done"&&typeof payload.value==="string")found=payload.value;
+   if(name.slice(-6)===".delta"&&typeof payload.delta==="string"&&parts.length<50)
+    parts.push(payload.delta);
+  }catch(e){}
+ }
+ if(!found)found=parts.join("");
+ // The content was observed as a JSON text property in Siri responses.
+ // Do not collect response metadata, tools, reasoning or raw SSE.
+ try{
+  var obj=JSON.parse(found);
+  if(obj&&typeof obj.content==="string")found=obj.content;
+ }catch(e){}
+ var originalLength=found.length;
+ found=found.replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g,"[REDACTED_KEY]")
+  .replace(/\bBearer\s+[A-Za-z0-9._-]{8,}\b/ig,"[REDACTED_AUTH]")
+  .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig,"[REDACTED_EMAIL]")
+  .replace(/https?:\/\/[^\s"'<>]+/ig,"[REDACTED_URL]");
+ return {text:found.slice(0,7000),chars:originalLength,truncated:found.length>7000};
+}
+function abNativeCapture(){
+ if(!abNativeTarget()||!uaSiri())return;
+ var raw=store&&store.read?store.read(AB_NATIVE_KEY):null,st=null,now=Date.now();
+ try{st=raw&&JSON.parse(raw);}catch(e){return;}
+ if(!st||st.v!==1||st.phase!=="armed"||
+    typeof st.createdAt!=="number"||typeof st.expiresAt!=="number"||
+    st.createdAt>now||st.expiresAt<=now||st.expiresAt>now+AB_NATIVE_TTL||
+    !Array.isArray(st.records)||st.records.length>=9)return;
+ var route=abNativeRoute(),rec={tMs:Math.max(0,now-st.createdAt),route:route};
+ if(!res){
+  var method=String(req.method||req.httpMethod||"").toUpperCase();
+  if(method!=="POST")return;
+  rec.stage="NATIVE_REQUEST";
+  rec.shape=requestSummary();
+ }else{
+  rec.stage="NATIVE_RESPONSE";
+  rec.shape=responseSummary();
+  var answer=abNativeAnswer(res.body);
+  rec.answerChars=answer.chars;
+  rec.answerText=answer.text;
+  rec.answerTruncated=answer.truncated;
+ }
+ st.records.push(rec);
+ var packed=JSON.stringify(st);
+ if(packed.length>47000)return;
+ if(store&&store.write&&store.write(packed,AB_NATIVE_KEY))
+  fixed(res?"AB_NATIVE_RESPONSE_CAPTURED_LOCAL":"AB_NATIVE_REQUEST_CAPTURED_LOCAL");
+}
+
 function main(){
  if(!isTarget()||!req||String(req.method||req.httpMethod||"").toUpperCase()!=="POST"||!uaSiri())return;
  var st=null,now=Date.now(),raw=read();
@@ -230,7 +303,7 @@ function main(){
  if(write(JSON.stringify(st)))fixed("RESPONSE_SSE_SCHEMA_CAPTURED_LOCAL");
  else fixed("STORE_FAILED");
 }
-try{main();}catch(e){fixed("DIAGNOSTIC_EXCEPTION");}finally{
+try{try{abNativeCapture();}catch(e){fixed("AB_NATIVE_CAPTURE_FAILED");}main();}catch(e){fixed("DIAGNOSTIC_EXCEPTION");}finally{
  // THE ONLY SCRIPT OUTCOME: preserve original Qwen request/response.
  if(typeof $done==="function")$done({});
 }
