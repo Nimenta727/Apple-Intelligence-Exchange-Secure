@@ -718,6 +718,7 @@ test("Qwen body capture handles secret-shaped fields and model prompts with mask
  obj.input[0].message.content=[{type:"text",text:{value:"Bearer VERYSECRET1234567890"}}];
  obj.api_key="EXPLICIT_PRIVATE_KEY";
  obj.user_email="test-person@example.org";
+ obj.input[0].message.device_token="EXPLICIT_DEVICE_TOKEN";
  request.body=JSON.stringify(obj);
  e.invoke(request);
  const str=qwenBodyState(e).body;
@@ -725,6 +726,7 @@ test("Qwen body capture handles secret-shaped fields and model prompts with mask
  assert.ok(!str.includes("VERYSECRET1234567890"));
  assert.ok(!str.includes("EXPLICIT_PRIVATE_KEY"));
  assert.ok(!str.includes("test-person@example.org"));
+ assert.ok(!str.includes("EXPLICIT_DEVICE_TOKEN"));
  assert.ok(str.includes("[REDACTED_FIELD]"));
  assert.ok(e.logs.every(x=>!x.includes("VERYSECRET")));
 });
