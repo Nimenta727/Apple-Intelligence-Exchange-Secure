@@ -29,3 +29,7 @@
 当前下一步：刷新 60 模块，下载**新的** `siri_schema_probe_ONCE.js` 并遵循 [本地结构诊断流程](SIRI_SCHEMA_PROBE_ZH.md)。此脚本与此前组名探针不同，需要第一次手动开启、问 Siri、第二次手动读出经过筛选的键名与类型。使用非隐私 Siri 问题检查是否出现 `REQUEST_CAPTURED`，若看到 `REQUEST_DIAG_INPUT_UNSUPPORTED`、`CONTENT_UNSUPPORTED` 或 `MEDIA_UNSUPPORTED` 则说明真实结构仍超出安全白名单，停止该分支的测试并仅反馈固定错误码。之后再分别验证上游 SSE、DeepSeek 和 Siri 原生 UI；详见[调试说明](DEBUGGING_ZH.md)。达到 [发布清单](RELEASE_CHECKLIST_ZH.md) 的门槛后再决定是否发布稳定版。
 
 仓库只保留当前 v0.6 的运行文件、测试与文档，不再维护不相关的旧实验代码。删除仓库中的旧文件**不等于清除设备上此前导入的模块**，实际设备仍需停用冲突配置。
+
+## 真机 UI 品牌与响应阶段（2026-11-19）
+
+用户反馈大约三次“无法获得回答”，一次出现 Qwen UI 标识，未见明确 DeepSeek 字样。不能将 Qwen UI 卡片标志直接等同于回答来源，也不能把 `DEEPSEEK_RESPONSE_ATTEMPTED` 判定为原生 Siri 展示成功。最新脚本仅在已验证的 DeepSeek 响应完成 SSE 重写后，在回答正文直接添加 `【DeepSeek · AIES】`；同时增加 Response Hook 中关联标记、关联存储与请求正文恢复来源的**固定状态日志**。不存在成功的 DeepSeek 调用时绝不加此标签。**SSE 和 Siri UI 最终成功率仍未验收，未宣布可用。**

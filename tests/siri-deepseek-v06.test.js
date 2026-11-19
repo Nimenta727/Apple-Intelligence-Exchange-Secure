@@ -60,6 +60,77 @@ test("complete dual-hook mock returns only DeepSeek answer and preserves source 
  assert.ok(e.logs.every(x=>!x.includes(KEY)&&!x.includes("Explain why")));
  assert.equal(e.data["AIES_R1_"+injected["X-AIES-Request-ID"]],"");
 });
+test("verified DeepSeek answer is visibly labeled once in the rewritten Siri SSE and provider identity prompt",()=>{
+ const e=env();
+ const req=e.invoke(e.request);
+ const response=e.invoke({...e.request,headers:req.returned[0].headers},{body:fixture,status:200});
+ assert.equal(response.returned[0].status,200);
+ const body=response.returned[0].body;
+ assert.ok(body.includes("【DeepSeek · AIES】"));
+ const name="session.response.choices[].items[].message.content[].text.value.delta";
+ const frames=body.trim().split("\n\n");
+ const contentFrame=frames.find(frame=>frame.startsWith("event: "+name+"\n"));
+ assert.ok(contentFrame);
+ const answerJSON=JSON.parse(contentFrame.split("\n")[1].slice(6));
+ const visibleContent=JSON.parse(answerJSON[name].delta).content;
+ assert.ok(visibleContent.startsWith("【DeepSeek · AIES】\n"));
+ assert.equal(visibleContent.split("【DeepSeek · AIES】").length-1,1);
+ assert.ok(body.includes("DEEPSEEK_EXCLUSIVE_REPLY"));
+ assert.ok(!body.includes("QWEN_ORIGINAL_ANSWER_TEST"));
+ assert.equal(response.returned[0].headers["X-AIES-Answer-Source"],"deepseek");
+ assert.ok(e.logs.includes("[AIES_V06] SSE_PREFLIGHT_PASSED"));
+ assert.ok(e.logs.includes("[AIES_V06] DEEPSEEK_LABEL_APPLIED"));
+ assert.ok(e.logs.includes("[AIES_V06] DEEPSEEK_RESPONSE_ATTEMPTED"));
+ assert.ok(e.logs.includes("[AIES_V06] RESPONSE_TAG_PRESENT"));
+ assert.ok(e.logs.includes("[AIES_V06] RESPONSE_PROMPT_FROM_STORE"));
+ const modelPayload=JSON.parse(e.requests[0].body);
+ assert.ok(modelPayload.messages[0].content.includes("DeepSeek"));
+ assert.ok(modelPayload.messages[0].content.includes("AIES"));
+ assert.ok(!modelPayload.messages[0].content.includes("千问或 Qwen 生成的回答"));
+ assert.equal(Sse.validateCandidateSse(body,"siri").ok,true);
+});
+test("provider marker never appears on errors or unvalidated upstream responses",()=>{
+ const badProvider=env(),a=badProvider.invoke(badProvider.request);
+ const bad=badProvider.invoke({...badProvider.request,headers:a.returned[0].headers},{body:fixture,status:200},{
+  post:(options,callback)=>callback(null,{statusCode:503},"DOWN")
+ });
+ assert.equal(bad.returned[0].status,502);
+ assert.ok(!JSON.stringify(bad.returned[0]).includes("【DeepSeek · AIES】"));
+ assert.ok(!badProvider.logs.includes("[AIES_V06] DEEPSEEK_LABEL_APPLIED"));
+ const invalidSse=env(),q=invalidSse.invoke(invalidSse.request);
+ const b=invalidSse.invoke({...invalidSse.request,headers:q.returned[0].headers},
+  {body:fixture.replace("session.created","wrong.event"),status:200});
+ assert.equal(b.returned[0].status,502);
+ assert.equal(invalidSse.requests.length,0);
+ assert.ok(!JSON.stringify(b.returned[0]).includes("【DeepSeek · AIES】"));
+ assert.ok(!invalidSse.logs.includes("[AIES_V06] DEEPSEEK_LABEL_APPLIED"));
+});
+test("response correlation diagnostics distinguish missing tag, store miss and request-body fallback without leaking content",()=>{
+ const e=env();
+ const untagged=e.invoke({...e.request,headers:{},body:undefined},{body:fixture,status:200});
+ assert.equal(untagged.returned[0].status,502);
+ assert.ok(e.logs.includes("[AIES_V06] RESPONSE_TAG_MISSING"));
+ assert.ok(e.logs.includes("[AIES_V06] RESPONSE_PROMPT_BODY_UNAVAILABLE"));
+ assert.ok(e.logs.includes("[AIES_V06] ERROR_PROMPT_UNAVAILABLE"));
+ assert.equal(e.requests.length,0);
+ const fallback=env();
+ const r=fallback.invoke({...fallback.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"}},{body:fixture,status:200});
+ assert.equal(r.returned[0].status,200);
+ assert.ok(fallback.logs.includes("[AIES_V06] RESPONSE_TAG_MISSING"));
+ assert.ok(fallback.logs.includes("[AIES_V06] RESPONSE_PROMPT_FROM_BODY"));
+ assert.ok(r.returned[0].body.includes("【DeepSeek · AIES】"));
+ const invalid=env();
+ const bad=invalid.invoke({...invalid.request,headers:{"X-AIES-Request-ID":"SENSITIVE_BEARER_VALUE"},body:undefined},{body:fixture,status:200});
+ assert.equal(bad.returned[0].status,502);
+ assert.ok(invalid.logs.includes("[AIES_V06] RESPONSE_TAG_INVALID"));
+ assert.ok(invalid.logs.every(x=>!x.includes("SENSITIVE_BEARER_VALUE")));
+ const lost=env(),q=lost.invoke(lost.request);
+ lost.data["AIES_R1_"+q.returned[0].headers["X-AIES-Request-ID"]]="";
+ const missing=lost.invoke({...lost.request,headers:q.returned[0].headers,body:undefined},{body:fixture,status:200});
+ assert.equal(missing.returned[0].status,502);
+ assert.ok(lost.logs.includes("[AIES_V06] RESPONSE_PROMPT_STORE_MISSING"));
+ assert.ok(lost.logs.includes("[AIES_V06] RESPONSE_PROMPT_BODY_UNAVAILABLE"));
+});
 test("concurrent prompts use independently keyed sessions",()=>{
  const e=env();
  const a=e.invoke(e.request),b=e.invoke({...e.request,body:promptBody.replace("sky","ocean")});
@@ -807,7 +878,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/95e2a83981e907472ee4395445038fa082e32d9b/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/187d755bf0f76032df162f4a9f25855b4f2a594f/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
