@@ -61,9 +61,11 @@ function textAtom(v){
     Object.keys(t).length===1&&typeof t.value==="string")return t.value;
  return null;
 }
-// One-shot local diagnostic: never log the observed identifier from the request.
-var GROUP_PROBE_ARM="AIES_SIRI_GROUP_PROBE_ARM";
-var GROUP_PROBE_RESULT="AIES_SIRI_GROUP_PROBE_RESULT";
+// Opt-in local-only v2 diagnostic. One state key avoids ARM/RESULT double-write
+// ambiguity. Never log group values, prompt text, headers or credential material.
+var GROUP_PROBE_STATE="AIES_SIRI_GROUP_PROBE_V2_STATE";
+var GROUP_PROBE_WINDOW_MS=600000;
+var requestGroup=null;
 function isWritingTools(){
  return /^WritingTools(?:\s|\()/i.test(header(req&&req.headers,"User-Agent"));
 }
@@ -76,18 +78,68 @@ function safeGroupIdentifier(v){
    !/[A-Za-z0-9]{25,}/.test(v)&&
    !/^(?:bearer|token|secret|sk-)/i.test(v);
 }
-function captureUnknownSiriGroup(g){
- // Capture only in the request hook for an explicit Siri POST; never in response.
- if(res||!isSiriForProbe()||String(req.method||req.httpMethod||"").toUpperCase()!=="POST")return;
- var arm=storeRead(GROUP_PROBE_ARM),exp=0;
- try{exp=JSON.parse(arm).expiresAt;}catch(e){return;}
- if(typeof exp!=="number"||!isFinite(exp)||exp<=Date.now()||exp>Date.now()+180000)return;
- // Consume opt-in on the first eligible request; no implicit background collection.
- storeWrite(GROUP_PROBE_ARM,"");
- if(!safeGroupIdentifier(g)){log("SIRI_GROUP_PROBE_UNSAFE_ID");return;}
- if(storeWrite(GROUP_PROBE_RESULT,JSON.stringify({id:g,expiresAt:Date.now()+180000})))
-  log("SIRI_GROUP_CAPTURED_LOCAL");
- else log("SIRI_GROUP_PROBE_STORE_FAILED");
+function readArmedProbe(){
+ var raw=storeRead(GROUP_PROBE_STATE),v=null,now=Date.now();
+ if(!raw||typeof raw!=="string")return null;
+ try{v=JSON.parse(raw);}catch(e){return null;}
+ if(!v||v.v!==2||v.phase!=="armed"||
+    typeof v.expiresAt!=="number"||!isFinite(v.expiresAt)||
+    v.expiresAt<=now||v.expiresAt>now+GROUP_PROBE_WINDOW_MS)return null;
+ return v;
+}
+function cappedCount(v){
+ return typeof v==="number"&&isFinite(v)&&v>=0?Math.min(9,Math.floor(v)+1):1;
+}
+function probeObserveWritingTools(){
+ if(res)return;
+ var state=readArmedProbe();
+ if(!state)return;
+ state.writingToolsSeen=cappedCount(state.writingToolsSeen);
+ if(storeWrite(GROUP_PROBE_STATE,JSON.stringify(state)))
+  log("SIRI_PROBE_WRITINGTOOLS_SEEN");
+ else log("SIRI_PROBE_STORE_WRITE_FAILED");
+}
+function probeObserveRequest(){
+ if(res)return;
+ var state=readArmedProbe();
+ if(!state)return;
+ // Never record group IDs from non-POST traffic, even with a Siri-looking UA.
+ if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){
+  log("SIRI_PROBE_NON_POST_IGNORED");return;
+ }
+ if(!isSiriForProbe()){
+  state.otherClientSeen=cappedCount(state.otherClientSeen);
+  if(storeWrite(GROUP_PROBE_STATE,JSON.stringify(state)))
+   log("SIRI_PROBE_OTHER_CLIENT_SEEN");
+  else log("SIRI_PROBE_STORE_WRITE_FAILED");
+  return;
+ }
+ state.siriSeen=cappedCount(state.siriSeen);
+ // Only these fixed parser codes may be recorded, never untrusted values.
+ var fixed={
+  OK:1,BODY_NOT_TEXT:1,BODY_EMPTY:1,BODY_OVERSIZE:1,
+  JSON_INVALID:1,ROOT_UNSUPPORTED:1,GROUP_MISSING:1,
+  GROUP_UNSUPPORTED:1,INPUT_UNSUPPORTED:1,CONTENT_UNSUPPORTED:1,
+  MEDIA_UNSUPPORTED:1,PROMPT_EMPTY:1,PROMPT_OVERSIZE:1,
+  STRUCTURE_UNSUPPORTED:1
+ };
+ state.lastCode=fixed[requestDiagnostic]?requestDiagnostic:"UNKNOWN_STAGE";
+ var now=Date.now();
+ if(requestDiagnostic==="GROUP_UNSUPPORTED"){
+  if(safeGroupIdentifier(requestGroup)){
+   state.phase="captured";
+   state.groupId=requestGroup;
+   // Keep the capture readable for ten minutes after the matching Siri request.
+   state.expiresAt=now+GROUP_PROBE_WINDOW_MS;
+   state.lastCode="GROUP_CAPTURED";
+  }else state.lastCode="GROUP_ID_UNSAFE";
+ }
+ if(!storeWrite(GROUP_PROBE_STATE,JSON.stringify(state))){
+  log("SIRI_PROBE_STORE_WRITE_FAILED");return;
+ }
+ if(state.phase==="captured")log("SIRI_GROUP_CAPTURED_LOCAL");
+ else if(state.lastCode==="GROUP_ID_UNSAFE")log("SIRI_GROUP_PROBE_UNSAFE_ID");
+ else log("SIRI_PROBE_SIRI_REQUEST_SEEN");
 }
 function parseRequest(raw){
  if(!raw){if(requestDiagnostic==="UNSET")requestDiagnostic="BODY_EMPTY";return null;}
@@ -98,7 +150,8 @@ function parseRequest(raw){
  try{
   var g=o.configuration&&o.configuration.response_configuration_group_id;
   if(typeof g!=="string"){requestDiagnostic="GROUP_MISSING";return null;}
-  if(!/^(siri\.tqa|siri_tqa)$/i.test(g)){requestDiagnostic="GROUP_UNSUPPORTED";captureUnknownSiriGroup(g);return null;}
+  requestGroup=g;
+  if(!/^(siri\.tqa|siri_tqa)$/i.test(g)){requestDiagnostic="GROUP_UNSUPPORTED";return null;}
   if(!Array.isArray(o.input)||o.input.length<1||o.input.length>12){
    requestDiagnostic="INPUT_UNSUPPORTED";return null;
   }
@@ -220,11 +273,12 @@ function storeRead(key){try{return store&&store.read?store.read(key):null;}catch
 function isTarget(){return !!(req&&typeof req.url==="string"&&C.target.test(req.url));}
 if(!isTarget()){done({});return;}
 // WritingTools uses this endpoint too, but is outside this Siri-only product.
-if(isWritingTools()){log("WRITINGTOOLS_SKIPPED");done({});return;}
+if(isWritingTools()){probeObserveWritingTools();log("WRITINGTOOLS_SKIPPED");done({});return;}
 if(!res){
  // Phase 1: capture a prompt and explicitly couple request/response using
  // an opaque ID. Unlike "latest prompt", concurrent requests never share a slot.
  var prompt=parseRequest(rawRequest());
+ probeObserveRequest();
  if(!prompt){log("REQUEST_DIAG_"+requestDiagnostic);error("UNSUPPORTED_SIRI_REQUEST");return;}
  if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){error("INVALID_METHOD");return;}
  var token=randomToken();

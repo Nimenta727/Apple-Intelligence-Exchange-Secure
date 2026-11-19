@@ -60,7 +60,7 @@ Siri 文本请求
 
 真实日志出现三个 `REQUEST_DIAG_GROUP_UNSUPPORTED`：一次 WritingTools、两次 Siri。因为二者共享同一个 URL，**仅匹配域名并不能区分**；当前脚本会对识别为 WritingTools 的请求和响应执行 `WRITINGTOOLS_SKIPPED`，不会向 DeepSeek 转发其内容。主程序仍严格拒绝未知 Siri 组名。
 
-为了在不提交私密请求的前提下查明 Siri 组名，新增一个需要主动手动运行两次的 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js)。请严格按照 [本地探针完整步骤](SIRI_GROUP_PROBE_ZH.md) 操作，只有你手动检查结果时才会在本地脚本测试日志出现 `GROUP_ID=...`；普通主程序日志只会出现固定的 `SIRI_GROUP_CAPTURED_LOCAL`，绝不输出实际值。若采样超时或格式不安全，不放宽校验。
+为避免旧版 180 秒采样过期和重复测试误取消，现用 **v2 600 秒状态检查工具**：先同步更新远程 60 模块和 iPad **本地同名 JS 文件**，使用 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) 手动开启、询问 Siri、反复查询剩余时间与分类计数，查询**不会取消**；捕获时仅在本机测试日志显示一次 `GROUP_ID=...`，其他日志仍只有固定码。确需取消，手动运行独立的 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js)。完整方法及 `ACTIVE_REMAINING_SECONDS` / `SIRI_REQUESTS_SEEN` / `LAST_STAGE` 解释见[本地探针指南](SIRI_GROUP_PROBE_ZH.md)。若窗口过期、网络通路未命中或格式不安全，不放宽白名单。
 
 **提示：** `SIRI_GROUP_CAPTURED_LOCAL` 不代表请求已捕获并可送 DeepSeek，只代表曾临时保存一个组名；在真实组名审查后仍须验证解析、SSE 和 Siri UI。禁止发完整 PacketTunnel 日志。
 

@@ -5,7 +5,8 @@
 ## 真机组名诊断维护要求（2026-11-19）
 
 - Siri 与 WritingTools 共用目标路径，不能仅凭 URL 放宽 Siri 组白名单，也不能把 WritingTools 当成 Siri。
-- `scripts/siri_group_probe_ONCE.js` 仅供设备本地 Script Test 两次手动运行，不是 Shadowrocket 自动 Hook；正式模块仍只有两条相同固定提交的 Hook。
+- `scripts/siri_group_probe_ONCE.js` 与 `scripts/siri_group_probe_STOP_ONCE.js` 仅供本地 Script Test；检查脚本首次开启 **600 秒**，再次执行仅报告状态、不会误取消；停止须显式运行 STOP。它们不是自动 Hook；正式模块仍只有两条相同固定提交的 HTTP Hook。
+- 升级必须同时刷新远程 60 模块和**覆盖 iPad 已缓存的本地手动检查脚本**。保留单键状态验证、到期清理、固定阶段码及敏感组名过滤的测试。
 - 组名仅在人工明确授权时暂存，主运行日志不包含组名、请求正文和认证凭据；原生 PacketTunnel 日志仍可能显示私有令牌。
 - 获得不敏感的真实场景标识后，应先添加明确的 Siri-only 兼容测试，再决定是否调整白名单；SSE / DeepSeek / 原生 UI 仍各自需要验收。
 

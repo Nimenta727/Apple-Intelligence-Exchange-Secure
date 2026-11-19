@@ -13,7 +13,8 @@ scripts/
   aies_siri_deepseek_v06.js                当前唯一请求/响应重写脚本
   provision_key_ONCE.js                    本机一次性 Key 设置模板
   clear_key_ONCE.js                        本机 Key 清空模板
-  siri_group_probe_ONCE.js                手动一次性 Siri 场景组名诊断
+  siri_group_probe_ONCE.js                手动 600 秒 Siri 组名状态诊断
+  siri_group_probe_STOP_ONCE.js           手动明确停止/清空诊断状态
 tests/
   siri-deepseek-v06.test.js                当前脚本模拟回归
   fixtures/siri-sse.js                     测试专用合成 SSE
@@ -66,7 +67,7 @@ Siri 原生 UI 是否接受：尚待真机验证
 
 用户日志确认 Siri 与 WritingTools 共用目标路径；请求钩子对两类请求都曾返回 `GROUP_UNSUPPORTED`。现在新增 `isWritingTools`，明确识别为 WritingTools 时无论 Request/Response 阶段均调用 `$done({})` 旁路，避免错误接管不支持的写作工具。
 
-`captureUnknownSiriGroup` **不会改变解析结果**，且只有在本机通过 `siri_group_probe_ONCE.js` 事先开启、用户代理符合 Siri、HTTP POST 请求阶段、组名格式经严格过滤时才暂存一个组名；读取后应及时清空。主运行脚本只打印固定码。探针不是自动运行的 Hook，也不要求填写 API Key。
+v2 的 `probeObserveRequest`、`probeObserveWritingTools` **不会改变解析结果**；它们仅在本机手动开启后的 600 秒有效期、HTTP Request 阶段、指定目标路径执行。单个状态键保留固定阶段码与有上限的统计；只有 Siri User-Agent 的目标 POST、组名格式通过过滤时才暂存一个组名，供本机手动查看并清除。手动脚本重复执行仅查状态，独立 STOP 文件明确停止。主运行日志只打印固定码；本地 Script Test 与网络脚本能否共享 `$persistentStore` 尚待真实设备确认。
 
 新版模块仍只有两个 HTTP Hook 且 pin 到同一个不可变提交，辅助脚本单独放在 `scripts/` 中供 Script Test。详情见 [诊断指南](SIRI_GROUP_PROBE_ZH.md)。
 

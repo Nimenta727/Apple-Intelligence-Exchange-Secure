@@ -11,7 +11,7 @@
 | [安装与回滚](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) | 模块导入、证书、设备本地 Key、停用 |
 | [首次使用及日常操作](USER_GUIDE_ZH.md) | 安装后测试、使用边界、故障恢复 |
 | [调试与错误码](DEBUGGING_ZH.md) | 请求/响应/模型/UI 诊断和脱敏反馈 |
-| [Siri 组名本地诊断](SIRI_GROUP_PROBE_ZH.md) | 180 秒单次采样；两次手动脚本测试；不抓取正文 |
+| [Siri 组名本地诊断](SIRI_GROUP_PROBE_ZH.md) | 600 秒采样；重复查看状态不取消；提供独立停止脚本，不采集正文 |
 | [安全与隐私](SECURITY_CURRENT_ZH.md) | Qwen 上游、DeepSeek、MITM、存储及回退 |
 
 ## 开发者与维护者

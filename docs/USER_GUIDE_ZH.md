@@ -22,7 +22,7 @@
 
 新版已确认 Siri 和 WritingTools 都可能使用 `/v1/sessions/responses`。当前明确跳过 WritingTools，但仍不自动放行未知 Siri 组名。
 
-如需继续验证：按照 [Siri 场景标识本地诊断步骤](SIRI_GROUP_PROBE_ZH.md) 将 `siri_group_probe_ONCE.js` 保存到本机，使用你已经找到的 **Script Test** 手动运行一次启用、一次检查/清理，中间只发一次非隐私 Siri 文本问题。不要将它添加到 event/cron/HTTP 自动触发规则，不需要重新写入 DeepSeek Key。主程序固定日志 `SIRI_GROUP_CAPTURED_LOCAL` 并不代表 DeepSeek 已调用。
+如需继续验证：按 [Siri 场景标识诊断 v2](SIRI_GROUP_PROBE_ZH.md) **重新下载并覆盖本机旧版 `siri_group_probe_ONCE.js`**；使用 **Script Test** 手动运行一次开启 600 秒窗口，接着向 Siri 提问。之后多次手动运行只检查状态与剩余时间，**不会误取消**；捕获时会在本机显示一次组名并清理。需要结束时单独运行 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js)。不得启用 event/cron/HTTP 自动脚本，不需要重新写入 DeepSeek Key。`SIRI_GROUP_CAPTURED_LOCAL` 只证明保存了场景标识，不代表调用 DeepSeek。
 
 ## 目前的能力边界
 

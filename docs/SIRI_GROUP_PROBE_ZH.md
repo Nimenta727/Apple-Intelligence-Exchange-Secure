@@ -1,32 +1,83 @@
-# AIES v0.6：Siri 场景标识的一次性本地诊断
+# Siri 场景组名：本地诊断 v2（10 分钟）
 
-> **2026-11-19 真机进度：** iPadOS 27.3 的 Siri 请求命中 `prod-yabuli.qianwen.com/v1/sessions/responses`，但出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`。同一接口也被 WritingTools 使用。具体 Siri `response_configuration_group_id` 尚未知，**不应直接把所有组名放行**。此操作仅用于收集一个明确的配置标识，不修复 SSE，也不会调用 DeepSeek。
+> 2026-11-19 诊断改进版。真机已观察 Siri 的 REQUEST_DIAG_GROUP_UNSUPPORTED，实际 response_configuration_group_id 仍未知。本工具仅用于定位，不自动放宽白名单，不证明 DeepSeek/SSE/Siri UI 已经兼容。
 
-## 先了解安全边界
+## 与旧版相比
 
-- 不需要修改或重新提交 DeepSeek API Key；`$persistentStore` 和 MITM 已确认工作。
-- 本工具**不上传**请求正文、Authorization、Private-Access-Token、问题、SSE 或其他 header，也不访问网络。
-- 主运行脚本只在**用户主动开启诊断**、请求头标记为 Siri 且出现 `GROUP_UNSUPPORTED` 时，尝试保存**单个简短的组名**到本机 `$persistentStore`。对 WritingTools 不保存组名；对异常/长得像凭据的标识拒绝保存。实际 `User-Agent` 仅为辅助判断，不能单凭它信任请求或放宽 Siri 白名单。
-- 数据存在 `AIES_SIRI_GROUP_PROBE_RESULT`，逻辑有效期为 **180 秒**。读取后会写入空字符串清空；这不保证底层存储物理擦除，因而只用于非隐私测试。
-- 除非你主动**再次手动运行**本地工具，诊断结果不会出现在主脚本日志。第二次手动运行会在**设备本机的脚本测试日志**显示组名。即使如此，该值也属于未经验证的原始服务元数据，请先检查是否敏感，不能直接上传整个 PacketTunnel 日志。
+- 旧版 180 秒，重复运行会取消采样；v2 **600 秒（10 分钟）**，重复运行只**检查状态**，绝不意外取消，不用等满 10 分钟。
+- 本机显示**剩余秒数**、**Siri 命中次数**、**WritingTools 命中次数**、**其他客户端命中次数**、**最近解析阶段码**，可判断“没有实际问 Siri”“被 WritingTools 命中”“真正解析失败”“过期”。
+- 成功捕获时只在本机暂存一个经格式/长度限制的场景组名；只在再次手动测试时显示一次 GROUP_ID 并清理。主 HTTP 脚本绝不输出组名或请求正文。
+- 取消有**独立 STOP 辅助脚本**，不会因查看状态而停用。
+- 两个辅助 JS 都只是本地 Script Test 工具，不是 HTTP、event 或 cron 自动钩子。
 
-## 安全使用步骤：同一个文件只运行两次
+## 一次性准备
 
-1. 备份 Shadowrocket 配置，停用同域旧探针模块。更新 [60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，确认两条 hook 指向修订后的固定脚本提交 `ca1842345ea90ce9b2d97e69675852614275404f`；保持 VPN、目标域名的 MITM 和本地 Key 不变。
-2. 从仓库下载 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) 到 iPad **本地临时文件**。不要修改文件，也不要在其中填写任何 Key。与之前验证 Key 的方法相同，使用 Shadowrocket 的 **Script Test / 脚本测试** 手动执行；**不要**把它添加为 HTTP、event、cron 或自动运行脚本。
-3. **第一次**运行：本机出现 `[AIES_SIRI_GROUP_LOCAL] ARMED_180_SECONDS`，表示已开启一次性 180 秒的采样窗口。
-4. 180 秒内只发起**一个不含隐私**的 Siri 纯文本问答（不要使用写作工具）；不要上传此过程的 PacketTunnel 原始日志。正常情况下，Siri 依旧可能显示错误，因为未知组名没有被放行。
-5. **第二次**手动运行同一个本地脚本：如捕获了格式安全的标识，将仅在本机显示 `[AIES_SIRI_GROUP_LOCAL] GROUP_ID=...`，并清除本机临时状态；否则显示 `NO_CAPTURE_PROBE_DISARMED` / `NO_SAFE_RESULT_OR_EXPIRED`。在主脚本日志中，仅会出现 `SIRI_GROUP_CAPTURED_LOCAL` 或 `SIRI_GROUP_PROBE_UNSAFE_ID` 的固定码。
-6. 删除本地辅助文件。如需取消已启用但尚未命中的采样，再手动运行第二次即可取消；如已超过 180 秒，仍需手动运行以清理本地记录。
+1. 备份 Shadowrocket 配置；确保 VPN、MITM 只针对 prod-yabuli.qianwen.com，并停用冲突规则。
+2. 更新 [唯一 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，确认双钩子固定脚本 SHA 为 **c0975113a0a142fbce42cad39856491e69e8e173**。模块原始 URL：
 
-## 反馈什么
+   https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule
 
-只反馈**自己检查过、确认不含敏感信息的组名**（例如一个普通的配置标签）和固定错误码。如果组名看起来像 Token、用户身份标识或随机密钥，**不要分享其值**，只描述 `UNSAFE_ID` 或“可能敏感”。**绝不发送**完整请求、抓包、带 Bearer 的截图、API Key 或 CA 私钥。
+3. **特别重要：还要更新 iPad 本地脚本文件。** 新版 [siri_group_probe_ONCE.js](../scripts/siri_group_probe_ONCE.js) 必须替换之前存在 Script 文件夹的旧版同名文件。**刷新 60 模块不会更新你手动保存的本地 JS 文件。**
+4. 可选保存新 [siri_group_probe_STOP_ONCE.js](../scripts/siri_group_probe_STOP_ONCE.js)，用于明确取消。
+5. 与此前验证 Key 的流程相同，通过 Shadowrocket 的「脚本测试」运行本地辅助文件。若新增脚本表强制要求类型，可保存成**禁用**的 event，绝不启用自动执行。**不需要重新填写或修改 DeepSeek API Key。**
 
-## 此次仍不能保证的事情
+## 正常使用：两次检查，中间向 Siri 提问
 
-- 当真实 Siri 标识得到确认后，才可**单独审查**是否把它加入白名单；不能仅凭 User-Agent 放行，也不能把 WritingTools 当成 Siri。
-- 请求解析后仍需验证原始 SSE、DeepSeek API 实际返回、Shadowrocket Response hook 和 Siri 原生展示。
-- VPN、MITM 或脚本被绕过时，系统仍可能展示千问响应；此方案不是系统级来源保证。
+### 第一次手动脚本测试：开始
 
-相关：[调试手册](DEBUGGING_ZH.md) · [当前状态](CURRENT_STATUS_ZH.md) · [安全说明](SECURITY_CURRENT_ZH.md) · [安装指南](INSTALL_SIRI_DEEPSEEK_V06_ZH.md)。
+运行本地 siri_group_probe_ONCE.js，应看到：
+
+- [AIES_SIRI_GROUP_LOCAL] ARMED_600_SECONDS
+- [AIES_SIRI_GROUP_LOCAL] PERSISTENCE_ROUNDTRIP_OK
+
+这只能证明**手动测试的执行环境中**持久存储读写成功；Request Hook 与手动测试环境是否共享状态仍要通过真机验证。
+
+### 10 分钟内发起 Siri 文本问答
+
+立即向 Siri 真正提一个**不包含私人信息**的问题，例如“什么是光合作用？”。不需要等 600 秒，也不要把 WritingTools 当作 Siri。提问成功或失败都可以检查诊断。
+
+### 第二次手动测试：读取/检查
+
+再次运行**同一个** siri_group_probe_ONCE.js：
+
+**成功采样时：** 在本机看到 [AIES_SIRI_GROUP_LOCAL] GROUP_ID=...，另有命中计数和 LAST_STAGE=GROUP_CAPTURED。读取前脚本先清空该组名的逻辑存储。请先检查此标识是否像凭据或个人身份标识；只在确认无敏感信息时才考虑分享。
+
+**没有捕获但窗口仍有效：** 显示例如：
+
+- ACTIVE_REMAINING_SECONDS=532
+- SIRI_REQUESTS_SEEN=0
+- WRITINGTOOLS_SEEN=0
+- OTHER_CLIENTS_SEEN=0
+- LAST_STAGE=NONE
+- STILL_ARMED
+
+此时**采样仍在运行，不需要重新开启**。若 SIRI_REQUESTS_SEEN 大于零但没抓到组名，LAST_STAGE 会提供 JSON_INVALID、GROUP_MISSING、GROUP_ID_UNSAFE 等固定诊断分类。若只看到 WRITINGTOOLS_SEEN 或 OTHER_CLIENTS_SEEN 增加，不代表 Siri 已命中。
+
+**过期时：** 显示 EXPIRED_CLEARED 或状态无效时 INVALID_OR_EXPIRED_STATE_CLEARED；不会在这次检查中自动重新开启。再运行一次才会重新开始 10 分钟。捕获成功后的结果只会在本机逻辑保留最多 10 分钟，等你手动读取。
+
+## 明确取消（可选）
+
+如需中止诊断，**只**手动执行 [siri_group_probe_STOP_ONCE.js](../scripts/siri_group_probe_STOP_ONCE.js)。
+
+正常输出 [AIES_SIRI_GROUP_LOCAL] PROBE_STOPPED_AND_CLEARED。它清除诊断存储和旧版缓存键，不会删除 DeepSeek API Key。逻辑清空不构成底层物理擦除证明。
+
+## 主脚本日志中可能出现的安全诊断码
+
+| 代码 | 含义 |
+|---|---|
+| SIRI_PROBE_SIRI_REQUEST_SEEN | 已开启的探针观察到一个 Siri User-Agent 目标请求，但不一定拿到了组名 |
+| SIRI_GROUP_CAPTURED_LOCAL | 一个符合限制的场景组名已经写入本机状态；具体值**不在 HTTP 日志中** |
+| SIRI_GROUP_PROBE_UNSAFE_ID | 场景组名不满足保守格式限制，因此不保存其值 |
+| SIRI_PROBE_WRITINGTOOLS_SEEN / WRITINGTOOLS_SKIPPED | WritingTools 被识别并跳过 DeepSeek 路径 |
+| SIRI_PROBE_OTHER_CLIENT_SEEN | 命中目标 URL 的客户端未匹配 Siri User-Agent |
+| SIRI_PROBE_STORE_WRITE_FAILED | 目标 HTTP Hook 无法写入诊断状态，不可将手动脚本的读写自检作为跨运行环境保证 |
+
+## 数据保护与真实性边界
+
+- 不采集、打印或上传用户问题正文、HTTP 原始请求、Headers、Authorization、Cookie、Private-Access-Token、DeepSeek Key 或 SSE。
+- 仅暂存固定状态码、有限计数和**最多一个受限格式的组名**。组名仍可能带敏感含义，人工检查之前不能认为绝对安全。
+- **不要上传完整 PacketTunnel 日志、数据库或包含 Bearer 的截图。** 只需要分享本地脚本测试里 [AIES_SIRI_GROUP_LOCAL] 前缀的几行；如果 GROUP_ID 看起来像令牌或个人信息，请遮挡。
+- 设备是否共享 Shadowrocket Script Test 与 Request Hook 的 $persistentStore 尚未真机复核；如始终 SIRI_REQUESTS_SEEN=0，应验证模块版本/命中时间/主日志固定码，而非反复导出敏感流量。
+- 未知 Siri 场景组仍不能访问 DeepSeek；真实 API、SSE 重建、Siri 原生 UI、系统级千问回退都尚未通过验收。
+
+其他：[调试手册](DEBUGGING_ZH.md) · [当前状态](CURRENT_STATUS_ZH.md) · [安装与回滚](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全边界](SECURITY_CURRENT_ZH.md)。

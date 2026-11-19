@@ -20,8 +20,8 @@
 真实日志发现 Siri 和 WritingTools 共享目标接口，且真实 Siri 的场景组名与当前白名单不符。本次改动：
 
 - WritingTools 的请求/响应识别为非 Siri 作用域时直接跳过，不调用 DeepSeek，主脚本只输出固定 `WRITINGTOOLS_SKIPPED`。
-- **默认不采集**未知组名。必须在本机通过手动运行 `siri_group_probe_ONCE.js` 主动开启 180 秒窗口，且请求阶段确实为 Siri User-Agent 的 POST，才可能暂存一个被长度和字符集限制的组名。
-- 主脚本不记录组名；第二次手动运行辅助脚本时本地显示一次 `GROUP_ID`，然后以空字符串清理临时状态。**本机存储的逻辑 TTL 和清空不保证物理删除**。这不是强认证或协议可信性证明。
+- **默认不采集**未知组名。必须在本机通过手动运行最新版 `siri_group_probe_ONCE.js` 主动开启 600 秒窗口，且请求阶段确实为 Siri User-Agent 的 POST，才可能暂存一个被长度和字符集限制的组名。
+- 主脚本不记录组名；新版采用单个本地状态键保存固定解析原因、最多 9 次的小型计数及至多一个格式受限组名；重复手动查看状态不会取消采样。捕获后只在设备本机手动 Script Test 中显示一次 `GROUP_ID`，随后逻辑清空；独立 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js) 可以明确停止。**本机存储的逻辑 TTL 和清空不保证物理删除**，不证明执行环境共享状态或协议可信性。
 - 如果标识像随机令牌/凭据或不符合保守格式，直接拒绝采样；不要分享该值。**不得提交**原始 PacketTunnel 日志，它可能包含 Authorization、私有访问令牌和其他数据。
 - Siri 组名仅用于待审查的白名单更新，不得仅凭 User-Agent 就让未知请求进入 DeepSeek；实际端到端安全仍未验证。
 
