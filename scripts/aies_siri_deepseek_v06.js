@@ -503,13 +503,31 @@ function rewriteSse(original,answer){
  // notices, moderation decisions or unexpected non-message output.
  var choiceAdded=entries[2].payload&&entries[2].payload.choice;
  var itemAdded=entries[3].payload&&entries[3].payload.item;
- var choiceDone=entries[entries.length-3].payload&&entries[entries.length-3].payload.choice;
+ var choiceCompleted=entries[entries.length-3].payload&&entries[entries.length-3].payload.choice;
+ var choiceDone=entries[entries.length-2].payload&&entries[entries.length-2].payload.choice;
  var lastResponse=entries[entries.length-1].payload;
+ var lastChoice=lastResponse&&Array.isArray(lastResponse.choices)&&lastResponse.choices[0];
  if(!emptyOrMissing(r.notices)||!emptyOrMissing(lastResponse&&lastResponse.notices)||
-    !emptyOrMissing(choiceDone&&choiceDone.moderation))return null;
+    !emptyOrMissing(choiceCompleted&&choiceCompleted.moderation)||
+    !emptyOrMissing(choiceDone&&choiceDone.moderation)||
+    !emptyOrMissing(lastChoice&&lastChoice.moderation))return null;
+ function hasToolOutput(choice){
+  if(!choice||!Array.isArray(choice.output))return false;
+  for(var k=0;k<choice.output.length;k++){
+   var item=choice.output[k];
+   if(!item||typeof item!=="object"||Array.isArray(item)||
+     item.type&&item.type!=="message"||
+     item.message&&item.message.role&&item.message.role!=="assistant")return true;
+  }
+  return false;
+ }
+ if(hasToolOutput(choiceCompleted)||hasToolOutput(choiceDone)||hasToolOutput(lastChoice)||
+    choiceAdded&&!emptyOrMissing(choiceAdded.output))return null;
  if(itemAdded&&itemAdded.type&&itemAdded.type!=="message")return null;
  if(itemAdded&&itemAdded.message&&itemAdded.message.role&&
     itemAdded.message.role!=="assistant")return null;
+ if(itemAdded&&itemAdded.message&&!emptyOrMissing(itemAdded.message.content))
+  return null;
  // Do not copy model text from any source field; keep only bounded identity
  // metadata that Siri already received from its own Qwen backend.
  var now=Math.floor(Date.now()/1000);
