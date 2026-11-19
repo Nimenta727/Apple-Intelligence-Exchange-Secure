@@ -12,7 +12,7 @@
 
 ## 操作步骤
 
-1. 首先备份配置，确保 Shadowrocket VPN、目标域名的 HTTPS MITM 和唯一 60 模块工作，其他同域冲突模块已停用。**刷新/重新导入 [唯一的 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)**，检查双钩子脚本路径都锁定到 `a9912de69bc4ced1b6ccdd3d1de7360d807335cf`。
+1. 首先备份配置，确保 Shadowrocket VPN、目标域名的 HTTPS MITM 和唯一 60 模块工作，其他同域冲突模块已停用。**刷新/重新导入 [唯一的 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)**，检查双钩子脚本路径都锁定到 `bf11ab5bdb6d039d0f68d528676eaf2f3986f891`。
 
    模块 URL：
 
@@ -54,3 +54,7 @@
 只需将**手动辅助脚本结果中** `[AIES_SIRI_SCHEMA_LOCAL]` 前缀的几行，在本机检查无敏感内容后发给开发者。不要发送完整 PacketTunnel、proxy.db、JSON 请求、截图里的认证头、API Key 或 CA 私钥。若显示 `REDACTED`，保留这个字样，不尝试恢复隐藏的键名。
 
 只有字段结构确证且经过内容安全审查后，才调整纯文本解析白名单。仍必须单独验证响应 SSE、真实 DeepSeek API 和 Siri 原生 UI；不能因为一个解析错误消失就宣称成功。
+
+## 已获取结构后的使用说明
+
+2026-11-19 11:54 已在 iPad 真机取得一次有效的结构摘要：根级为 `client_tools:array`、`response_format:object`、`server_tools:array`、`stream:boolean`；消息包装为 `type:string`；内部为 `content:array` 和 `role:string`。**无需再次运行本探针**，现在请刷新最新 60 模块，并只用非隐私问题观察下一阶段的固定错误码；本探针仍保留供其他版本的受控诊断。工具无法从字段类型推导字段值，因此最新代码没有无条件放行工具和媒体。
