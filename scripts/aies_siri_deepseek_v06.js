@@ -937,29 +937,41 @@ if(isWritingTools())probeObserveWritingTools();
 // responses with DeepSeek without confirmed same-transaction correlation.
 // Block only Siri HTTP-200 SSE responses on this specific path, not requests,
 // non-SSE metadata, other clients or the whole Qwen domain.
-if(isFollowup()){
- if(res&&isSiriForProbe()&&isFollowupTextSse()){
-  abSse("SESSION_FOLLOWUP_BLOCKED",statusCode(res),res.body);
-  log("QWEN_SESSION_FOLLOWUP_SSE_BLOCKED");
-  error("QWEN_FOLLOWUP_UNVERIFIED_SOURCE");
- }else{
-  if(res&&isSiriForProbe())log("QWEN_SESSION_FOLLOWUP_NON_SSE_SKIPPED");
-  done({});
+var followupRoute=isFollowup();
+if(followupRoute){
+ // Do not intercept other Qwen clients. Only observed Siri text SSE may be rewritten.
+ var uaNow=header(req&&req.headers,"User-Agent");
+ if(!res&&!isSiriForProbe()){done({});return;}
+ if(res&&uaNow&&!isSiriForProbe()){done({});return;}
+ if(res&&!isFollowupTextSse()){done({});return;}
+ if(res&&!header(req.headers,"X-AIES-Request-ID")){
+  if(isSiriForProbe()){
+   abSse("SESSION_FOLLOWUP_BLOCKED",statusCode(res),res.body);
+   log("QWEN_SESSION_FOLLOWUP_SSE_BLOCKED");
+  }
+  error("QWEN_FOLLOWUP_UNVERIFIED_SOURCE");return;
  }
- return;
 }
 if(!res){
  // Phase 1: capture a prompt and explicitly couple request/response using
  // an opaque ID. Unlike "latest prompt", concurrent requests never share a slot.
  captureQwenRequestBodyOnce();
- var prompt=parseApplePrompt(rawRequest());
- abRequest(rawRequest(),prompt);
+ var requestRaw=rawRequest();
+ var prompt=parseApplePrompt(requestRaw,"",followupRoute);
+ abRequest(requestRaw,prompt);
  probeObserveRequest();
  if(!prompt){log("REQUEST_DIAG_"+requestDiagnostic);error(isWritingTools()?"UNSUPPORTED_WRITING_REQUEST":"UNSUPPORTED_SIRI_REQUEST");return;}
  if(isWritingTools())log("WRITINGTOOLS_COMPOSE_SCOPED");
  if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){error("INVALID_METHOD");return;}
+ var followupDetails=followupRoute?followupIds():null;
+ if(followupRoute&&(!followupDetails||
+    !verifiedHistory(followupDetails.prev,followupDetails.sid))){
+  error("FOLLOWUP_CONTEXT_UNAVAILABLE");return;
+ }
  var token=randomToken();
- if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,scene:isWritingTools()?"writing":"siri",exp:Date.now()+C.sessionTtlMs}))){
+ if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,scene:isWritingTools()?"writing":"siri",route:followupRoute?"followup":"main",
+   sid:followupDetails&&followupDetails.sid,prev:followupDetails&&followupDetails.prev,
+   exp:Date.now()+C.sessionTtlMs}))){
   error("SESSION_STORE_UNAVAILABLE");return;
  }
  var headers={};Object.keys(req.headers||{}).forEach(function(k){
@@ -971,7 +983,7 @@ if(!res){
  return;
 }
 // Phase 2: never return the raw Qwen body from code paths we control.
-abSse("MAIN_UPSTREAM",statusCode(res),res&&res.body);
+abSse(followupRoute?"FOLLOWUP_UPSTREAM":"MAIN_UPSTREAM",statusCode(res),res&&res.body);
 if(statusCode(res)!==200){error("ORIGINAL_RESPONSE_STATUS");return;}
 if(!res||typeof res.body!=="string"||res.body.length>C.maxSse){error("SSE_UNAVAILABLE");return;}
 var tag=header(req.headers,"X-AIES-Request-ID"),current=null,prompt2=null;
@@ -996,17 +1008,20 @@ if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
  }
  // A mismatched transaction tag is never rescued by reading the current
  // request body: it may belong to an unrelated Siri/WritingTools operation.
- if(current&&typeof current.scene==="string"&&current.scene!==activeScene){
+ if(current&&typeof current.scene==="string"&&(current.scene!==activeScene||
+     (current.route||"main")!==(followupRoute?"followup":"main")||
+     (followupRoute&&current.sid!==followupSessionId()))){
   storeWrite("AIES_R1_"+tag,"");
   error("CORRELATION_MISMATCH");return;
  }
  storeWrite("AIES_R1_"+tag,""); // consume once, even if invalid
- if(validStored&&current.scene===activeScene)prompt2=current.p;
+ if(validStored&&current.scene===activeScene&&
+    (current.route||"main")===(followupRoute?"followup":"main"))prompt2=current.p;
  if(prompt2)log("RESPONSE_PROMPT_FROM_STORE");
  else log("RESPONSE_PROMPT_STORE_MISSING");
 }
 var responseBody=rawRequest();
-var fromReq=parseApplePrompt(responseBody,!responseUA&&activeScene==="writing"&&!!prompt2);
+var fromReq=parseApplePrompt(responseBody,!responseUA&&prompt2?activeScene:"",followupRoute);
 // When recovering scene without a response UA, a *present* request body must
 // still be parseable as that same scene. Otherwise a Siri body carrying a
 // WritingTools token could bypass the usual cross-scene comparison.
@@ -1014,13 +1029,28 @@ if(prompt2&&!responseUA&&req&&typeof req.body==="string"&&req.body.length&&!from
  error("CORRELATION_MISMATCH");return;
 }
 if(prompt2&&fromReq&&prompt2!==fromReq){error("CORRELATION_MISMATCH");return;}
+if(followupRoute&&prompt2&&req&&typeof req.body==="string"&&req.body.length){
+ var reflected=followupIds();
+ if(!reflected||reflected.sid!==current.sid||reflected.prev!==current.prev){
+  error("CORRELATION_MISMATCH");return;
+ }
+}
 if(!prompt2){
  if(fromReq){prompt2=fromReq;log("RESPONSE_PROMPT_FROM_BODY");}
  else log("RESPONSE_PROMPT_BODY_UNAVAILABLE");
 }
 if(!prompt2){error("PROMPT_UNAVAILABLE");return;}
+// Session followups MUST have a verified response tag and previous DeepSeek
+// choice context; never infer identity from a global "last question" slot.
+if(followupRoute&&(!current||current.route!=="followup"||
+   !validId(current.prev)||!validId(current.sid))){error("FOLLOWUP_CORRELATION_UNAVAILABLE");return;}
+var priorMessages=followupRoute?verifiedHistory(current.prev,current.sid):[];
+if(followupRoute&&!priorMessages){error("FOLLOWUP_CONTEXT_UNAVAILABLE");return;}
 // Fail before billing DeepSeek if this upstream stream cannot be rewritten.
-if(!rewriteSse(res.body,"AIES_VALIDATION_ONLY",activeScene)){error("SSE_REWRITE_UNSUPPORTED");return;}
+if(!rewriteSse(res.body,"AIES_VALIDATION_ONLY",activeScene,
+   followupRoute?"followup":"main",followupRoute?current.sid:null)){
+ error("SSE_REWRITE_UNSUPPORTED");return;
+}
 log("SSE_PREFLIGHT_PASSED");
 var key=storeRead(C.keyName);
 if(!validKey(key)){error("KEY_NOT_PROVISIONED");return;}
@@ -1037,8 +1067,7 @@ try{
     {role:"system",content:activeScene==="writing"?
      "你是 Apple 写作工具的 DeepSeek 纯文本创作助手。按用户提供的说明和文本进行起草或改写。只返回最终正文，不输出 JSON、代码围栏、引言或无关提示。不要自称千问。AIES 会在最终正文前自动添加来源标记。":
      "你是通过 AIES 转发的 DeepSeek 中文 Siri 问答助手。仅回答用户问题，内容尽量准确、清晰，并在复杂问题中保留必要推理步骤。不要自称千问或 Qwen。用户问来源时如实说明这条回答来自 DeepSeek API，经 AIES 转发；不要自己重复固定来源前缀，AIES 会在每条验证成功的回答正文开头强制添加【DeepSeek · AIES】。"},
-    {role:"user",content:prompt2}
-   ]
+   ].concat(priorMessages,[{role:"user",content:prompt2}])
   })
  },function(err,reply,bodyText){
   if(once)return;
@@ -1048,11 +1077,15 @@ try{
   if(!answer){error("MODEL_RESPONSE_INVALID");return;}
   var labeledAnswer=verifiedDeepSeekAnswerWithLabel(answer);
   if(!labeledAnswer){error("MODEL_RESPONSE_INVALID");return;}
-  var rewritten=rewriteSse(res.body,labeledAnswer,activeScene);
+  var rewritten=rewriteSse(res.body,labeledAnswer,activeScene,
+   followupRoute?"followup":"main",followupRoute?current.sid:null);
   if(!rewritten){error("SSE_REWRITE_UNSUPPORTED");return;}
   abSse("AIES_SYNTHETIC",200,rewritten);
   abRecord("AIES_OUTPUT",{rewrittenChars:rewritten.length,markerPresent:rewritten.indexOf(DEEPSEEK_SOURCE_LABEL)>=0});
   if(activeScene==="writing")log("WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY");
+  else if(saveVerifiedHistory(rewritten,prompt2,answer,priorMessages))
+   log("SIRI_CONTEXT_STORED");
+  else log("SIRI_CONTEXT_STORE_FAILED");
   log("DEEPSEEK_LABEL_APPLIED");
   log("DEEPSEEK_RESPONSE_ATTEMPTED");
   done({status:200,headers:{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-store","X-AIES-Answer-Source":"deepseek"},body:rewritten});
