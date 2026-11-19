@@ -133,3 +133,26 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 - 本地化减少对**GitHub 脚本更新链路**的依赖，**不会**防止系统或网络绕过 MITM，也**不能**保证“每个问题系统级零 Qwen”。本地也不会自动升级：未来更新必须人工替换整个 JS + 模块规则并重新核验 SHA。
 
 建议先修好 Raw 通路并使用原版 60；62 是备用加载方案，其本地路径在用户设备上仍需实测。
+
+## 2026-11-20 01:01：62 LOCAL 实际提示 `script js file is not found`
+
+用户先尝试 60 Remote 时出现 `NSURLErrorDomain -1001 请求超时`（远程脚本获取失败），再启用 62 LOCAL，日志四次显示：
+
+```text
+script try to read js file in cloud driver => aies_siri_deepseek_v06.js
+script js file is not found => aies_siri_deepseek_v06.js
+```
+
+用户在 `Script/aies_siri_deepseek_v06.js` 上执行 **Script Test** 没有异常与日志。这**不等于**模块的 HTTP 请求/响应 Hook 成功读取了该文件：主脚本在没有 `$request`/`$done` 的手动测试上下文中可以静默退出。随后的上传日志 `PacketTunnel-20261120010000.log` 显示四条脚本规则和 MITM 证书均正常加载，Siri 的主请求及会话级请求确实经过代理，但**没有任何 `[AIES_V06]` 执行阶段码**。不能称为 DeepSeek 生效。
+
+### 应先排查 iCloud 目录与文件真实位置
+
+1. **先保持 60/61/62 全部关闭**；不要把未打来源标记的原生 Qwen 回复当成已改写。
+2. 打开 iPad 自带的 **文件 App → 浏览 → iCloud 云盘 → Shadowrocket → Script**。检查这里是否存在名称**完全一致**的 `aies_siri_deepseek_v06.js`，而非仅出现在“我的 iPad”目录或 Shadowrocket 的手动 Script Test 列表。Shadowrocket 本次日志明确写的是 `cloud driver`，所以应优先核实它所使用的 iCloud 云盘位置。参考 [Shadowrocket 社区使用手册](https://github.com/LOWERTOP/Shadowrocket/blob/main/README.md) 中的 iCloud Shadowrocket / Script 文件夹说明。
+3. 如果文件仅在“我的 iPad”，从受信任的本地副本**复制/移动到以上 iCloud Script 文件夹**；确认文件扩展名是 `.js`、无额外 `.txt` 后缀、大小不为 0、不是空文件或普通快捷方式。若 iCloud 文件旁出现云朵下载标记，先点下载并等待其完全存于本机。避免上传任何带真实 DeepSeek Key 的版本。
+4. 如果未显示 `Shadowrocket` 文件夹，检查 **iPad 设置 → Apple 账户 → iCloud → iCloud 云盘**，以及允许 Shadowrocket 使用 iCloud 的选项。若设备所在网络阻断 iCloud 同步或 iCloud 没有正确初始化，则不要假设它已经保存成功。
+5. 在 Shadowrocket 中确认仅启用 **62 LOCAL**，四条规则仍以 `script-path=aies_siri_deepseek_v06.js` 结尾；刷新/重新应用当前配置，必要时重新启动 VPN，以避免上一份编译缓存继续运行。
+6. 先只用一个无隐私的 Siri 文本问题，看日志中还会不会出现 `script js file is not found`；**真正证明脚本已由 HTTP Hook 执行**的信号是 `[AIES_V06] REQUEST_CAPTURED`，或者明确的 `[AIES_V06] REQUEST_DIAG_*` / `ERROR_*`。即使脚本已运行，仍需依据来源标记与 Siri UI 单独验证答案。
+7. 若 iCloud Script 文件已完全下载、文件名准确、模块只有 62 且仍找不到，优先核对 Shadowrocket 版本的本地路径解析方式；**不要随意尝试 `Script/`、`file://` 等未经该版本验证的路径前缀**。返回 60 Remote 的下载通路修复或根据设备文档做单点兼容实验，保留原脚本不改动。
+
+以上为**结合实际日志和公开说明的设备修复步骤**，非远程设备验证。没有必要再次开启 `siri_followup_schema_probe_ONCE.js`；前次 61 协议探针已经成功，当前故障是脚本载入层。
