@@ -65,10 +65,15 @@ if(tests.length!==2||!tests.includes("tests/siri-deepseek-v06.test.js")||!tests.
 const moduleText=fs.readFileSync(path.join(root,"shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");
 const js=fs.readFileSync(path.join(root,"scripts/aies_siri_deepseek_v06.js"),"utf8");
 const hooks=moduleText.match(/^AIES60 .+type=http-(?:request|response).+script-path=.+$/gm)||[];
-if(hooks.length!==2||!hooks.some(x=>x.includes("type=http-request"))||
- !hooks.some(x=>x.includes("type=http-response")))fail("require one request and one response hook");
+if(hooks.length!==3||
+ hooks.filter(x=>x.includes("type=http-request")).length!==1||
+ hooks.filter(x=>x.includes("type=http-response")).length!==2||
+ !hooks.some(x=>x.includes("AIES60 Scoped Qwen SSE Guard = type=http-response")&&
+   x.includes("/v1")===false&&x.includes("sessions"))) // regex escaped in module
+ fail("require one DeepSeek request hook, one rewrite response hook and one scoped follow-up response guard");
 const urls=hooks.map(x=>x.match(/script-path=(https:\/\/\S+)/)?.[1]);
-if(urls.length!==2||!urls[0]||urls[0]!==urls[1])fail("both hooks must share exactly one version-pinned script");
+if(urls.length!==3||!urls[0]||urls.some(x=>x!==urls[0]))
+ fail("all three 60 hooks must share one version-pinned script");
 if(urls.some(x=>!/^https:\/\/raw\.githubusercontent\.com\/Nimenta727\/Apple-Intelligence-Exchange-Secure\/[0-9a-f]{40}\/scripts\/aies_siri_deepseek_v06\.js$/.test(x)))
  fail("runtime URL must be pinned to a full immutable commit");
 const passiveModule=fs.readFileSync(path.join(root,"shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule"),"utf8");
