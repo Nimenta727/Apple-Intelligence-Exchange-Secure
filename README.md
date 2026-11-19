@@ -23,6 +23,10 @@
 
 **如需再次诊断（v2）**：先[刷新 60 模块](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，同时**用新版覆盖 iPad 本地同名 JS**。手动测试 [`siri_group_probe_ONCE.js`](scripts/siri_group_probe_ONCE.js) 一次开启 **600 秒（10 分钟）**，然后实际问 Siri 一次，再手动测试同一个脚本读取结果或查看剩余时间。反复检查不会取消采样；需要取消时专门运行 [`siri_group_probe_STOP_ONCE.js`](scripts/siri_group_probe_STOP_ONCE.js)。不使用 event/cron/HTTP 自动规则，不提交完整 PacketTunnel 日志，已有 API Key 不需重设。详细步骤见[本地诊断指南](docs/SIRI_GROUP_PROBE_ZH.md)。
 
+## Qwen 原生通行与被动 SSE 诊断（临时模式）
+
+**如果想先恢复正常 Siri→Qwen 回答并研究原始协议**：请先停用 DeepSeek 改写的 60 模块、旧 REJECT 或同域冲突规则，再验证一次**不启用诊断的原生 Qwen 基线**。之后可选独立的 [61 Qwen 被动诊断模块](shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule)；它只有 `$done({})` 的请求/响应钩子，不修改流量或调用 DeepSeek。手动开启 600 秒后，仅采集请求字段类型与 Qwen SSE 事件名称、顺序、结构和少量已白名单化的系统版本信息，不存储提问、回答、凭据。**60 与 61 不得同时启用**。完整流程：[Qwen 被动诊断使用说明](docs/QWEN_PASSIVE_DIAG_ZH.md)。
+
 ## 项目目标
 
 - **界面**：保留 Siri 原生界面，只面向特定 Siri 文本问答场景。
@@ -32,7 +36,7 @@
 
 ## 安装入口
 
-**目前只有一个 Shadowrocket 模块：**
+**正常 DeepSeek 实验模式只有一个 60 模块；另有一个必须与它互斥的 61 临时被动诊断模块：**
 
 [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)
 
