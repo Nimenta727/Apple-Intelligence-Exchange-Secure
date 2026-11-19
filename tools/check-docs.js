@@ -39,7 +39,8 @@ const activeNames=[
  "docs/RELEASE_CHECKLIST_ZH.md",
  "scripts/aies_siri_deepseek_v06.js","scripts/provision_key_ONCE.js",
  "scripts/clear_key_ONCE.js","scripts/siri_group_probe_ONCE.js","scripts/siri_group_probe_STOP_ONCE.js",
- "scripts/siri_schema_probe_ONCE.js","scripts/siri_schema_probe_STOP_ONCE.js","shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule",
+ "scripts/siri_schema_probe_ONCE.js","scripts/siri_schema_probe_STOP_ONCE.js",
+ "scripts/siri_qwen_body_probe_ONCE.js","scripts/siri_qwen_body_probe_STOP_ONCE.js","shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule",
  "tests/siri-deepseek-v06.test.js","tests/fixtures/siri-sse.js"
 ];
 for(const item of activeNames)if(!fs.existsSync(path.join(root,item)))fail("missing active file: "+item);
@@ -52,7 +53,7 @@ const modules=all.filter(x=>x.endsWith(".sgmodule")).map(relative);
 if(modules.length!==1||modules[0]!=="shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule")
  fail("expected exactly one current .sgmodule, got "+modules.join(","));
 const scripts=all.filter(x=>relative(x).startsWith("scripts/")&&x.endsWith(".js")).map(relative);
-if(scripts.length!==7)fail("expected runtime, two Key scripts and four manual Siri diagnostic helpers: "+scripts.join(","));
+if(scripts.length!==9)fail("expected runtime, two Key scripts and six manual Siri diagnostic helpers: "+scripts.join(","));
 const tests=all.filter(x=>relative(x).startsWith("tests/")&&x.endsWith(".test.js")).map(relative);
 if(tests.length!==1||tests[0]!=="tests/siri-deepseek-v06.test.js")fail("obsolete unit tests present: "+tests.join(","));
 const moduleText=fs.readFileSync(path.join(root,"shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");
