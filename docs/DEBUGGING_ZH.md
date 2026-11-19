@@ -107,3 +107,11 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 真实 PacketTunnel 只包含固定诊断码，观察到 `NORTI_SHAPE_ROOT_FIELDS`、`NORTI_SHAPE_ITEM_WRAPPER_FIELDS`、`REQUEST_DIAG_INPUT_UNSUPPORTED`、`ERROR_UNSUPPORTED_SIRI_REQUEST`。这些分类**不能告诉我们需要支持的具体键名，也不能证明所有额外字段都安全**。
 
 已添加严格本地、需要用户主动手动启用的 [JSON 结构键名/类型探针](SIRI_SCHEMA_PROBE_ZH.md)：**先刷新 60 模块，下载新的** `siri_schema_probe_ONCE.js` 到本机，运行一次开启 600 秒、问 Siri 一次、再运行一次本机查看结果。普通主日志只会打印固定的 `NORTI_SCHEMA_CAPTURED_LOCAL`，不会打印字段名、字段值或正文；字段名也会进行疑似敏感内容筛查。不得上传完整抓包，不要盲目放宽或跳过媒体校验。
+
+## 2026-11-19 11:54：已确认 Siri noRTI 外层键名与类型
+
+本地辅助脚本成功返回 `SCHEMA_CAPTURED`、`INPUT_TYPE=array`、`ROOT_EXTRA_FIELDS=client_tools:array,response_format:object,server_tools:array,stream:boolean`、`ITEM_WRAPPER_EXTRA_FIELDS=type:string`、`MESSAGE_FIELD_TYPES=content:array,role:string`，且读取后 `SCHEMA_CLEARED`。同时 PacketTunnel 仅确认请求被两处形状检查拒绝，不含字段值。
+
+针对这些已确认的键名和 JSON 类型，主脚本已做**精确允许**，但不会将根级工具列表、格式配置等元数据传给 DeepSeek。外层 `type` 的具体值仍**未知**，代码仅允许 `message`；如果真实 Siri 使用其他值，将输出 `NORTI_SHAPE_WRAPPER_TYPE_UNSUPPORTED`。如果消息内容数组元素不是受支持纯文本，将输出固定的 `NORTI_CONTENT_TEXT_OBJECT_UNSUPPORTED`、`NORTI_CONTENT_NESTED_ARRAY_UNSUPPORTED` 或 `NORTI_CONTENT_PRIMITIVE_UNSUPPORTED`，同时仍出现 `REQUEST_DIAG_CONTENT_UNSUPPORTED`。这些日志**不包含任何真实值**。
+
+下次复测：刷新 60 模块至固定脚本 SHA `bf11ab5bdb6d039d0f68d528676eaf2f3986f891`，直接向 Siri 提一次**非私密文本问题**；只报告 `[AIES_V06]` 固定日志行和 Siri 原生界面表现。**无需重复结构探针，也不要发送 PacketTunnel 全文**。
