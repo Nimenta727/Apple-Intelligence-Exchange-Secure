@@ -761,6 +761,7 @@ function abRequest(raw,prompt){
  try{
   var o=JSON.parse(raw),c=o&&o.configuration,g=c&&c.response_configuration_group_id;
   record.group=g==="siri.multimodal.noRTI"?"siri.multimodal.noRTI":
+   g==="compose_selectedAndAllText"?"compose_selectedAndAllText":
    (/^siri[._]tqa$/.test(g)?"siri.tqa":"OTHER_OR_MISSING");
   record.inputItems=Array.isArray(o.input)?Math.min(o.input.length,99):0;
   record.rootFields=Object.keys(o).filter(function(k){
