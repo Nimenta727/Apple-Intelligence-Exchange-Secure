@@ -567,6 +567,42 @@ test("exact SAIR WritingTools Compose group is rewritten as body/refinements, no
  assert.ok(e.logs.includes("[AIES_V06] WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY"));
  assert.equal(e.data["AIES_R1_"+a.returned[0].headers["X-AIES-Request-ID"]],"");
 });
+test("WritingTools response recovers scene from an unexpired matching tag when UA is missing",()=>{
+ for(const body of [undefined,writingBody]){
+  const e=env(),req=writingReq(e),a=e.invoke(req);
+  const id=a.returned[0].headers["X-AIES-Request-ID"];
+  const responseReq={...req,headers:{"X-AIES-Request-ID":id},body};
+  const b=e.invoke(responseReq,{status:200,headers:{"Content-Type":"text/event-stream"},body:fixture});
+  assert.equal(b.returned[0].status,200);
+  const answer=completedWritingAnswer(b.returned[0].body);
+  assert.ok(answer&&answer.body.includes("DEEPSEEK_EXCLUSIVE_REPLY"));
+  assert.equal(answer.content,undefined);
+  assert.equal(e.requests.length,1);
+  assert.ok(e.logs.includes("[AIES_V06] WRITINGTOOLS_SCENE_RECOVERED_FROM_TAG"));
+  assert.ok(e.logs.includes("[AIES_V06] WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY"));
+ }
+});
+test("WritingTools tag recovery rejects conflicting explicit client, changed body or missing token",()=>{
+ const a=env(),req=writingReq(a),captured=a.invoke(req);
+ const id=captured.returned[0].headers["X-AIES-Request-ID"];
+ const wrongUA=a.invoke({...req,headers:{"X-AIES-Request-ID":id,"User-Agent":"Siri (iPad - Version 27.3.0)"},body:undefined},
+  {status:200,body:fixture});
+ assert.equal(wrongUA.returned[0].status,502);
+ assert.ok(a.logs.includes("[AIES_V06] ERROR_CORRELATION_MISMATCH"));
+ assert.equal(a.requests.length,0);
+ const b=env(),req2=writingReq(b),cap2=b.invoke(req2),id2=cap2.returned[0].headers["X-AIES-Request-ID"];
+ const changed=b.invoke({...req2,headers:{"X-AIES-Request-ID":id2},
+  body:writingBody.replace("清晰自然","内容被替换")},
+  {status:200,body:fixture});
+ assert.equal(changed.returned[0].status,502);
+ assert.ok(b.logs.includes("[AIES_V06] ERROR_CORRELATION_MISMATCH"));
+ assert.equal(b.requests.length,0);
+ const c=env(),missing=c.invoke({...writingReq(c),headers:{},body:writingBody},
+  {status:200,body:fixture});
+ assert.equal(missing.returned[0].status,502);
+ assert.equal(c.requests.length,0);
+ assert.ok(!c.logs.includes("[AIES_V06] WRITINGTOOLS_SCENE_RECOVERED_FROM_TAG"));
+});
 test("WritingTools Compose rejects media, non-user roles and unverified groups before DeepSeek",()=>{
  const all=[
   {...JSON.parse(writingBody),input:[{type:"message",message:{role:"tool",content:[{type:"text",text:"PRIVATE_TOOL"}]}}]},
@@ -639,7 +675,7 @@ test("WritingTools unknown groups fail closed without DeepSeek, even when diagno
  assert.equal(probeState(e).writingToolsSeen,1);
  assert.equal(probeState(e).siriSeen,0);
  assert.equal(e.requests.length,0);
- assert.ok(e.logs.includes("[AIES_V06] WRITINGTOOLS_COMPOSE_SCOPED"));
+ assert.ok(!e.logs.includes("[AIES_V06] WRITINGTOOLS_COMPOSE_SCOPED"));
  assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_WRITING_GROUP_UNVERIFIED"));
 });
 test("unarmed unknown Siri group fails closed and creates no v2 diagnostic state",()=>{
