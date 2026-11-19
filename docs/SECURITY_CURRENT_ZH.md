@@ -47,3 +47,7 @@
 ## 自愿同题 A/B 诊断（2026-11-19）
 
 新增两个独立、默认关闭的本地单次测试采样键：`AIES_AB_NATIVE_V1_STATE`（61 原生 Qwen）与 `AIES_AB_DEEPSEEK_V1_STATE`（60 DeepSeek）。在用户通过**手动 Script Test**开启后，采集安全的字段/事件类型、模型 HTTP 状态、`finish_reason`、用量、长度和**客户端可见的非隐私测试答案文本**（每个答案最长 7000 字符，常见 token/email/URL 字段遮挡）；不会记录认证 Header、API Key、会话 ID 值、隐藏系统提示词、原始 SSE 或模型推理细节。答案正文脱敏并不绝对，因此不得拿私人题目进行测试，读取结果应先本地检查再选择性分享。用户完全关闭两模块的 A 组不可能同时进行脚本层抓包；实验分为 A 原生基线、A' 61 插桩原生和 B 60 改写三组，避免混淆。参见[实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。
+
+## WritingTools 写作文本的额外安全边界（2026-11-19）
+
+WritingTools 可能包含用户选中的完整文字，涉及草稿或其他隐私。60 只为 SAIR 逆向记录的 `compose_selectedAndAllText` 文本分组提供实验转发；严格要求 UA、user 角色、文本对象、已知根键、长度和 `stream:true`，未知模式、工具输出和媒体不进入 DeepSeek。成功时用户文字**仍可能同时发送 Qwen 与 DeepSeek**，不能假定仅在设备本地处理。若无安全的同事务响应关联，保持 502，而非采用原 SAIR `SAIR_LATEST_PROMPT` 全局最近内容兜底，防止 Siri 和写作工具交叉暴露。强制 DeepSeek 来源标签会留在生成正文中，用户需人工检查。 [协议证据与不确定性](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。
