@@ -702,7 +702,7 @@ test("local Qwen capture includes user text and JSON envelope, but never headers
  assert.ok(!snap.body.includes("PRIVATE_DEVICE_CONTEXT"));
  assert.ok(!snap.body.includes("PRIVATE_TOOL_SYSTEM_PROMPT"));
  assert.ok(!snap.body.includes("PRIVATE_RESPONSE_META"));
- assert.ok(!snap.body.includes("PRIVATE_ROOT_CONTEXT")===false); // this field is not known private
+ assert.ok(!snap.body.includes("PRIVATE_ROOT_CONTEXT"));
  const logs=runLocal(e,bodyProbe).logs;
  assert.ok(logs.includes("[AIES_QWEN_BODY_LOCAL] BODY_CAPTURED_REDACTED_JSON"));
  assert.ok(logs.includes("[AIES_QWEN_BODY_LOCAL] CAPTURE_CLEARED"));
@@ -805,7 +805,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/7bab9460482475d01056ff43088b26f3996514e1/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/95e2a83981e907472ee4395445038fa082e32d9b/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
