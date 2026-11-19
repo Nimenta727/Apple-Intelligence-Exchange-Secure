@@ -18,7 +18,7 @@ var C={
   model:"deepseek-flash",
   keyName:"SAIRS_DEEPSEEK_API_KEY",
   maxRequest:300000,maxPrompt:14000,maxSse:900000,maxAnswer:12000,
-  timeoutMs:15000,sessionTtlMs:45000
+  timeoutMs:15000,sessionTtlMs:45000,followupContextTtlMs:300000
 };
 // Only add this human-visible source label to successfully validated DeepSeek
 // replies. Siri/Qwen service branding is controlled upstream and may not change.
@@ -295,12 +295,14 @@ function captureQwenRequestBodyOnce(){
   log("QWEN_BODY_CAPTURED_LOCAL");
  else log("QWEN_BODY_CAPTURE_STORE_FAILED");
 }
-function observedSiriTextEnvelopeReasons(o){
+function observedSiriTextEnvelopeReasons(o,isFollowupRoute){
  // Exact field names and field TYPES confirmed by the local iPad schema probe.
  // Root metadata is not forwarded to DeepSeek. Unknown keys, tool calls, media
  // and unsupported message types remain blocked by this and textAtom().
  var reasons=[],top=Object.keys(o);
  var allowedRoot=["configuration","input","client_tools","input_hint","response_format","server_tools","stream"];
+ if(isFollowupRoute)allowedRoot.push("previous_choice_id");
+ if(isFollowupRoute&&!validId(o.previous_choice_id))reasons.push("PREVIOUS_CHOICE_INVALID");
  if(top.some(function(k){return allowedRoot.indexOf(k)<0;})||
     top.indexOf("configuration")<0||top.indexOf("input")<0)
   reasons.push("ROOT_FIELDS");
@@ -356,7 +358,7 @@ function observedSiriTextEnvelopeReasons(o){
  }
  return reasons;
 }
-function parseRequest(raw){
+function parseRequest(raw,allowRecoveredSiri,followupMode){
  if(!raw){if(requestDiagnostic==="UNSET")requestDiagnostic="BODY_EMPTY";return null;}
  if(raw.length>C.maxRequest){requestDiagnostic="BODY_OVERSIZE";return null;}
  var o;
@@ -367,16 +369,17 @@ function parseRequest(raw){
   if(typeof g!=="string"){requestDiagnostic="GROUP_MISSING";return null;}
   requestGroup=g;
   var observedGroup=g==="siri.multimodal.noRTI";
+   if(followupMode&&!observedGroup){requestDiagnostic="FOLLOWUP_GROUP_UNVERIFIED";return null;}
   if(!/^(siri\.tqa|siri_tqa)$/i.test(g)&&!observedGroup){
    requestDiagnostic="GROUP_UNSUPPORTED";return null;
   }
   // The newly observed multimodal group is never accepted for WritingTools,
   // unknown clients or unverified non-text JSON envelopes.
-  if(observedGroup&&!isSiriForProbe()){
+  if(observedGroup&&!isSiriForProbe()&&!allowRecoveredSiri){
    requestDiagnostic="GROUP_UNSUPPORTED";return null;
   }
   if(observedGroup){
-   var shapeReasons=observedSiriTextEnvelopeReasons(o);
+   var shapeReasons=observedSiriTextEnvelopeReasons(o,!!followupMode);
    if(shapeReasons.length){
     captureNortiSchemaLocally(o);
     shapeReasons.forEach(function(code){log("NORTI_SHAPE_"+code);});
@@ -474,9 +477,10 @@ function parseWritingToolsRequest(raw,allowRecoveredScene){
  }
  requestDiagnostic="OK";return prompt;
 }
-function parseApplePrompt(raw,allowRecoveredScene){
- return isWritingTools()||allowRecoveredScene?
-  parseWritingToolsRequest(raw,!!allowRecoveredScene):parseRequest(raw);
+function parseApplePrompt(raw,recoveredScene,followupMode){
+ return isWritingTools()||recoveredScene==="writing"?
+  parseWritingToolsRequest(raw,recoveredScene==="writing"):
+  parseRequest(raw,recoveredScene==="siri",!!followupMode);
 }
 
 function validKey(k){return typeof k==="string"&&/^[A-Za-z0-9_-]{12,256}$/.test(k)&&!/REPLACE_WITH|PLACEHOLDER/i.test(k);}
@@ -541,8 +545,10 @@ function safeContinueUrl(v){
   (v===""||/^https:\/\/prod-yabuli\.qianwen\.com(?:\/|$)/i.test(v))?v:"";
 }
 function emptyOrMissing(v){return typeof v==="undefined"||(Array.isArray(v)&&v.length===0);}
-function rewriteSse(original,answer,scene){
+function rewriteSse(original,answer,scene,route,expectedSession){
  if(scene!=="writing")scene="siri";
+ route=route==="followup"?"followup":"main";
+ if(route==="followup"&&(scene!=="siri"||!validId(expectedSession)))return null;
  // Exact event sequence known from native Siri/Qwen. Unknown frames or tool
  // variants fail CLOSED. Never copy a full original SSE payload.
  if(typeof original!=="string"||original.length>C.maxSse||!original.length||
@@ -573,7 +579,7 @@ function rewriteSse(original,answer,scene){
  // content.done. Never copy their source URLs, IDs, snippets or other Qwen
  // content into a synthetic DeepSeek reply. Preserve only the text event
  // skeleton, and fail closed for annotations outside this verified interval.
- if(entries.length<12||entries.length>256)return null;
+ if(entries.length<(route==="followup"?11:12)||entries.length>256)return null;
  var clean=[],seenTextDone=false,seenContentDone=false,annotationCount=0;
  for(i=0;i<entries.length;i++){
   var row=entries[i];
@@ -592,25 +598,31 @@ function rewriteSse(original,answer,scene){
   clean.push(row);
  }
  entries=clean;
- if(entries.length<12||entries.length>256)return null;
+ if(entries.length<(route==="followup"?11:12)||entries.length>256)return null;
  var names=entries.map(function(x){return x.name;});
- var prefix=[E.session,E.created,E.choice,E.item,E.added];
+ var prefix=route==="followup"?[E.created,E.choice,E.item,E.added]:
+  [E.session,E.created,E.choice,E.item,E.added];
  var suffix=[E.textDone,E.contentDone,E.itemDone,E.completed,E.choiceDone,E.responseDone];
- for(i=0;i<5;i++)if(names[i]!==prefix[i])return null;
+ for(i=0;i<prefix.length;i++)if(names[i]!==prefix[i])return null;
  for(i=0;i<6;i++)if(names[names.length-6+i]!==suffix[i])return null;
- for(i=5;i<names.length-6;i++)if(names[i]!==E.delta)return null;
- var s=entries[0].payload,r=entries[1].payload;
+ for(i=prefix.length;i<names.length-6;i++)if(names[i]!==E.delta)return null;
+ var r=entries[route==="followup"?0:1].payload;
+ var s=route==="followup"?{id:expectedSession,expires_at:Math.floor(Date.now()/1000)+120}:
+   entries[0].payload;
  if(!s||!r||!validId(s.id)||!validId(r.id)||r.session_id!==s.id||
     !validEpoch(s.expires_at))return null;
  // Modality / safety: never synthesize an answer for active tool executions,
  // notices, moderation decisions or unexpected non-message output.
- var choiceAdded=entries[2].payload&&entries[2].payload.choice;
- var itemAdded=entries[3].payload&&entries[3].payload.item;
+ var offset=route==="followup"?-1:0;
+ var choiceAdded=entries[2+offset].payload&&entries[2+offset].payload.choice;
+ var itemAdded=entries[3+offset].payload&&entries[3+offset].payload.item;
  var choiceCompleted=entries[entries.length-3].payload&&entries[entries.length-3].payload.choice;
  var choiceDone=entries[entries.length-2].payload&&entries[entries.length-2].payload.choice;
  var lastResponse=entries[entries.length-1].payload;
  var lastChoice=lastResponse&&Array.isArray(lastResponse.choices)&&lastResponse.choices[0];
- if(!emptyOrMissing(r.notices)||!emptyOrMissing(lastResponse&&lastResponse.notices)||
+ if(!lastResponse||lastResponse.id!==r.id||
+    (typeof lastResponse.session_id!=="undefined"&&lastResponse.session_id!==s.id)||
+    !emptyOrMissing(r.notices)||!emptyOrMissing(lastResponse&&lastResponse.notices)||
     !emptyOrMissing(choiceCompleted&&choiceCompleted.moderation)||
     !emptyOrMissing(choiceDone&&choiceDone.moderation)||
     !emptyOrMissing(lastChoice&&lastChoice.moderation))return null;
@@ -642,7 +654,7 @@ function rewriteSse(original,answer,scene){
   return false;
  }
  var itemDone=entries[entries.length-4].payload&&entries[entries.length-4].payload.item;
- var contentAdded=entries[4].payload&&entries[4].payload.content;
+ var contentAdded=entries[4+offset].payload&&entries[4+offset].payload.content;
  var contentDone=entries[entries.length-5].payload&&entries[entries.length-5].payload.content;
  if(hasToolOutput(choiceCompleted)||hasToolOutput(choiceDone)||hasToolOutput(lastChoice)||
     choiceAdded&&!emptyOrMissing(choiceAdded.output)||
@@ -689,9 +701,10 @@ function rewriteSse(original,answer,scene){
   {item_index:0,choice_index:0,index:0,
    content:{text:{annotations:[],value:""},type:"text"}}
  ];
+ if(route==="followup")start.shift(); // No session.created in observed followup SSE.
  var out=[],n=start.slice();
- for(i=5;i<names.length-6;i++)
-  n.push({item_index:0,choice_index:0,content_index:0,delta:i===5?content:""});
+ for(i=start.length;i<names.length-6;i++)
+  n.push({item_index:0,choice_index:0,content_index:0,delta:i===start.length?content:""});
  n.push(
   {item_index:0,choice_index:0,content_index:0,value:content},
   {item_index:0,choice_index:0,index:0,content:textContent},
@@ -836,6 +849,70 @@ function abModel(reply,body,err){
  abRecord("DEEPSEEK_API",info);
 }
 
+// The previous_choice_id is an opaque Qwen continuation pointer, never
+// submitted to DeepSeek. A valid followup can use ONLY prior locally verified
+// DeepSeek text, scoped to the same session, with a five-minute logical TTL.
+// This transient device-local context contains plain user/model text; it is
+// not logged, and its TTL does not claim physical secure erasure.
+function followupSessionId(){
+ if(!req||typeof req.url!=="string")return "";
+ var m=req.url.match(/^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/([^\/?#]{1,160})\/responses(?:\?[^#]*)?$/i);
+ return m&&validId(m[1])?m[1]:"";
+}
+function followupIds(){
+ var sid=followupSessionId(),obj=null;
+ if(!sid||!req||typeof req.body!=="string"||
+    !req.body.length||req.body.length>C.maxRequest)return null;
+ try{obj=JSON.parse(req.body);}catch(e){return null;}
+ if(!obj||typeof obj!=="object"||Array.isArray(obj)||
+    !validId(obj.previous_choice_id)||
+    !obj.configuration||
+    obj.configuration.response_configuration_group_id!=="siri.multimodal.noRTI")return null;
+ return {sid:sid,prev:obj.previous_choice_id};
+}
+function verifiedHistory(prev,sid){
+ if(!validId(prev)||!validId(sid))return null;
+ var raw=storeRead("AIES_CTX_"+prev),v=null,now=Date.now();
+ if(typeof raw!=="string"||raw.length>36000)return null;
+ try{v=JSON.parse(raw);}catch(e){return null;}
+ if(!v||v.v!==1||v.sid!==sid||v.exp<=now||
+    v.exp>now+C.followupContextTtlMs||!Array.isArray(v.messages)||
+    !v.messages.length||v.messages.length>6||v.messages.length%2!==0)return null;
+ var size=0;
+ for(var i=0;i<v.messages.length;i++){
+  var msg=v.messages[i],role=i%2===0?"user":"assistant";
+  if(!msg||msg.role!==role||typeof msg.content!=="string"||
+     !msg.content.length||msg.content.length>C.maxPrompt)return null;
+  size+=msg.content.length;
+ }
+ return size<=30000?v.messages:null;
+}
+function saveVerifiedHistory(rewritten,prompt,answer,previous){
+ if(typeof rewritten!=="string"||typeof prompt!=="string"||
+    typeof answer!=="string"||prompt.length>C.maxPrompt||
+    answer.length>C.maxAnswer)return false;
+ var frames=rewritten.split("\n\n"),sid="",choiceId="";
+ for(var i=0;i<frames.length;i++){
+  var lines=frames[i].split("\n"),name="",json=null;
+  for(var j=0;j<lines.length;j++)if(lines[j].indexOf("event: ")===0)
+   name=lines[j].slice(7);
+  if(name!==E.session&&name!==E.created&&name!==E.choice)continue;
+  for(var k=0;k<lines.length;k++)if(lines[k].indexOf("data: ")===0){
+   try{json=JSON.parse(lines[k].slice(6));}catch(e){}
+  }
+  var p=json&&json[name];
+  if(!p)continue;
+  if(name===E.session&&validId(p.id))sid=p.id;
+  if(name===E.created&&validId(p.session_id))sid=p.session_id;
+  if(name===E.choice&&p.choice&&validId(p.choice.id))choiceId=p.choice.id;
+ }
+ if(!validId(sid)||!validId(choiceId))return false;
+ var msgs=Array.isArray(previous)?previous.slice(-4):[];
+ msgs.push({role:"user",content:prompt},{role:"assistant",content:answer});
+ var packed=safeJson({v:1,sid:sid,exp:Date.now()+C.followupContextTtlMs,messages:msgs});
+ if(packed.length>32000)return false;
+ return storeWrite("AIES_CTX_"+choiceId,packed);
+}
 function randomToken(){
  return "aies_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,14)+"_"+Math.random().toString(36).slice(2,14);
 }
@@ -861,29 +938,41 @@ if(isWritingTools())probeObserveWritingTools();
 // responses with DeepSeek without confirmed same-transaction correlation.
 // Block only Siri HTTP-200 SSE responses on this specific path, not requests,
 // non-SSE metadata, other clients or the whole Qwen domain.
-if(isFollowup()){
- if(res&&isSiriForProbe()&&isFollowupTextSse()){
-  abSse("SESSION_FOLLOWUP_BLOCKED",statusCode(res),res.body);
-  log("QWEN_SESSION_FOLLOWUP_SSE_BLOCKED");
-  error("QWEN_FOLLOWUP_UNVERIFIED_SOURCE");
- }else{
-  if(res&&isSiriForProbe())log("QWEN_SESSION_FOLLOWUP_NON_SSE_SKIPPED");
-  done({});
+var followupRoute=isFollowup();
+if(followupRoute){
+ // Do not intercept other Qwen clients. Only observed Siri text SSE may be rewritten.
+ var uaNow=header(req&&req.headers,"User-Agent");
+ if(!res&&!isSiriForProbe()){done({});return;}
+ if(res&&uaNow&&!isSiriForProbe()){done({});return;}
+ if(res&&!isFollowupTextSse()){done({});return;}
+ if(res&&!header(req.headers,"X-AIES-Request-ID")){
+  if(isSiriForProbe()){
+   abSse("SESSION_FOLLOWUP_BLOCKED",statusCode(res),res.body);
+   log("QWEN_SESSION_FOLLOWUP_SSE_BLOCKED");
+  }
+  error("QWEN_FOLLOWUP_UNVERIFIED_SOURCE");return;
  }
- return;
 }
 if(!res){
  // Phase 1: capture a prompt and explicitly couple request/response using
  // an opaque ID. Unlike "latest prompt", concurrent requests never share a slot.
  captureQwenRequestBodyOnce();
- var prompt=parseApplePrompt(rawRequest());
- abRequest(rawRequest(),prompt);
+ var requestRaw=rawRequest();
+ var prompt=parseApplePrompt(requestRaw,"",followupRoute);
+ abRequest(requestRaw,prompt);
  probeObserveRequest();
  if(!prompt){log("REQUEST_DIAG_"+requestDiagnostic);error(isWritingTools()?"UNSUPPORTED_WRITING_REQUEST":"UNSUPPORTED_SIRI_REQUEST");return;}
  if(isWritingTools())log("WRITINGTOOLS_COMPOSE_SCOPED");
  if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){error("INVALID_METHOD");return;}
+ var followupDetails=followupRoute?followupIds():null;
+ if(followupRoute&&(!followupDetails||
+    !verifiedHistory(followupDetails.prev,followupDetails.sid))){
+  error("FOLLOWUP_CONTEXT_UNAVAILABLE");return;
+ }
  var token=randomToken();
- if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,scene:isWritingTools()?"writing":"siri",exp:Date.now()+C.sessionTtlMs}))){
+ if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,scene:isWritingTools()?"writing":"siri",route:followupRoute?"followup":"main",
+   sid:followupDetails&&followupDetails.sid,prev:followupDetails&&followupDetails.prev,
+   exp:Date.now()+C.sessionTtlMs}))){
   error("SESSION_STORE_UNAVAILABLE");return;
  }
  var headers={};Object.keys(req.headers||{}).forEach(function(k){
@@ -895,7 +984,7 @@ if(!res){
  return;
 }
 // Phase 2: never return the raw Qwen body from code paths we control.
-abSse("MAIN_UPSTREAM",statusCode(res),res&&res.body);
+abSse(followupRoute?"FOLLOWUP_UPSTREAM":"MAIN_UPSTREAM",statusCode(res),res&&res.body);
 if(statusCode(res)!==200){error("ORIGINAL_RESPONSE_STATUS");return;}
 if(!res||typeof res.body!=="string"||res.body.length>C.maxSse){error("SSE_UNAVAILABLE");return;}
 var tag=header(req.headers,"X-AIES-Request-ID"),current=null,prompt2=null;
@@ -920,17 +1009,20 @@ if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
  }
  // A mismatched transaction tag is never rescued by reading the current
  // request body: it may belong to an unrelated Siri/WritingTools operation.
- if(current&&typeof current.scene==="string"&&current.scene!==activeScene){
+ if(current&&typeof current.scene==="string"&&(current.scene!==activeScene||
+     (current.route||"main")!==(followupRoute?"followup":"main")||
+     (followupRoute&&current.sid!==followupSessionId()))){
   storeWrite("AIES_R1_"+tag,"");
   error("CORRELATION_MISMATCH");return;
  }
  storeWrite("AIES_R1_"+tag,""); // consume once, even if invalid
- if(validStored&&current.scene===activeScene)prompt2=current.p;
+ if(validStored&&current.scene===activeScene&&
+    (current.route||"main")===(followupRoute?"followup":"main"))prompt2=current.p;
  if(prompt2)log("RESPONSE_PROMPT_FROM_STORE");
  else log("RESPONSE_PROMPT_STORE_MISSING");
 }
 var responseBody=rawRequest();
-var fromReq=parseApplePrompt(responseBody,!responseUA&&activeScene==="writing"&&!!prompt2);
+var fromReq=parseApplePrompt(responseBody,!responseUA&&prompt2?activeScene:"",followupRoute);
 // When recovering scene without a response UA, a *present* request body must
 // still be parseable as that same scene. Otherwise a Siri body carrying a
 // WritingTools token could bypass the usual cross-scene comparison.
@@ -938,13 +1030,28 @@ if(prompt2&&!responseUA&&req&&typeof req.body==="string"&&req.body.length&&!from
  error("CORRELATION_MISMATCH");return;
 }
 if(prompt2&&fromReq&&prompt2!==fromReq){error("CORRELATION_MISMATCH");return;}
+if(followupRoute&&prompt2&&req&&typeof req.body==="string"&&req.body.length){
+ var reflected=followupIds();
+ if(!reflected||reflected.sid!==current.sid||reflected.prev!==current.prev){
+  error("CORRELATION_MISMATCH");return;
+ }
+}
 if(!prompt2){
  if(fromReq){prompt2=fromReq;log("RESPONSE_PROMPT_FROM_BODY");}
  else log("RESPONSE_PROMPT_BODY_UNAVAILABLE");
 }
 if(!prompt2){error("PROMPT_UNAVAILABLE");return;}
+// Session followups MUST have a verified response tag and previous DeepSeek
+// choice context; never infer identity from a global "last question" slot.
+if(followupRoute&&(!current||current.route!=="followup"||
+   !validId(current.prev)||!validId(current.sid))){error("FOLLOWUP_CORRELATION_UNAVAILABLE");return;}
+var priorMessages=followupRoute?verifiedHistory(current.prev,current.sid):[];
+if(followupRoute&&!priorMessages){error("FOLLOWUP_CONTEXT_UNAVAILABLE");return;}
 // Fail before billing DeepSeek if this upstream stream cannot be rewritten.
-if(!rewriteSse(res.body,"AIES_VALIDATION_ONLY",activeScene)){error("SSE_REWRITE_UNSUPPORTED");return;}
+if(!rewriteSse(res.body,"AIES_VALIDATION_ONLY",activeScene,
+   followupRoute?"followup":"main",followupRoute?current.sid:null)){
+ error("SSE_REWRITE_UNSUPPORTED");return;
+}
 log("SSE_PREFLIGHT_PASSED");
 var key=storeRead(C.keyName);
 if(!validKey(key)){error("KEY_NOT_PROVISIONED");return;}
@@ -961,8 +1068,7 @@ try{
     {role:"system",content:activeScene==="writing"?
      "你是 Apple 写作工具的 DeepSeek 纯文本创作助手。按用户提供的说明和文本进行起草或改写。只返回最终正文，不输出 JSON、代码围栏、引言或无关提示。不要自称千问。AIES 会在最终正文前自动添加来源标记。":
      "你是通过 AIES 转发的 DeepSeek 中文 Siri 问答助手。仅回答用户问题，内容尽量准确、清晰，并在复杂问题中保留必要推理步骤。不要自称千问或 Qwen。用户问来源时如实说明这条回答来自 DeepSeek API，经 AIES 转发；不要自己重复固定来源前缀，AIES 会在每条验证成功的回答正文开头强制添加【DeepSeek · AIES】。"},
-    {role:"user",content:prompt2}
-   ]
+   ].concat(priorMessages,[{role:"user",content:prompt2}])
   })
  },function(err,reply,bodyText){
   if(once)return;
@@ -972,11 +1078,15 @@ try{
   if(!answer){error("MODEL_RESPONSE_INVALID");return;}
   var labeledAnswer=verifiedDeepSeekAnswerWithLabel(answer);
   if(!labeledAnswer){error("MODEL_RESPONSE_INVALID");return;}
-  var rewritten=rewriteSse(res.body,labeledAnswer,activeScene);
+  var rewritten=rewriteSse(res.body,labeledAnswer,activeScene,
+   followupRoute?"followup":"main",followupRoute?current.sid:null);
   if(!rewritten){error("SSE_REWRITE_UNSUPPORTED");return;}
   abSse("AIES_SYNTHETIC",200,rewritten);
   abRecord("AIES_OUTPUT",{rewrittenChars:rewritten.length,markerPresent:rewritten.indexOf(DEEPSEEK_SOURCE_LABEL)>=0});
   if(activeScene==="writing")log("WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY");
+  else if(saveVerifiedHistory(rewritten,prompt2,answer,priorMessages))
+   log("SIRI_CONTEXT_STORED");
+  else log("SIRI_CONTEXT_STORE_FAILED");
   log("DEEPSEEK_LABEL_APPLIED");
   log("DEEPSEEK_RESPONSE_ATTEMPTED");
   done({status:200,headers:{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-store","X-AIES-Answer-Source":"deepseek"},body:rewritten});

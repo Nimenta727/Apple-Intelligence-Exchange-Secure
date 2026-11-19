@@ -129,6 +129,182 @@ test("AB trace identifies failed session follow-up SSE without collecting Qwen t
  assert.equal(JSON.stringify(r2.returned[0]),"{}");
 });
 
+
+function eventPayload(raw,name){
+ const frame=raw.split("\n\n").find(x=>x.startsWith("event: "+name+"\n"));
+ assert.ok(frame,"event "+name+" exists");
+ return JSON.parse(frame.split("\n").find(x=>x.startsWith("data: ")).slice(6))[name];
+}
+function siriFollowupFixture(sessionId,salt="followup"){
+ const native=Sse.candidateSse("QWEN_FOLLOWUP_ONLY", "PRIVATE_NATIVE_CONTEXT","siri",
+  {now:()=>1730000005000,id:()=>salt});
+ const nativeSid=eventPayload(native,"session.created").id;
+ return native.slice(native.indexOf("event: session.response.created"))
+  .split(nativeSid).join(sessionId);
+}
+function siriFollowupRequest(e,sessionId,previousChoice,prompt="Which planet is largest?"){
+ return {...e.request,url:URL.replace("/sessions/responses","/sessions/"+sessionId+"/responses"),
+  headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},
+  body:JSON.stringify({
+   configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},
+   input:[{type:"message",message:{role:"user",content:[{type:"text",text:prompt}]}}],
+   previous_choice_id:previousChoice,stream:true
+  })};
+}
+function completeFirstSiriTurn(e){
+ const req={...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"}};
+ const a=e.invoke(req);
+ const response=e.invoke({...req,headers:{...req.headers,...a.returned[0].headers}},
+  {status:200,body:fixture,headers:{"Content-Type":"text/event-stream"}});
+ assert.equal(response.returned[0].status,200);
+ const raw=response.returned[0].body;
+ const sid=eventPayload(raw,"session.created").id;
+ const prev=eventPayload(raw,"session.response.choices[].added").choice.id;
+ return {sid,prev,raw};
+}
+test("Siri followup uses prior verified DeepSeek-only context and emits observed response.created-first SSE",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ assert.ok(e.data["AIES_CTX_"+first.prev],"first verified reply stored");
+ const req=siriFollowupRequest(e,first.sid,first.prev);
+ const a=e.invoke(req);
+ assert.ok(a.returned[0].headers["X-AIES-Request-ID"]);
+ const b=e.invoke({...req,headers:{...req.headers,...a.returned[0].headers}},
+  {status:200,headers:{"Content-Type":"text/event-stream"},body:siriFollowupFixture(first.sid)});
+ assert.equal(b.returned[0].status,200);
+ assert.ok(b.returned[0].body.startsWith("event: session.response.created\n"));
+ assert.ok(!b.returned[0].body.includes("event: session.created\n"));
+ assert.ok(b.returned[0].body.includes("【DeepSeek · AIES】"));
+ assert.ok(!b.returned[0].body.includes("QWEN_FOLLOWUP_ONLY"));
+ assert.equal(e.requests.length,2);
+ const messages=JSON.parse(e.requests[1].body).messages;
+ assert.deepEqual(messages.map(x=>x.role),["system","user","assistant","user"]);
+ assert.equal(messages[1].content,"Explain why the sky is blue");
+ assert.equal(messages[2].content,"DEEPSEEK_EXCLUSIVE_REPLY");
+ assert.equal(messages[3].content,"Which planet is largest?");
+ assert.ok(e.logs.includes("[AIES_V06] SIRI_CONTEXT_STORED"));
+ assert.ok(!e.logs.some(x=>x.includes("Which planet")||x.includes("Explain why")));
+});
+test("Siri second and third turns retain session/choice linkage and verified history",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ const req=siriFollowupRequest(e,first.sid,first.prev,"What is its color?");
+ const tag=e.invoke(req).returned[0].headers;
+ const second=e.invoke({...req,headers:{...req.headers,...tag}},
+  {status:200,body:siriFollowupFixture(first.sid,"turn-two")});
+ assert.equal(second.returned[0].status,200);
+ const choice=eventPayload(second.returned[0].body,"session.response.choices[].added").choice.id;
+ const thirdReq=siriFollowupRequest(e,first.sid,choice,"Why does it look that way?");
+ const thirdTag=e.invoke(thirdReq).returned[0].headers;
+ assert.ok(thirdTag["X-AIES-Request-ID"]);
+ const third=e.invoke({...thirdReq,headers:{...thirdReq.headers,...thirdTag},body:undefined},
+  {status:200,body:siriFollowupFixture(first.sid,"turn-three")});
+ assert.equal(third.returned[0].status,200);
+ assert.equal(e.requests.length,3);
+ assert.deepEqual(JSON.parse(e.requests[2].body).messages.map(x=>x.role),
+  ["system","user","assistant","user","assistant","user"]);
+});
+test("Siri followup without verified previous DeepSeek choice is rejected before model billing",()=>{
+ const e=env();
+ const req=siriFollowupRequest(e,"sess_unknown","choice_unknown");
+ const r=e.invoke(req);
+ assert.equal(r.returned[0].response.status,502);
+ assert.ok(e.logs.includes("[AIES_V06] ERROR_FOLLOWUP_CONTEXT_UNAVAILABLE"));
+ assert.equal(e.requests.length,0);
+});
+test("Siri followup session mismatches, malformed previous IDs and expired context fail closed",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ const other=siriFollowupRequest(e,"sess_other",first.prev);
+ const a=e.invoke(other);
+ assert.equal(a.returned[0].response.status,502);
+ const malformed=siriFollowupRequest(e,first.sid,"wrong/value");
+ const b=e.invoke(malformed);
+ assert.equal(b.returned[0].response.status,502);
+ e.data["AIES_CTX_"+first.prev]=JSON.stringify({...JSON.parse(e.data["AIES_CTX_"+first.prev]),exp:Date.now()-1});
+ const old=e.invoke(siriFollowupRequest(e,first.sid,first.prev));
+ assert.equal(old.returned[0].response.status,502);
+ assert.equal(e.requests.length,1);
+});
+test("Siri followup response tag and matching stream session are mandatory",()=>{
+ const e=env(),first=completeFirstSiriTurn(e),req=siriFollowupRequest(e,first.sid,first.prev);
+ const noTag=e.invoke(req,{status:200,headers:{"Content-Type":"text/event-stream"},body:siriFollowupFixture(first.sid)});
+ assert.equal(noTag.returned[0].status,502);
+ assert.ok(e.logs.includes("[AIES_V06] QWEN_SESSION_FOLLOWUP_SSE_BLOCKED"));
+ const a=e.invoke(req),tag=a.returned[0].headers;
+ const mismatched=e.invoke({...req,headers:{...req.headers,...tag}},
+  {status:200,body:siriFollowupFixture("sess_wrong")});
+ assert.equal(mismatched.returned[0].status,502);
+ assert.ok(e.logs.includes("[AIES_V06] ERROR_SSE_REWRITE_UNSUPPORTED"));
+ assert.equal(e.requests.length,1);
+});
+test("WritingTools and unknown client followup routes remain pass-through and do not use Siri context",()=>{
+ const e=env(),req={url:URL.replace("/sessions/responses","/sessions/sess_safe/responses"),
+  method:"POST",body:"PRIVATE",headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)"}};
+ assert.equal(JSON.stringify(e.invoke(req).returned[0]),"{}");
+ assert.equal(JSON.stringify(e.invoke(req,{status:200,body:siriFollowupFixture("sess_safe"),
+  headers:{"Content-Type":"text/event-stream"}}).returned[0]),"{}");
+ assert.equal(e.requests.length,0);
+});
+
+test("observed 18-event followup: four deltas + four post-text-done annotations are stripped",()=>{
+ const e=env(),first=completeFirstSiriTurn(e),req=siriFollowupRequest(e,first.sid,first.prev);
+ const a=e.invoke(req),token=a.returned[0].headers;
+ let raw=siriFollowupFixture(first.sid,"annotated");
+ const delta="event: session.response.choices[].items[].message.content[].text.value.delta\n";
+ const frame=raw.split("\n\n").find(x=>x.startsWith(delta));
+ assert.ok(frame);
+ raw=raw.replace(frame+"\n\n",new Array(4).fill(frame+"\n\n").join(""));
+ const annotationName="session.response.choices[].items[].message.content[].text.annotations[].added";
+ let annotation="";
+ for(let i=0;i<4;i++){
+  const o={type:annotationName};
+  o[annotationName]={index:i,annotation:{url:"https://QWEN_PRIVATE_CITATION.example/"+i,
+   title:"QWEN_PRIVATE_CITATION"}};
+  annotation+="event: "+annotationName+"\ndata: "+JSON.stringify(o)+"\n\n";
+ }
+ raw=raw.replace("event: session.response.choices[].items[].message.content[].done\n",
+  annotation+"event: session.response.choices[].items[].message.content[].done\n");
+ assert.equal(raw.trim().split("\n\n").length,18);
+ const b=e.invoke({...req,headers:{...req.headers,...token}},
+  {status:200,headers:{"Content-Type":"text/event-stream"},body:raw});
+ assert.equal(b.returned[0].status,200);
+ assert.ok(b.returned[0].body.includes("DEEPSEEK_EXCLUSIVE_REPLY"));
+ assert.ok(!b.returned[0].body.includes("QWEN_FOLLOWUP_ONLY"));
+ assert.ok(!b.returned[0].body.includes("QWEN_PRIVATE_CITATION"));
+ assert.ok(!b.returned[0].body.includes(annotationName));
+ assert.equal(e.requests.length,2);
+});
+test("followup response without UA uses valid same-transaction tag only",()=>{
+ const e=env(),first=completeFirstSiriTurn(e),req=siriFollowupRequest(e,first.sid,first.prev);
+ const a=e.invoke(req),tag=a.returned[0].headers["X-AIES-Request-ID"];
+ const b=e.invoke({...req,headers:{"X-AIES-Request-ID":tag},body:undefined},
+  {status:200,body:siriFollowupFixture(first.sid,"lost-ua")});
+ assert.equal(b.returned[0].status,200);
+ assert.equal(e.requests.length,2);
+});
+test("followup response body cannot change previous_choice_id under a trusted transaction tag",()=>{
+ const e=env(),first=completeFirstSiriTurn(e),req=siriFollowupRequest(e,first.sid,first.prev);
+ const a=e.invoke(req),tag=a.returned[0].headers;
+ const changed=JSON.stringify({...JSON.parse(req.body),previous_choice_id:"choice_changed"});
+ const b=e.invoke({...req,body:changed,headers:{...req.headers,...tag}},
+  {status:200,body:siriFollowupFixture(first.sid,"changed-prev")});
+ assert.equal(b.returned[0].status,502);
+ assert.ok(e.logs.includes("[AIES_V06] ERROR_CORRELATION_MISMATCH"));
+ assert.equal(e.requests.length,1);
+});
+test("invalid placement of followup Qwen annotations fails closed before DeepSeek",()=>{
+ const e=env(),first=completeFirstSiriTurn(e),req=siriFollowupRequest(e,first.sid,first.prev);
+ const a=e.invoke(req),token=a.returned[0].headers;
+ let raw=siriFollowupFixture(first.sid,"unsafe-annotation");
+ const name="session.response.choices[].items[].message.content[].text.annotations[].added";
+ const o={type:name};o[name]={annotation:{title:"QWEN_PRIVATE_ANNOTATION"}};
+ const frame="event: "+name+"\ndata: "+JSON.stringify(o)+"\n\n";
+ raw=raw.replace("event: session.response.choices[].items[].message.content[].text.value.done\n",
+  frame+"event: session.response.choices[].items[].message.content[].text.value.done\n");
+ const b=e.invoke({...req,headers:{...req.headers,...token}},
+  {status:200,body:raw});
+ assert.equal(b.returned[0].status,502);
+ assert.equal(e.requests.length,1);
+ assert.ok(!JSON.stringify(b.returned[0]).includes("QWEN_PRIVATE_ANNOTATION"));
+});
 function annotatedQwenSse(raw,annotationCount=5,position="after_text_done"){
  const eventName="session.response.choices[].items[].message.content[].text.annotations[].added";
  let out=raw;
@@ -1251,8 +1427,8 @@ test("DeepSeek Flash is requested in documented disabled-thinking mode for short
 
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
- assert.equal(scripts.length,3);
- assert.ok(scripts.every(x=>x.includes("/975599163bafeb8c6ba8aa60624577e2a861d9f0/scripts/aies_siri_deepseek_v06.js")));
+ assert.equal(scripts.length,4);
+ assert.ok(scripts.every(x=>x.includes("/7a698fbaadeb37431d9bd1d43df359292ee78ba0/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{

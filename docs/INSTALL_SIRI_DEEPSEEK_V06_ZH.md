@@ -6,7 +6,7 @@
 
 | 模式 | 模块 | Runtime 固定 SHA |
 |---|---|---|
-| **60 Siri / 写作工具 → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `975599163bafeb8c6ba8aa60624577e2a861d9f0` |
+| **60 Siri / 写作工具 → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `7a698fbaadeb37431d9bd1d43df359292ee78ba0` |
 | **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `506e51ad1ad549722242611f174b527cc12c4d21` |
 
 **60 的 Shadowrocket 模块 Raw URL：**
@@ -38,7 +38,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 4. 60 DeepSeek 实验模式
 
-1. 关闭 61 和其它同域冲突模块，再导入并启用 60。确认三条脚本规则固定 SHA 为 `975599163bafeb8c6ba8aa60624577e2a861d9f0`。
+1. 关闭 61 和其它同域冲突模块，再导入并启用 60。确认三条脚本规则固定 SHA 为 `7a698fbaadeb37431d9bd1d43df359292ee78ba0`。
 2. 在 Siri 问一个非私密且答案容易核对的**纯文本问题**；音频、图像、工具调用、未经验证的 WritingTools 操作、未知 SSE 事件都不应被当作受支持的纯文本转给 DeepSeek。
 3. **只查看固定 `[AIES_V06]` 状态码**：`REQUEST_CAPTURED`、`RESPONSE_TAG_*`、`SSE_PREFLIGHT_PASSED`、`DEEPSEEK_STARTED`、`DEEPSEEK_LABEL_APPLIED`、`DEEPSEEK_RESPONSE_ATTEMPTED` 或 `ERROR_*`；不要上传原始请求日志。
 4. 看 Siri **真正显示的内容**。只有用户肉眼看到 `【DeepSeek · AIES】` 的正文、且固定日志链与同一测试一致，才算至少一次 DeepSeek Siri 显示闭环。Qwen 服务卡片可能仍然显示原品牌。
@@ -71,7 +71,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 同题 A/B 实验（2026-11-19 16:15 后）
 
-为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `975599163bafeb8c6ba8aa60624577e2a861d9f0`；61 的四条原样放行规则均固定到 `506e51ad1ad549722242611f174b527cc12c4d21`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
+为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `7a698fbaadeb37431d9bd1d43df359292ee78ba0`；61 的四条原样放行规则均固定到 `506e51ad1ad549722242611f174b527cc12c4d21`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
 
 ## 写作工具 Compose Beta（2026-11-19 浏览器协议研究后新增）
 
@@ -94,3 +94,18 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 2026-11-19 两份真机日志显示，多次 `DEEPSEEK_RESPONSE_ATTEMPTED` 已发生，而 60 的第三条规则累计 7 次 `QWEN_SESSION_FOLLOWUP_SSE_BLOCKED`（给会话级路径返回 502），并且每份日志各出现一次请求关联缺失。**这不能证明 DeepSeek API 只支持第一问**，也不能仅凭日志断定第二问 UI 失败完全由 Guard 引起。
 
 在改动 60 的会话逻辑之前，先按 [61 被动诊断指南](QWEN_PASSIVE_DIAG_ZH.md)第五节运行一次 Siri followup *仅结构*探针：保持 60 关闭、61 独占，手动开启 `siri_followup_schema_probe_ONCE.js`，连续问两条非隐私文本问题，然后手动读取结构并清除。**不要把禁用 Guard 后偶然出现的原生 Qwen 回答误判为 DeepSeek。**
+
+## 2026-11-20：真正的 Siri 会话级 DeepSeek 续答实验（替代旧第三条阻断 Guard）
+
+**这节描述当前新版，覆盖上面旧版本关于“60 只有三条 Hook、第三条永远返回 502”的历史说明。** 本次 iPad 61 无正文探针证实：后续会话 POST 的路径是 `/v1/sessions/{id}/responses`，具有严格 `siri.multimodal.noRTI` 纯文本输入及 `previous_choice_id:string`；原生 HTTP 200 的 SSE **从 `session.response.created` 开始，不包含 `session.created`**，18 个可解析事件里包括 4 个文本增量和 4 个在 `text.value.done` 后的引用注释。之前的 `EVENT_ORDER_UNSUPPORTED` 因此是**主接口预检不可直接用于续答响应**，不代表原生 SSE 无效。
+
+新版 60 **共四条 Hook**：主请求、主响应、会话级请求、会话级响应，全部固定 SHA `7a698fbaadeb37431d9bd1d43df359292ee78ba0`。后续请求必须有有效 Siri UA、明确纯文本、合法 `previous_choice_id`，且该 choice 必须关联到**同一 Qwen session 中上一轮成功生成并返回的 DeepSeek 答案**。AIES 仅在设备本地 `$persistentStore` 保留最多三轮经 DeepSeek 验证的问答历史，逻辑有效期 **5 分钟**；注意过期只代表拒绝继续读取，**不保证底层物理擦除**。回答前还需通过请求/响应同事务临时 token（45 秒）和 SSE 结构与会话身份双重校验。只有这些校验都成功，才把经过验证的历史 + 本轮纯文本发送给 DeepSeek。Qwen 答案、引用链接及原始上下文元数据都不会被转交或回显。
+
+新固定日志：
+- `SIRI_CONTEXT_STORED`：经 DeepSeek 验证的当轮回答在本地建立了续答关联；
+- `ERROR_FOLLOWUP_CONTEXT_UNAVAILABLE`：没有同一会话、未过期的前轮 DeepSeek choice；
+- `ERROR_FOLLOWUP_CORRELATION_UNAVAILABLE` / `ERROR_CORRELATION_MISMATCH`：响应阶段事务标签/会话关联不可用；
+- `SSE_PREFLIGHT_PASSED`、`DEEPSEEK_STARTED`、`DEEPSEEK_RESPONSE_ATTEMPTED`：续答结构通过并尝试替换，**不代表 Siri UI 一定显示成功**。
+- 原 `QWEN_SESSION_FOLLOWUP_SSE_BLOCKED` 仍可能出现，例如响应没有可信关联标记；不安全的真实后续会话仍返回 502，而不会伪称 DeepSeek 回答。
+
+**安装时必须重新导入 60**：旧模块固定 pin 不会因为 GitHub 的 `main` 更新而自动变成新版。确保 60 四条 Hook 都为上述 SHA、61 停用、旧 `00 REJECT` 和同域 Rewrite 停用。无需重复写入已有的 DeepSeek Key。先做普通纯文本同一 Siri 会话两问，并只查看固定 `[AIES_V06]` 错误码与每轮 UI 是否都显示 `【DeepSeek · AIES】`。如任一轮只显示无标记的 Qwen、错误、或中断，则停用 60，恢复原生模式并记录**非敏感状态码**；当前依然是 **Beta，未通过这条新路径的 iPad 真机 UI 验收**。

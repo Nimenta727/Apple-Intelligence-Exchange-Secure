@@ -73,3 +73,9 @@
 [PR #32](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/32) 已合并到 `main`（`49c7556b921525319e6e89bda5ab39e6c18b3aff`），GitHub Actions 96/96 模拟测试通过；新增可手动开启 600 秒、只记录字段类型与 SSE 事件的 61 Siri followup 探针和 `siri_followup_schema_probe_ONCE.js` / `STOP_ONCE.js`。61 四条 Hook 新 pin：`506e51ad1ad549722242611f174b527cc12c4d21`。**60 仍保持旧的 Guard 和单轮适配，不声称修复多轮。**
 
 下一步必须由用户在设备上使用 61（关闭 60）进行一次不含私密内容的连续两问会话级 schema/SSE 采样，再决定如何进行支持同事务关联的后续 DeepSeek 重写。详情 [61 诊断指南](QWEN_PASSIVE_DIAG_ZH.md) 与 [维护记录](routine/2026-11-19-23-49-Siri-multi-turn-followup-502-diagnostics.md)。
+
+## 2026-11-20：Siri followup 真实协议已采样，四 Hook DeepSeek Beta 进入 CI
+
+用户本人已运行新版 61 `siri_followup_schema_probe_ONCE.js`，输出 `CAPTURED_LOCAL_PROTOCOL_SCHEMA`、`RECORDS=2`，一条会话级 Siri 请求（`siri.multimodal.noRTI`、`previous_choice_id:string`）和一条 HTTP 200 SSE 响应（共 18 帧，开头 `session.response.created`、4 个 delta、4 个注释、0 解析失败），并经本地清理。**这些是事实，不代表原生 Siri 已成功接受合成 SSE，也不代表两条诊断记录已被严格证实属于同事务。**
+
+基于该结构，新增 60 四 Hook 续答 Beta 适配：严格解析 previous_choice / session、临时 tag 关联与短期同会话 DeepSeek-only 历史、支持 followup SSE 不存在 session.created 的事件序列、丢弃原生引用、失败关闭；拒绝跨会话与非纯文本。主接口/WritingTools 的行为保留。CI 与 PR 发布状态以 GitHub Actions 为准，**真机多轮验收仍待用户执行**。完整记录见 [routine](routine/2026-11-20-00-25-Siri-verified-followup-DeepSeek-beta.md)。
