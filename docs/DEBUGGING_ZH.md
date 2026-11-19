@@ -115,3 +115,9 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 针对这些已确认的键名和 JSON 类型，主脚本已做**精确允许**，但不会将根级工具列表、格式配置等元数据传给 DeepSeek。外层 `type` 的具体值仍**未知**，代码仅允许 `message`；如果真实 Siri 使用其他值，将输出 `NORTI_SHAPE_WRAPPER_TYPE_UNSUPPORTED`。如果消息内容数组元素不是受支持纯文本，将输出固定的 `NORTI_CONTENT_TEXT_OBJECT_UNSUPPORTED`、`NORTI_CONTENT_NESTED_ARRAY_UNSUPPORTED` 或 `NORTI_CONTENT_PRIMITIVE_UNSUPPORTED`，同时仍出现 `REQUEST_DIAG_CONTENT_UNSUPPORTED`。这些日志**不包含任何真实值**。
 
 下次复测：刷新 60 模块至固定脚本 SHA `13dab6261fc5bf834e286b4e1878faca2941867e`，直接向 Siri 提一次**非私密文本问题**；只报告 `[AIES_V06]` 固定日志行和 Siri 原生界面表现。**无需重复结构探针，也不要发送 PacketTunnel 全文**。
+
+## 2026-11-19 12:07：一次性查看 Siri 发往 Qwen 的请求正文
+
+因已确认根级 `input_hint:string`，但 `message.content[]` 的实际元素形状和字段值未知，提供[单次本地脱敏请求正文探针](SIRI_QWEN_BODY_CAPTURE_ZH.md)，能够在**Siri POST 请求进入严格解析器之前**一次性保存有限的、经脱敏的 JSON 正文，并通过手动 Script Test 查看 `BODY_PART_*`。普通 AIES 日志只记录 `QWEN_BODY_CAPTURED_LOCAL`，不输出原文。
+
+**请不要再发完整 PacketTunnel 日志**。只从设备本地手动测试日志中，检查后摘取不敏感的 `BODY_PART_*`，不要包括请求头、凭据、私人问题或未经筛查的原始 JSON。采样不改变拒绝或放行行为，不能推断请求已经由 Qwen 处理。
