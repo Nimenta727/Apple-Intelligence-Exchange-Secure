@@ -145,27 +145,52 @@ function probeObserveRequest(){
 // accidentally routing images, audio, sidecar attachments or hidden context to
 // the text-only model, support only explicit text envelopes for this group.
 // The real Siri JSON envelope remains unverified: reject unknown structures.
-function observedSiriTextOnlyEnvelope(o){
- if(!o||typeof o!=="object"||Array.isArray(o))return false;
- var top=Object.keys(o);
- if(top.length!==2||top.indexOf("configuration")<0||top.indexOf("input")<0)return false;
- if(!Array.isArray(o.input)||o.input.length<1||o.input.length>12)return false;
+function observedSiriTextEnvelopeReasons(o){
+ // Report *only* fixed categories, never unknown field names or field values.
+ // Check independent layers even after one failure, so a single Siri request
+ // can distinguish multiple shape mismatches without exposing its JSON.
+ var reasons=[],top=Object.keys(o);
+ if(top.length!==2||top.indexOf("configuration")<0||top.indexOf("input")<0)
+  reasons.push("ROOT_FIELDS");
+ if(!Object.prototype.hasOwnProperty.call(o,"input")){
+  reasons.push("INPUT_MISSING");return reasons;
+ }
+ if(!Array.isArray(o.input)){
+  reasons.push("INPUT_NOT_ARRAY");return reasons;
+ }
+ if(o.input.length<1||o.input.length>12){
+  reasons.push("INPUT_COUNT");return reasons;
+ }
  for(var i=0;i<o.input.length;i++){
   var it=o.input[i];
-  if(!it||typeof it!=="object"||Array.isArray(it))return false;
+  if(!it||typeof it!=="object"||Array.isArray(it)){
+   reasons.push("ITEM_NOT_OBJECT");break;
+  }
   var keys=Object.keys(it),nested=Object.prototype.hasOwnProperty.call(it,"message");
   if(nested){
-   if(keys.length!==1||keys[0]!=="message")return false;
+   if(keys.length!==1||keys[0]!=="message"){
+    reasons.push("ITEM_WRAPPER_FIELDS");break;
+   }
    it=it.message;
-   if(!it||typeof it!=="object"||Array.isArray(it))return false;
+   if(!it||typeof it!=="object"||Array.isArray(it)){
+    reasons.push("MESSAGE_NOT_OBJECT");break;
+   }
    keys=Object.keys(it);
   }
-  if(!keys.length||keys.some(function(k){return k!=="content"&&k!=="role"&&k!=="type";}))return false;
-  if(!Object.prototype.hasOwnProperty.call(it,"content"))return false;
-  if(Object.prototype.hasOwnProperty.call(it,"role")&&it.role!=="user")return false;
-  if(Object.prototype.hasOwnProperty.call(it,"type")&&it.type!=="message")return false;
+  if(!keys.length||keys.some(function(k){return k!=="content"&&k!=="role"&&k!=="type";})){
+   reasons.push("ITEM_FIELDS");break;
+  }
+  if(!Object.prototype.hasOwnProperty.call(it,"content")){
+   reasons.push("CONTENT_MISSING");break;
+  }
+  if(Object.prototype.hasOwnProperty.call(it,"role")&&it.role!=="user"){
+   reasons.push("ROLE_UNSUPPORTED");break;
+  }
+  if(Object.prototype.hasOwnProperty.call(it,"type")&&it.type!=="message"){
+   reasons.push("ITEM_TYPE_UNSUPPORTED");break;
+  }
  }
- return true;
+ return reasons;
 }
 function parseRequest(raw){
  if(!raw){if(requestDiagnostic==="UNSET")requestDiagnostic="BODY_EMPTY";return null;}
@@ -186,8 +211,12 @@ function parseRequest(raw){
   if(observedGroup&&!isSiriForProbe()){
    requestDiagnostic="GROUP_UNSUPPORTED";return null;
   }
-  if(observedGroup&&!observedSiriTextOnlyEnvelope(o)){
-   requestDiagnostic="INPUT_UNSUPPORTED";return null;
+  if(observedGroup){
+   var shapeReasons=observedSiriTextEnvelopeReasons(o);
+   if(shapeReasons.length){
+    shapeReasons.forEach(function(code){log("NORTI_SHAPE_"+code);});
+    requestDiagnostic="INPUT_UNSUPPORTED";return null;
+   }
   }
   if(!Array.isArray(o.input)||o.input.length<1||o.input.length>12){
    requestDiagnostic="INPUT_UNSUPPORTED";return null;
