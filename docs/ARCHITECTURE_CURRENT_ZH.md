@@ -14,7 +14,9 @@ scripts/
   provision_key_ONCE.js                    本机一次性 Key 设置模板
   clear_key_ONCE.js                        本机 Key 清空模板
   siri_group_probe_ONCE.js                手动 600 秒 Siri 组名状态诊断
-  siri_group_probe_STOP_ONCE.js           手动明确停止/清空诊断状态
+  siri_group_probe_STOP_ONCE.js           手动明确停止/清空组名诊断状态
+  siri_schema_probe_ONCE.js               手动开启/读取 noRTI 字段名+类型摘要
+  siri_schema_probe_STOP_ONCE.js          手动明确停止结构诊断
 tests/
   siri-deepseek-v06.test.js                当前脚本模拟回归
   fixtures/siri-sse.js                     测试专用合成 SSE
@@ -87,3 +89,7 @@ v2 的 `probeObserveRequest`、`probeObserveWritingTools` **不会改变解析�
 ## noRTI 结构细分诊断（2026-11-19）
 
 设备真实请求已到达精确的 noRTI 分支，但出现 `INPUT_UNSUPPORTED`。函数 `observedSiriTextEnvelopeReasons` 在仍然拒绝原始请求的前提下，返回不超过两个固定结构分类（根级字段、input 容器和消息包装错误）；主脚本通过 `NORTI_SHAPE_*` 记录常量，**不打印未知键名、键值、正文或请求头**。一旦结构正确，则复用原纯文本解析、SSE 校验和 Key 安全路径。现阶段未证明真实请求结构被接受。
+
+## noRTI 字段结构探针（手动授权）
+
+`captureNortiSchemaLocally` 只在 noRTI 严格文本检查失败且本机用户明确打开 600 秒窗口时运行。它仅将最多 8 项/层级、已过滤敏感样式的字段名称和**数据类型标签**写入独立本地状态键；不将任何字段值、正文、HTTP Header、Cookie、Authorization 或 Key 写入诊断状态或 HTTP 日志。`siri_schema_probe_ONCE.js` 手动测试将读取并逻辑清除；独立 STOP 允许明确取消。原解析限制完全不变，真实字段名仍待设备确认；参考[结构探针指南](SIRI_SCHEMA_PROBE_ZH.md)。
