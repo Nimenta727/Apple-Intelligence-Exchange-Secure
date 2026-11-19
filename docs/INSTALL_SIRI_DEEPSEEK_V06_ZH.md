@@ -7,7 +7,7 @@
 | 模式 | 模块 | Runtime 固定 SHA |
 |---|---|---|
 | **60 Siri → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `b2c2ff84443fa046c70f89823808fc74d04924c3` |
-| **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `56755369499c85b3bf1594627ec2556633c8cf5b` |
+| **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `52ae2a07d68b38a34c102969b32805159270e717` |
 
 **60 的 Shadowrocket 模块 Raw URL：**
 
@@ -68,3 +68,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 - 只分享固定错误码、脚本 SHA 和 Siri 显示结果；**不要上传完整 PacketTunnel、代理 DB、CA 私钥、真实问题或认证信息**。
 
 完整资料：[请求 JSON](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)、[调试历史](DEBUG_HISTORY_2026-11-19_ZH.md)、[根因与未修项](ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)、[验收矩阵](VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)。
+
+## 同题 A/B 实验（2026-11-19 16:15 后）
+
+为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `b2c2ff84443fa046c70f89823808fc74d04924c3`；61 的四条原样放行规则均固定到 `52ae2a07d68b38a34c102969b32805159270e717`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
