@@ -68,8 +68,8 @@ const hooks=moduleText.match(/^AIES60 .+type=http-(?:request|response).+script-p
 if(hooks.length!==3||
  hooks.filter(x=>x.includes("type=http-request")).length!==1||
  hooks.filter(x=>x.includes("type=http-response")).length!==2||
- !hooks.some(x=>x.includes("AIES60 Scoped Qwen SSE Guard = type=http-response")&&
-   x.includes("/v1")===false&&x.includes("sessions"))) // regex escaped in module
+ !hooks.some(x=>x.startsWith("AIES60 Scoped Qwen SSE Guard = type=http-response,")&&
+   x.includes("sessions")&&x.includes("responses")))
  fail("require one DeepSeek request hook, one rewrite response hook and one scoped follow-up response guard");
 const urls=hooks.map(x=>x.match(/script-path=(https:\/\/\S+)/)?.[1]);
 if(urls.length!==3||!urls[0]||urls.some(x=>x!==urls[0]))
