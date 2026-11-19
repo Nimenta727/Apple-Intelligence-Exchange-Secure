@@ -41,6 +41,10 @@
 
 注意：该 Guard 可能让某些复杂 Siri 请求从 Qwen 回答变成“无法获得回答”；并不是全域封锁或完整 DeepSeek 替换。跨 Hook 关联偶发丢失仍未安全修复。本轮按用户要求不做额外人工或设备测试。
 
+## 16:15 真机故障后新增同题对照实验
+
+最新上传的 2,987 行日志与 175 条代理记录显示：4 次主请求、2 次 DeepSeek 重建提交、1 次请求关联丢失、1 次上游 SSE 不兼容，以及 **4 次由当前 Guard 主动阻断的会话级 Qwen SSE**。扩大 Qwen 拦截可能降低复杂提问可用性。因此现在提供[原生 Qwen 与 DeepSeek 同题 A/B 实验](docs/AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)：先关闭全部模块观察真实原生 Siri；再分别只启用 61 和 60，以手动短期探针比较 SSE、客户端可见答案、模型完成原因/用量、合成输出和 Guard 错误。**这是诊断能力，不代表复杂问题已修复。**
+
 ## 对开发者最重要的文档
 
 - [真实 Siri → Qwen 请求 JSON 结构及 OS 元数据](docs/OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)
