@@ -4,6 +4,8 @@
 
 ## 真机组名诊断维护要求（2026-11-19）
 
+- **新增 noRTI 字段结构探针**：`siri_schema_probe_ONCE.js` 与 `siri_schema_probe_STOP_ONCE.js` 是两份**手动测试**辅助文件；结构摘要只包含受限键名与数据类型，不包含字段值。必须单独进行 opt-in、有效期、WritingTools 和错误路径隐私测试；不添加为自动 Hook。
+
 - Siri 与 WritingTools 共用目标路径，不能仅凭 URL 放宽 Siri 组白名单，也不能把 WritingTools 当成 Siri。
 - `scripts/siri_group_probe_ONCE.js` 与 `scripts/siri_group_probe_STOP_ONCE.js` 仅供本地 Script Test；检查脚本首次开启 **600 秒**，再次执行仅报告状态、不会误取消；停止须显式运行 STOP。它们不是自动 Hook；正式模块仍只有两条相同固定提交的 HTTP Hook。
 - 升级必须同时刷新远程 60 模块和**覆盖 iPad 已缓存的本地手动检查脚本**。保留单键状态验证、到期清理、固定阶段码及敏感组名过滤的测试。
