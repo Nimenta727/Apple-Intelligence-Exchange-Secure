@@ -511,18 +511,37 @@ function rewriteSse(original,answer){
     !emptyOrMissing(choiceCompleted&&choiceCompleted.moderation)||
     !emptyOrMissing(choiceDone&&choiceDone.moderation)||
     !emptyOrMissing(lastChoice&&lastChoice.moderation))return null;
- function hasToolOutput(choice){
-  if(!choice||!Array.isArray(choice.output))return false;
-  for(var k=0;k<choice.output.length;k++){
-   var item=choice.output[k];
-   if(!item||typeof item!=="object"||Array.isArray(item)||
+ function isUnsupportedItem(item){
+  if(!item||typeof item!=="object"||Array.isArray(item)||
      item.type&&item.type!=="message"||
      item.message&&item.message.role&&item.message.role!=="assistant")return true;
+  var contents=item.message&&item.message.content;
+  if(typeof contents!=="undefined"&&!Array.isArray(contents))return true;
+  if(Array.isArray(contents)){
+   for(var j=0;j<contents.length;j++){
+    var entry=contents[j];
+    if(!entry||typeof entry!=="object"||Array.isArray(entry)||
+       entry.type&&entry.type!=="text"||
+       entry.text&&entry.text.annotations&&!emptyOrMissing(entry.text.annotations))
+     return true;
+   }
   }
   return false;
  }
+ function hasToolOutput(choice){
+  if(!choice||!Array.isArray(choice.output))return false;
+  for(var k=0;k<choice.output.length;k++)
+   if(isUnsupportedItem(choice.output[k]))return true;
+  return false;
+ }
+ var itemDone=entries[entries.length-4].payload&&entries[entries.length-4].payload.item;
+ var contentAdded=entries[4].payload&&entries[4].payload.content;
+ var contentDone=entries[entries.length-5].payload&&entries[entries.length-5].payload.content;
  if(hasToolOutput(choiceCompleted)||hasToolOutput(choiceDone)||hasToolOutput(lastChoice)||
-    choiceAdded&&!emptyOrMissing(choiceAdded.output))return null;
+    choiceAdded&&!emptyOrMissing(choiceAdded.output)||
+    itemDone&&isUnsupportedItem(itemDone)||
+    contentAdded&&contentAdded.type&&contentAdded.type!=="text"||
+    contentDone&&contentDone.type&&contentDone.type!=="text")return null;
  if(itemAdded&&itemAdded.type&&itemAdded.type!=="message")return null;
  if(itemAdded&&itemAdded.message&&itemAdded.message.role&&
     itemAdded.message.role!=="assistant")return null;
