@@ -41,6 +41,7 @@ const activeNames=[
  "docs/OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md","docs/ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md",
  "docs/VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md","docs/QWEN_PASSIVE_DIAG_ZH.md",
  "docs/AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md",
+ "docs/COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md",
  "scripts/aies_siri_deepseek_v06.js","scripts/provision_key_ONCE.js",
  "scripts/clear_key_ONCE.js","scripts/siri_group_probe_ONCE.js","scripts/siri_group_probe_STOP_ONCE.js",
  "scripts/siri_schema_probe_ONCE.js","scripts/siri_schema_probe_STOP_ONCE.js",
