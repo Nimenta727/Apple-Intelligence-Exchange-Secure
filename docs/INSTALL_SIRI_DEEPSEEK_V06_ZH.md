@@ -6,7 +6,7 @@
 
 | 模式 | 模块 | Runtime 固定 SHA |
 |---|---|---|
-| **60 Siri / 写作工具 → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `f2a565e197bb0718d9cc6b258d67fb8cc21ab673` |
+| **60 Siri / 写作工具 → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `975599163bafeb8c6ba8aa60624577e2a861d9f0` |
 | **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `955fe4f7cec2471042469cdb7de740015db850bf` |
 
 **60 的 Shadowrocket 模块 Raw URL：**
@@ -38,7 +38,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 4. 60 DeepSeek 实验模式
 
-1. 关闭 61 和其它同域冲突模块，再导入并启用 60。确认三条脚本规则固定 SHA 为 `f2a565e197bb0718d9cc6b258d67fb8cc21ab673`。
+1. 关闭 61 和其它同域冲突模块，再导入并启用 60。确认三条脚本规则固定 SHA 为 `975599163bafeb8c6ba8aa60624577e2a861d9f0`。
 2. 在 Siri 问一个非私密且答案容易核对的**纯文本问题**；音频、图像、工具调用、未经验证的 WritingTools 操作、未知 SSE 事件都不应被当作受支持的纯文本转给 DeepSeek。
 3. **只查看固定 `[AIES_V06]` 状态码**：`REQUEST_CAPTURED`、`RESPONSE_TAG_*`、`SSE_PREFLIGHT_PASSED`、`DEEPSEEK_STARTED`、`DEEPSEEK_LABEL_APPLIED`、`DEEPSEEK_RESPONSE_ATTEMPTED` 或 `ERROR_*`；不要上传原始请求日志。
 4. 看 Siri **真正显示的内容**。只有用户肉眼看到 `【DeepSeek · AIES】` 的正文、且固定日志链与同一测试一致，才算至少一次 DeepSeek Siri 显示闭环。Qwen 服务卡片可能仍然显示原品牌。
@@ -71,7 +71,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 同题 A/B 实验（2026-11-19 16:15 后）
 
-为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `f2a565e197bb0718d9cc6b258d67fb8cc21ab673`；61 的四条原样放行规则均固定到 `955fe4f7cec2471042469cdb7de740015db850bf`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
+为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `975599163bafeb8c6ba8aa60624577e2a861d9f0`；61 的四条原样放行规则均固定到 `955fe4f7cec2471042469cdb7de740015db850bf`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
 
 ## 写作工具 Compose Beta（2026-11-19 浏览器协议研究后新增）
 
