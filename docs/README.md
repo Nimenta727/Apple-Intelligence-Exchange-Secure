@@ -2,6 +2,10 @@
 
 > **当前可用的是实验性 60 DeepSeek SSE 改写和互斥的 61 Qwen 原生被动诊断**。本轮离线模拟测试用于验证代码安全，不代表 Siri 原生 UI 已通过验收。真实设备请求与 Qwen SSE 的主要字段结构已有证据，历史日志只留脱敏摘要，不把抓包或 Token 提交到仓库。
 
+## 2026-11-19 17:12 维护记录
+
+- [复杂 Siri 注释 SSE 根因、三份 A/B 日志错位、代码修改和下一步计划](routine/2026-11-19-17-12-Siri-complex-annotations-ab-diagnosis.md)：今后在 `docs/routine/` 以“时间—内容简介”持续保存维护记录。
+
 ## 优先阅读：调试事实与协议归档
 
 **新增：** [Siri 同题 A/B 实验——完全关闭基线 / 原生 Qwen 只读采集 / DeepSeek 改写采集](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)，包含手动诊断脚本、原生 Qwen/DeepSeek 客户端可见文本、SSE 结构、模型 `finish_reason`/token 用量、会话级 Guard 事件的比较方法。
