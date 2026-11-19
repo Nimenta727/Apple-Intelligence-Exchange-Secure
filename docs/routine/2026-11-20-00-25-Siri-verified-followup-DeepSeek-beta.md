@@ -23,3 +23,11 @@
 3. 只使用无个人信息的纯文本，在**同一次 Siri 会话连续问两轮和三轮**。观察每轮 UI 是否有 `【DeepSeek · AIES】`；仅记录固定 `[AIES_V06]` 代码（特别是 `SIRI_CONTEXT_STORED`、`ERROR_FOLLOWUP_* `、`SSE_PREFLIGHT_PASSED`、`DEEPSEEK_RESPONSE_ATTEMPTED`）。
 4. 若出现 `ERROR_FOLLOWUP_CONTEXT_UNAVAILABLE`，先研究真实 `previous_choice_id` 与合成 choice ID 关联（仅对比是否匹配，勿记录/外泄值）；若 `ERROR_SSE_REWRITE_UNSUPPORTED`，继续只读、安全的 SSE 结构归类，不导出原文。
 5. 真机确认两/三轮后，再研究网络断联、响应 UA 丢失、快速连续问题、不同 Qwen 会话、上下文清理及可撤销数据保留等边界，避免宣称系统级零 Qwen。
+
+## 合并与测试结果补记（2026-11-20）
+
+- [PR #33](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/33) 已合并至 `main`，merge commit `345ec50c45c8966ed3ad5ec005148ba3203318cc`。
+- 首轮 CI 发现错误地要求主 SSE 末尾 `session.response.done.session_id` 必填，导致原本成功的单轮测试退化为 502。修复为该字段**出现时必须匹配**，缺失时由 `session.created` / `session.response.created` 及 response ID 的已有校验承担关联。修复代码及四 Hook 的固定 SHA 均为 `7a698fbaadeb37431d9bd1d43df359292ee78ba0`。
+- [CI 最终结果](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44567918717)：**106 tests / 106 pass / 0 fail**。新增真机 18 事件形状（4 delta + 4 citation）、无 UA 但有可信事务 tag 的补救、`previous_choice_id` 篡改拒绝和注释非法位置拒绝。
+- 校验主分支 60 模块四条脚本规则：Capture / Rewrite / Followup Capture / Followup Rewrite，**全部 pin `7a698fbaadeb37431d9bd1d43df359292ee78ba0`**；61 保持 `506e51ad1ad549722242611f174b527cc12c4d21`。
+- **尚未有用户真机对新 60 Beta 的重复追问验收**。不能将 CI 通过当作完整生产可用。下一步用户更新 60 并确认四条 Hook 版本、单次 Siri 会话两/三轮每轮界面显示 `【DeepSeek · AIES】`；只回传固定 `[AIES_V06]` 状态码及屏幕显示分类。出现 502 时检查 `ERROR_FOLLOWUP_CONTEXT_UNAVAILABLE`、`ERROR_SSE_REWRITE_UNSUPPORTED`、`ERROR_CORRELATION_MISMATCH`，不要转发原始密钥与数据。
