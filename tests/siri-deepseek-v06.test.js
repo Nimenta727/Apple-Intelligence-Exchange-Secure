@@ -11,6 +11,8 @@ const localProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_group_prob
 const localStop=fs.readFileSync(path.join(__dirname,"../scripts/siri_group_probe_STOP_ONCE.js"),"utf8");
 const schemaProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_schema_probe_ONCE.js"),"utf8");
 const schemaStop=fs.readFileSync(path.join(__dirname,"../scripts/siri_schema_probe_STOP_ONCE.js"),"utf8");
+const bodyProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_qwen_body_probe_ONCE.js"),"utf8");
+const bodyStop=fs.readFileSync(path.join(__dirname,"../scripts/siri_qwen_body_probe_STOP_ONCE.js"),"utf8");
 const URL="https://prod-yabuli.qianwen.com/v1/sessions/responses";
 const fixture=Sse.candidateSse("QWEN_ORIGINAL_ANSWER_TEST","Sample","siri",{now:()=>1730000000000,id:()=>"beta-test"});
 const promptBody=JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:[{content:"Explain why the sky is blue"}]});
@@ -227,6 +229,7 @@ test("confirmed real noRTI root fields and message wrapper allow text-only captu
   client_tools:[{name:"UNTRUSTED_TOOL_SPEC",description:"NEVER_SEND_TO_MODEL"}],
   server_tools:[{name:"UNTRUSTED_SERVER_TOOL"}],
   response_format:{kind:"SIRI_PRIVATE_METADATA"},
+  input_hint:"PRIVATE_DEVICE_HINT_DO_NOT_FORWARD",
   stream:true,
   input:[{type:"message",message:{role:"user",content:[
    {type:"text",text:{value:"Why does sunlight warm Earth?"}}
@@ -246,6 +249,8 @@ test("confirmed real noRTI root fields and message wrapper allow text-only captu
  assert.ok(!api.includes("UNTRUSTED_TOOL_SPEC"));
  assert.ok(!api.includes("UNTRUSTED_SERVER_TOOL"));
  assert.ok(!api.includes("SIRI_PRIVATE_METADATA"));
+ assert.ok(!api.includes("PRIVATE_DEVICE_HINT_DO_NOT_FORWARD"));
+ assert.ok(!JSON.stringify(second.returned[0]).includes("PRIVATE_DEVICE_HINT_DO_NOT_FORWARD"));
  assert.ok(!e.logs.some(x=>x.includes("Why does sunlight")||x.includes("NEVER_SEND")));
 });
 test("confirmed noRTI root field names require exact type, unknown root fields remain denied",()=>{
@@ -256,6 +261,9 @@ test("confirmed noRTI root field names require exact type, unknown root fields r
   {obj:{...base,server_tools:"TOOL_LIST"},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
   {obj:{...base,response_format:[]},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
   {obj:{...base,stream:"true"},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
+  {obj:{...base,input_hint:123},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
+  {obj:{...base,input_hint:null},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
+  {obj:{...base,input_hint:{value:"PRIVATE_HINT"}},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
   {obj:{...base,attachments:["PRIVATE_MEDIA"]},stage:"NORTI_SHAPE_ROOT_FIELDS"},
   {obj:{...base,media:{data:"PRIVATE_MEDIA"}},stage:"NORTI_SHAPE_ROOT_FIELDS"}
  ];
@@ -266,7 +274,7 @@ test("confirmed noRTI root field names require exact type, unknown root fields r
   assert.ok(e.logs.includes("[AIES_V06] "+x.stage));
   assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_INPUT_UNSUPPORTED"));
   assert.equal(e.requests.length,0);
-  assert.ok(e.logs.every(l=>!l.includes("PRIVATE_MEDIA")&&!l.includes("TOOL_LIST")));
+  assert.ok(e.logs.every(l=>!l.includes("PRIVATE_MEDIA")&&!l.includes("TOOL_LIST")&&!l.includes("PRIVATE_HINT")));
  }
 });
 test("confirmed noRTI wrapper only accepts message discriminator and refuses tool calls",()=>{
@@ -649,6 +657,113 @@ test("schema probe persistence errors never claim a successful arm or stop",()=>
  assert.ok(runLocal(e,schemaStop,bad).logs.includes("[AIES_SIRI_SCHEMA_LOCAL] STOP_FAILED"));
 });
 
+function qwenBodyState(e){return JSON.parse(e.data.AIES_QWEN_BODY_PROBE_V1_STATE);}
+function makeQwenTestReq(e){
+ return {...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)",Authorization:"Bearer PRIVATE_HEADER"},
+  body:JSON.stringify({
+   configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},
+   client_tools:[{instructions:"PRIVATE_TOOL_SYSTEM_PROMPT"}],
+   server_tools:[{url:"https://PRIVATE_TOOL_ENDPOINT"}],
+   response_format:{private:"PRIVATE_RESPONSE_META"},
+   stream:true,input_hint:"PRIVATE_DEVICE_CONTEXT",
+   input:[{type:"message",message:{role:"user",content:[{type:"text",text:{value:"What is photosynthesis?"}}]}}],
+   surprising_extra:"PRIVATE_ROOT_CONTEXT"
+  })};
+}
+test("one-shot Qwen body capture is opt-in and captures only after local arm",()=>{
+ const e=env(),r=makeQwenTestReq(e);
+ const before=e.invoke(r);
+ assert.equal(before.returned[0].response.status,502);
+ assert.equal(e.data.AIES_QWEN_BODY_PROBE_V1_STATE,undefined);
+ const arm=runLocal(e,bodyProbe);
+ assert.ok(arm.logs.includes("[AIES_QWEN_BODY_LOCAL] ARMED_600_SECONDS"));
+ assert.ok(arm.logs.includes("[AIES_QWEN_BODY_LOCAL] PERSISTENCE_ROUNDTRIP_OK"));
+ const saved=e.data.AIES_QWEN_BODY_PROBE_V1_STATE;
+ const repeat=runLocal(e,bodyProbe);
+ assert.ok(repeat.logs.includes("[AIES_QWEN_BODY_LOCAL] STILL_ARMED"));
+ assert.equal(saved,e.data.AIES_QWEN_BODY_PROBE_V1_STATE);
+ const result=e.invoke(r);
+ assert.equal(result.returned[0].response.status,502);
+ assert.ok(e.logs.includes("[AIES_V06] QWEN_BODY_CAPTURED_LOCAL"));
+ assert.equal(e.requests.length,0);
+ assert.equal(qwenBodyState(e).phase,"captured");
+});
+test("local Qwen capture includes user text and JSON envelope, but never headers or sensitive metadata",()=>{
+ const e=env();
+ runLocal(e,bodyProbe);
+ e.invoke(makeQwenTestReq(e));
+ const snap=qwenBodyState(e);
+ assert.ok(snap.body.includes("What is photosynthesis?"));
+ assert.ok(snap.body.includes("response_configuration_group_id"));
+ assert.ok(snap.body.includes("input_hint"));
+ assert.ok(snap.body.includes("[REDACTED_CONTEXT]"));
+ assert.ok(snap.body.includes("surprising_extra"));
+ assert.ok(!snap.body.includes("PRIVATE_HEADER"));
+ assert.ok(!snap.body.includes("PRIVATE_DEVICE_CONTEXT"));
+ assert.ok(!snap.body.includes("PRIVATE_TOOL_SYSTEM_PROMPT"));
+ assert.ok(!snap.body.includes("PRIVATE_RESPONSE_META"));
+ assert.ok(!snap.body.includes("PRIVATE_ROOT_CONTEXT"));
+ const logs=runLocal(e,bodyProbe).logs;
+ assert.ok(logs.includes("[AIES_QWEN_BODY_LOCAL] BODY_CAPTURED_REDACTED_JSON"));
+ assert.ok(logs.includes("[AIES_QWEN_BODY_LOCAL] CAPTURE_CLEARED"));
+ const body=logs.filter(x=>x.includes("BODY_PART_")&&x.includes("="))
+   .map(x=>x.slice(x.indexOf("=")+1)).join("");
+ assert.deepEqual(JSON.parse(body),JSON.parse(snap.body));
+ assert.equal(e.data.AIES_QWEN_BODY_PROBE_V1_STATE,"");
+});
+test("Qwen body capture handles secret-shaped fields and model prompts with masking",()=>{
+ const e=env();
+ runLocal(e,bodyProbe);
+ const request=makeQwenTestReq(e),obj=JSON.parse(request.body);
+ obj.input[0].message.content=[{type:"text",text:{value:"Bearer VERYSECRET1234567890"}}];
+ obj.api_key="EXPLICIT_PRIVATE_KEY";
+ obj.user_email="test-person@example.org";
+ obj.input[0].message.device_token="EXPLICIT_DEVICE_TOKEN";
+ request.body=JSON.stringify(obj);
+ e.invoke(request);
+ const str=qwenBodyState(e).body;
+ assert.ok(str.includes("[REDACTED_TOKEN]"));
+ assert.ok(!str.includes("VERYSECRET1234567890"));
+ assert.ok(!str.includes("EXPLICIT_PRIVATE_KEY"));
+ assert.ok(!str.includes("test-person@example.org"));
+ assert.ok(!str.includes("EXPLICIT_DEVICE_TOKEN"));
+ assert.ok(str.includes("[REDACTED_FIELD]"));
+ assert.ok(e.logs.every(x=>!x.includes("VERYSECRET")));
+});
+test("Qwen body capture ignores other clients, WritingTools, non-POST and response hooks",()=>{
+ const cases=[
+  {ua:"WritingTools (iPad - Version 27.3.0)",method:"POST"},
+  {ua:"OtherClient (iPad - Version 27.3.0)",method:"POST"},
+  {ua:"Siri (iPad - Version 27.3.0)",method:"GET"}
+ ];
+ for(const c of cases){
+  const e=env();
+  runLocal(e,bodyProbe);
+  const r=makeQwenTestReq(e);
+  e.invoke({...r,method:c.method,headers:{"User-Agent":c.ua}});
+  assert.equal(qwenBodyState(e).phase,"armed");
+  assert.ok(!e.logs.includes("[AIES_V06] QWEN_BODY_CAPTURED_LOCAL"));
+ }
+ const e=env();
+ runLocal(e,bodyProbe);
+ e.invoke(makeQwenTestReq(e),{status:200,body:fixture});
+ assert.equal(qwenBodyState(e).phase,"armed");
+});
+test("Qwen body capture is one-shot and can be explicitly stopped without touching API key",()=>{
+ const e=env();
+ runLocal(e,bodyProbe);
+ e.invoke(makeQwenTestReq(e));
+ const first=e.data.AIES_QWEN_BODY_PROBE_V1_STATE;
+ const another=makeQwenTestReq(e);
+ another.body=another.body.replace("photosynthesis","geography");
+ e.invoke(another);
+ assert.equal(e.data.AIES_QWEN_BODY_PROBE_V1_STATE,first);
+ const stop=runLocal(e,bodyStop);
+ assert.ok(stop.logs.includes("[AIES_QWEN_BODY_LOCAL] CAPTURE_STOPPED_AND_CLEARED"));
+ assert.equal(e.data.SAIRS_DEEPSEEK_API_KEY,KEY);
+ assert.equal(e.data.AIES_QWEN_BODY_PROBE_V1_STATE,"");
+});
+
 test("out-of-scope URL is untouched",()=>{
  const e=env();
  const r=e.invoke({url:"https://unrelated.example/test",method:"GET",headers:{}},undefined);
@@ -692,7 +807,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/13dab6261fc5bf834e286b4e1878faca2941867e/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/95e2a83981e907472ee4395445038fa082e32d9b/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{

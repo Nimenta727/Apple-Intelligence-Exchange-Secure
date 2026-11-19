@@ -11,6 +11,8 @@
 
 ## 2026-11-19：Siri 组名已确认，真实文本结构仍待适配
 
+**12:07 最新诊断：** 真实 Siri 请求还含 `input_hint:string`，现在仅按字符串类型允许该字段，并忽略其值。为了避免继续猜测，已加入[一次性捕获 Siri→Qwen 脱敏 JSON 请求正文](docs/SIRI_QWEN_BODY_CAPTURE_ZH.md)的本地脚本；你可在 Shadowrocket 手动开启 600 秒窗口，问一次不含个人信息的 Siri 问题，再手动读出正文片段。这不会抓取 HTTP 认证头，也**不会直接采集 Qwen App/网页聊天**；仍不代表 Siri/DeepSeek 端到端成功。
+
 **11:54 真机进展：** 本地结构探针已经采到顶层 `client_tools:array`、`response_format:object`、`server_tools:array`、`stream:boolean` 和输入包装 `type:string`、内部 `content:array` 与 `role:string`。已依据这一证据增加严格范围内的类型兼容，不转发工具元数据；但未知 `type` 值和内容项格式仍待真机验证。**新版本只需刷新 60 模块，当前不必重复结构采样。**
 
 **11:14 前次进展：** 新日志确认 `NORTI_SHAPE_ROOT_FIELDS` 与 `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`。原始 PacketTunnel 不包含安全可用的字段名称；因此新增**完全本地、手动开启、只采集字段名及数据类型**的 [noRTI 结构探针](docs/SIRI_SCHEMA_PROBE_ZH.md)。此工具不采集字段值、问题正文或认证信息；实际解析仍失败，DeepSeek/Siri 端到端尚未修复。需要先刷新 60 模块，再下载 [本地新脚本](scripts/siri_schema_probe_ONCE.js) 手动运行。

@@ -18,6 +18,8 @@
 
 产品支持范围：特定 Siri 文本问答，不支持写作工具、视觉智能、音频文件、多模型或本地离线模型。用户接受原始请求可能由千问处理，DeepSeek 也会收到问题。
 
+**2026-11-19 12:07 新证据：** 真实 Siri 的顶层还可能有 `input_hint:string`，已将该字段按类型严格允许，但不发送其值。另新增[主动开启的单次请求正文（脱敏）采样](SIRI_QWEN_BODY_CAPTURE_ZH.md)，目的是直接定位 `input` 中的文本元素，而不是继续猜 JSON 字段；用户需主动用 Siri 发一次非隐私问题。**尚无请求捕获/模型成功的真机验证。**
+
 **真机新证据（2026-11-19 11:54）**：在明确手动授权的本机字段探针中，确认 `input:array`；顶层额外字段为 `client_tools:array`、`response_format:object`、`server_tools:array`、`stream:boolean`；`input` 包装层有 `type:string`；`message` 内部有 `content:array`、`role:string`。同期 PacketTunnel 的固定码证明两处原严格校验确实拦截了请求。现在仅精确允许这些**已证实的字段和类型**，要求消息 wrapper 的 `type` 若存在则必须为 `message`，未知实际值、媒体和工具调用仍拒绝。**真机完整解析、DeepSeek API、SSE 与 Siri UI 都未验证。**
 
 **真机前次定位（2026-11-19 11:14）**：新版结构诊断明确报告 `NORTI_SHAPE_ROOT_FIELDS` + `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`。本次增加单独的 [本机字段名/类型探针](SIRI_SCHEMA_PROBE_ZH.md)，只在明确手动授权时保存筛选过的字段键名/类型，不保存值。**不能仅据此认为输入已兼容**。

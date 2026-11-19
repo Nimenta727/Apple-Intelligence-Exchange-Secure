@@ -26,7 +26,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 诊断版更新（2026-11-19）
 
-如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `13dab6261fc5bf834e286b4e1878faca2941867e`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
+如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `95e2a83981e907472ee4395445038fa082e32d9b`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
 
 额外的 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) **仅供手动 Script Test**，不是模块自动安装的第三条钩子。**必须在 iPad 本地把旧版同名 JS 覆盖为最新版**；仅刷新远程 60 模块不够。手动运行一次开启 **600 秒**，问一次非隐私 Siri 问题，再运行同一个脚本查看结果、剩余时间和命中次数；重复检查**不自动取消**。需要停止时专门手动运行 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js)。不要把任何辅助脚本放入启用的 `event`、`cron` 或 HTTP 自动规则。详见[完整步骤](SIRI_GROUP_PROBE_ZH.md)。
 
@@ -67,3 +67,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 ### 已确认的 noRTI 外层结构兼容更新（2026-11-19）
 
 本机手动探针已确认 Siri 的根级工具/格式字段名称及 JSON 类型、输入包装 `type:string`、内部 `message` 的 `content:array`、`role:string`。新脚本在 Siri UA + 精确 noRTI 组名下**只放行这些键与类型**，不会将工具配置或格式元数据转发到 DeepSeek。若真实包装 `type` 不是文本消息的 `message` 或内容元素不是纯文本，仍可能被拒绝并输出固定的 `NORTI_SHAPE_*` 或 `NORTI_CONTENT_*`。**只需刷新 60 模块，无需更新已成功的本地探针或重设 API Key/证书。**
+
+## 12:07 已确认的字段与单次请求正文采样
+
+本地结构诊断再次确认了顶层 `input_hint:string`，本版严格允许其字段名与类型但**不使用其值**。为了直接核对用户希望发给 Qwen 的文本片段，另增加 [一次性本地脱敏请求正文采集工具](SIRI_QWEN_BODY_CAPTURE_ZH.md)：更新 60 模块，并在本地 Shadowrocket Script Test 手动运行 `siri_qwen_body_probe_ONCE.js`，问一次非隐私 Siri 问题，再手动读取。捕获体不读取请求头、Token 或 API Key；**不能将辅助脚本启用为自动钩子**，不需要重设 CA 或 Key。这仍不等于 DeepSeek 或 Siri UI 工作正常。

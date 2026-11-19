@@ -17,6 +17,8 @@ scripts/
   siri_group_probe_STOP_ONCE.js           手动明确停止/清空组名诊断状态
   siri_schema_probe_ONCE.js               手动开启/读取 noRTI 字段名+类型摘要
   siri_schema_probe_STOP_ONCE.js          手动明确停止结构诊断
+  siri_qwen_body_probe_ONCE.js            手动启动/读取单次脱敏请求正文
+  siri_qwen_body_probe_STOP_ONCE.js       手动明确停止请求正文采样
 tests/
   siri-deepseek-v06.test.js                当前脚本模拟回归
   fixtures/siri-sse.js                     测试专用合成 SSE
@@ -97,3 +99,7 @@ v2 的 `probeObserveRequest`、`probeObserveWritingTools` **不会改变解析�
 ## 11:54 真机 schema 探针反馈后的受限允许规则
 
 仅在精确 noRTI + Siri UA 分支允许已证实的根级字段及类型：`client_tools:array`、`server_tools:array`、`response_format:object`、`stream:boolean`；它们只参与类型检查，**不发送到 DeepSeek**。输入外层只允许 `message` 和可选 `type`，后者若存在必须为文本消息类型 `message`；内部只允许 `content`、`role=user`、可选 `type=message`。实际 `type` **值**和内容数组元素的结构尚未知，不允许自动扩展媒体/工具调用。内容解析仍采用严格 `textAtom`。若拒绝未知元素，只记录固定 `NORTI_CONTENT_*` 分类。
+
+## 12:07 输入提示字段与用户授权的单次请求体诊断
+
+已观察到额外根级 `input_hint:string`，精确支持字符串型但不将其值用于模型。`captureQwenRequestBodyOnce` 在**目标 Siri POST Request Hook** 与主解析器运行之前，以单独的本机状态键保存一份**脱敏后的**请求 JSON（保留受限 `input` 纯文本，省略工具定义、格式配置及未知根级的值）。该功能必须通过本地 `siri_qwen_body_probe_ONCE.js` 手动开启，默认不采集，成功后仅保存一次，不在 HTTP 日志输出正文，不影响原请求的失败关闭路径。用户手动读取先清理存储再分段显示。**不等于原始网络抓包或 Qwen 已接收证明。**
