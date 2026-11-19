@@ -30,10 +30,16 @@ function uaSiri(){
  return false;
 }
 function safeFieldName(s){
- return typeof s==="string"&&s.length>=1&&s.length<=36&&
-  /^[A-Za-z_][A-Za-z0-9_-]*$/.test(s)&&
-  !/(?:auth|bearer|cookie|token|secret|password|api.?key|session.?id|device.?id|user.?id|uuid|account|credential|signature|email|phone|address|location|private)/i.test(s)?
-  s:"REDACTED_KEY";
+ if(typeof s!=="string"||s.length<1)return "REDACTED_KEY";
+ if(/(?:auth|bearer|cookie|token|secret|password|api.?key|session.?id|device.?id|user.?id|uuid|account|credential|signature|email|phone|address|location|private)/i.test(s))
+  return "REDACTED_KEY";
+ // Siri/Qwen uses an SSE wrapper key equal to its dotted event name.
+ // Allow those structured event names (no values), not arbitrary identifiers.
+ if(s.length<=105&&/^[A-Za-z][A-Za-z0-9_.\[\]-]*$/.test(s)&&
+    /^(?:session|response|message|content|completion|error|ping|done)(?:\.|\[|$)/i.test(s))
+  return s;
+ if(s.length<=36&&/^[A-Za-z_][A-Za-z0-9_-]*$/.test(s))return s;
+ return "REDACTED_KEY";
 }
 function kind(v){
  if(v===null)return "null";
