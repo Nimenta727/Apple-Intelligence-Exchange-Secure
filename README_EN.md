@@ -55,3 +55,7 @@ The latest Siri failure yields `NORTI_SHAPE_ROOT_FIELDS` and `NORTI_SHAPE_ITEM_W
 ## Real iPad Siri field metadata (2026-11-19 11:54)
 
 Explicit local-only schema probe established root field names/types: `client_tools:array`, `response_format:object`, `server_tools:array`, `stream:boolean`; item wrapper `type:string`; nested message `content:array`, `role:string`. The runtime now accepts only the confirmed additional root fields with matching JSON types (never forwards tool metadata to DeepSeek), and an optional wrapper `type` only if it equals `message`. Unknown discriminators and content element types remain fail-closed. **Refresh the 60 module** for the next nonsensitive Siri test; no need to rerun the schema probe. Native DeepSeek/SSE/Siri output remains unverified.
+
+## Local one-shot sanitized Siri-to-Qwen request-body capture (2026-11-19)
+
+The iPad schema probe also observed an `input_hint:string` field; the parser now accepts that key only as a string and discards its value. A separate, manual, ten-minute, one-shot [request-body probe](docs/SIRI_QWEN_BODY_CAPTURE_ZH.md) captures a **sanitized copy** of the Siri-bound Qwen JSON POST body, preserving a bounded `input` text structure while masking credentials and unrelated metadata. The capture is not a header dump, nor a general Qwen app/web chat interceptor. It does not establish that Qwen actually received the request or that DeepSeek/native Siri answers work.
