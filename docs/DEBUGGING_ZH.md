@@ -173,3 +173,11 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 - 近期**不能**通过删除 Guard、直接 Qwen 透传或全局最近提问缓存来声称多轮均由 DeepSeek 生成。
 
 **下一步**：使用 61 的 [Siri 会话级 schema-only 手动诊断](QWEN_PASSIVE_DIAG_ZH.md)（`scripts/siri_followup_schema_probe_ONCE.js`）验证会话级 Request 类型 / 组名结构和 SSE 事件；全部捕获仅记录字段/类型与固定状态，不获取全文。待协议、同事务关联、Siri UI 结果均已证实后，另行设计 multi-turn 适配。原始 PacketTunnel 及 Key/Headers 不进入 GitHub。
+
+## 2026-11-20：续答组名、previous_choice_id 与无 session.created 的真实 SSE
+
+61 真机无正文结构证据：会话级请求增加 `previous_choice_id:string`，响应 HTTP 200/SSE 从 `session.response.created` 开始，4 个 `text.value.delta` 和 4 个紧随 `text.value.done` 的 `text.annotations[].added`，共 18 个已解析 JSON 数据事件，`strict60Preflight=EVENT_ORDER_UNSUPPORTED`。这解释了旧主接口协议校验和第三条 Guard 为什么不能完成续答。
+
+**新版 60 的四 Hook Beta 改写**：仅当上一轮在本机保存了有效的 DeepSeek choice、URL session 相同、事务 tag 有效、当前 body 严格纯文本、原生 response.created 与 URL session 及 response.done 一致时，才构建没有 `session.created` 的 DeepSeek SSE。历史文本只限于 DeepSeek 已确认的短期会话内容，不将 Qwen 正文或 citation 传给模型。失配时出现 `ERROR_FOLLOWUP_CONTEXT_UNAVAILABLE`、`ERROR_FOLLOWUP_CORRELATION_UNAVAILABLE`、`ERROR_CORRELATION_MISMATCH` 或 `ERROR_SSE_REWRITE_UNSUPPORTED`，不调用模型。**这份协议推断来源于一条真机续答样本；尚未证明 iPad 会接受合成续答。**
+
+测试时不能将是否看到 `DEEPSEEK_RESPONSE_ATTEMPTED` 与 Siri 实际 UI 显示混为一谈；多轮 UI 出现真实 DeepSeek 来源标记才算端到端成功。旧 60 的“第三条 Guard 一律阻断”说明仅适用于升级之前的固定脚本。
