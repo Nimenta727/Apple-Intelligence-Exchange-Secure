@@ -424,6 +424,60 @@ function parseRequest(raw){
   return prompt;
  }catch(e){requestDiagnostic="STRUCTURE_UNSUPPORTED";return null;}
 }
+// Compose is documented by boitar/sair's iOS 27.3 Qwen reverse analysis.
+// Exact allowlist: other WritingTools modes and rich/media input are NOT proven.
+function parseWritingToolsRequest(raw){
+ if(!isWritingTools()){requestDiagnostic="WRITING_CLIENT_UNSUPPORTED";return null;}
+ if(!raw||raw.length>C.maxRequest){requestDiagnostic="WRITING_BODY_UNAVAILABLE";return null;}
+ var o;
+ try{o=JSON.parse(raw);}catch(e){requestDiagnostic="WRITING_JSON_INVALID";return null;}
+ if(!o||typeof o!=="object"||Array.isArray(o)){
+  requestDiagnostic="WRITING_ROOT_UNSUPPORTED";return null;
+ }
+ var g=o.configuration&&o.configuration.response_configuration_group_id;
+ if(g!=="compose_selectedAndAllText"){
+  requestDiagnostic="WRITING_GROUP_UNVERIFIED";return null;
+ }
+ if(o.stream!==true||!Array.isArray(o.input)||o.input.length<1||o.input.length>12){
+  requestDiagnostic="WRITING_INPUT_UNSUPPORTED";return null;
+ }
+ if(Object.keys(o).some(function(k){
+  return ["configuration","input","client_tools","server_tools","stream",
+   "response_format","input_hint"].indexOf(k)<0;
+ })){requestDiagnostic="WRITING_ROOT_UNSUPPORTED";return null;}
+ if((o.client_tools&&!Array.isArray(o.client_tools))||
+    (o.server_tools&&!Array.isArray(o.server_tools))){
+  requestDiagnostic="WRITING_TOOLS_UNSUPPORTED";return null;
+ }
+ var parts=[];
+ for(var i=0;i<o.input.length;i++){
+  var item=o.input[i];
+  if(!item||typeof item!=="object"||Array.isArray(item)||
+     (item.type&&item.type!=="message")){
+   requestDiagnostic="WRITING_INPUT_UNSUPPORTED";return null;
+  }
+  var m=item.message&&typeof item.message==="object"?item.message:item;
+  if(m.role!=="user"){requestDiagnostic="WRITING_ROLE_UNSUPPORTED";return null;}
+  var content=m.content,atoms=Array.isArray(content)?content:[content];
+  if(atoms.length<1||atoms.length>32){requestDiagnostic="WRITING_CONTENT_UNSUPPORTED";return null;}
+  for(var j=0;j<atoms.length;j++){
+   var txt=textAtom(atoms[j]);
+   if(typeof txt!=="string"||/data:(?:image|audio|video)\//i.test(txt)){
+    requestDiagnostic="WRITING_MEDIA_OR_CONTENT_UNSUPPORTED";return null;
+   }
+   if(txt.trim())parts.push(txt.trim());
+  }
+ }
+ var prompt=parts.join("\n\n");
+ if(!prompt||prompt.length>C.maxPrompt){
+  requestDiagnostic="WRITING_PROMPT_UNSUPPORTED";return null;
+ }
+ requestDiagnostic="OK";return prompt;
+}
+function parseApplePrompt(raw){
+ return isWritingTools()?parseWritingToolsRequest(raw):parseRequest(raw);
+}
+
 function validKey(k){return typeof k==="string"&&/^[A-Za-z0-9_-]{12,256}$/.test(k)&&!/REPLACE_WITH|PLACEHOLDER/i.test(k);}
 function statusCode(resp){
  var s=resp&&(resp.statusCode||resp.status)||0;
@@ -486,7 +540,8 @@ function safeContinueUrl(v){
   (v===""||/^https:\/\/prod-yabuli\.qianwen\.com(?:\/|$)/i.test(v))?v:"";
 }
 function emptyOrMissing(v){return typeof v==="undefined"||(Array.isArray(v)&&v.length===0);}
-function rewriteSse(original,answer){
+function rewriteSse(original,answer,scene){
+ if(scene!=="writing")scene="siri";
  // Exact event sequence known from native Siri/Qwen. Unknown frames or tool
  // variants fail CLOSED. Never copy a full original SSE payload.
  if(typeof original!=="string"||original.length>C.maxSse||!original.length||
@@ -613,7 +668,9 @@ function rewriteSse(original,answer){
  var choiceId=choiceAdded&&validId(choiceAdded.id)?choiceAdded.id:
    "choice_aies_"+rid.slice(0,80);
  var continuation=safeContinueUrl(choiceAdded&&choiceAdded.continue_url);
- var content=safeJson({content:answer,suggestions:[],summary:"【DeepSeek · AIES】"});
+ var content=scene==="writing"?
+  safeJson({body:answer,refinements:["精炼表达","调整语气","优化结构"]}):
+  safeJson({content:answer,suggestions:[],summary:"【DeepSeek · AIES】"});
  var textContent={type:"text",text:{annotations:[],value:content}};
  var outputItem={type:"message",message:{role:"assistant",content:[textContent]}};
  var choiceOpen={output:[],id:choiceId,continue_url:continuation,status:"in_progress"};
@@ -794,8 +851,9 @@ function isFollowupTextSse(){
   /(?:^|\n)event:\s*session\.response\./.test(res.body.slice(0,65536));
 }
 if(!isTarget()&&!isFollowup()){done({});return;}
-// WritingTools shares the host but must remain outside Siri interception.
-if(isWritingTools()){probeObserveWritingTools();log("WRITINGTOOLS_SKIPPED");done({});return;}
+// Apple WritingTools Compose and Siri have distinct return schemas.
+// Only exact SAIR-observed Compose is opted into the experimental adapter.
+if(isWritingTools())log("WRITINGTOOLS_COMPOSE_SCOPED");
 // Light native-Qwen leak guard: extra session-scoped URL observed in the user
 // device proxy DB. Unlike the base request, we cannot safely rewrite these
 // responses with DeepSeek without confirmed same-transaction correlation.
@@ -816,13 +874,13 @@ if(!res){
  // Phase 1: capture a prompt and explicitly couple request/response using
  // an opaque ID. Unlike "latest prompt", concurrent requests never share a slot.
  captureQwenRequestBodyOnce();
- var prompt=parseRequest(rawRequest());
+ var prompt=parseApplePrompt(rawRequest());
  abRequest(rawRequest(),prompt);
  probeObserveRequest();
- if(!prompt){log("REQUEST_DIAG_"+requestDiagnostic);error("UNSUPPORTED_SIRI_REQUEST");return;}
+ if(!prompt){log("REQUEST_DIAG_"+requestDiagnostic);error(isWritingTools()?"UNSUPPORTED_WRITING_REQUEST":"UNSUPPORTED_SIRI_REQUEST");return;}
  if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){error("INVALID_METHOD");return;}
  var token=randomToken();
- if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,exp:Date.now()+C.sessionTtlMs}))){
+ if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,scene:isWritingTools()?"writing":"siri",exp:Date.now()+C.sessionTtlMs}))){
   error("SESSION_STORE_UNAVAILABLE");return;
  }
  var headers={};Object.keys(req.headers||{}).forEach(function(k){
@@ -838,6 +896,7 @@ abSse("MAIN_UPSTREAM",statusCode(res),res&&res.body);
 if(statusCode(res)!==200){error("ORIGINAL_RESPONSE_STATUS");return;}
 if(!res||typeof res.body!=="string"||res.body.length>C.maxSse){error("SSE_UNAVAILABLE");return;}
 var tag=header(req.headers,"X-AIES-Request-ID"),current=null,prompt2=null;
+var activeScene=isWritingTools()?"writing":"siri";
 if(!tag)log("RESPONSE_TAG_MISSING");
 else if(!/^aies_[a-z0-9_]{12,90}$/.test(tag))log("RESPONSE_TAG_INVALID");
 else log("RESPONSE_TAG_PRESENT");
@@ -846,11 +905,11 @@ if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
  try{current=raw&&JSON.parse(raw);}catch(e){}
  storeWrite("AIES_R1_"+tag,""); // consume once, even if invalid
  if(current&&current.exp>Date.now()&&current.exp<=Date.now()+C.sessionTtlMs&&
-    typeof current.p==="string"&&current.p.length<=C.maxPrompt)prompt2=current.p;
+    current.scene===activeScene&&typeof current.p==="string"&&current.p.length<=C.maxPrompt)prompt2=current.p;
  if(prompt2)log("RESPONSE_PROMPT_FROM_STORE");
  else log("RESPONSE_PROMPT_STORE_MISSING");
 }
-var fromReq=parseRequest(rawRequest());
+var fromReq=parseApplePrompt(rawRequest());
 if(prompt2&&fromReq&&prompt2!==fromReq){error("CORRELATION_MISMATCH");return;}
 if(!prompt2){
  if(fromReq){prompt2=fromReq;log("RESPONSE_PROMPT_FROM_BODY");}
@@ -858,7 +917,7 @@ if(!prompt2){
 }
 if(!prompt2){error("PROMPT_UNAVAILABLE");return;}
 // Fail before billing DeepSeek if this upstream stream cannot be rewritten.
-if(!rewriteSse(res.body,"AIES_VALIDATION_ONLY")){error("SSE_REWRITE_UNSUPPORTED");return;}
+if(!rewriteSse(res.body,"AIES_VALIDATION_ONLY",activeScene)){error("SSE_REWRITE_UNSUPPORTED");return;}
 log("SSE_PREFLIGHT_PASSED");
 var key=storeRead(C.keyName);
 if(!validKey(key)){error("KEY_NOT_PROVISIONED");return;}
@@ -872,7 +931,9 @@ try{
   body:safeJson({
    model:C.model,stream:false,thinking:{type:"disabled"},max_tokens:1000,
    messages:[
-    {role:"system",content:"你是通过 AIES 转发的 DeepSeek 中文 Siri 问答助手。仅回答用户问题，内容尽量准确、清晰，并在复杂问题中保留必要推理步骤。不要自称千问或 Qwen。用户问来源时如实说明这条回答来自 DeepSeek API，经 AIES 转发；不要自己重复固定来源前缀，AIES 会在每条验证成功的回答正文开头强制添加【DeepSeek · AIES】。"},
+    {role:"system",content:activeScene==="writing"?
+     "你是 Apple 写作工具的 DeepSeek 纯文本创作助手。按用户提供的说明和文本进行起草或改写。只返回最终正文，不输出 JSON、代码围栏、引言或无关提示。不要自称千问。AIES 会在最终正文前自动添加来源标记。":
+     "你是通过 AIES 转发的 DeepSeek 中文 Siri 问答助手。仅回答用户问题，内容尽量准确、清晰，并在复杂问题中保留必要推理步骤。不要自称千问或 Qwen。用户问来源时如实说明这条回答来自 DeepSeek API，经 AIES 转发；不要自己重复固定来源前缀，AIES 会在每条验证成功的回答正文开头强制添加【DeepSeek · AIES】。"},
     {role:"user",content:prompt2}
    ]
   })
@@ -884,10 +945,11 @@ try{
   if(!answer){error("MODEL_RESPONSE_INVALID");return;}
   var labeledAnswer=verifiedDeepSeekAnswerWithLabel(answer);
   if(!labeledAnswer){error("MODEL_RESPONSE_INVALID");return;}
-  var rewritten=rewriteSse(res.body,labeledAnswer);
+  var rewritten=rewriteSse(res.body,labeledAnswer,activeScene);
   if(!rewritten){error("SSE_REWRITE_UNSUPPORTED");return;}
   abSse("AIES_SYNTHETIC",200,rewritten);
   abRecord("AIES_OUTPUT",{rewrittenChars:rewritten.length,markerPresent:rewritten.indexOf(DEEPSEEK_SOURCE_LABEL)>=0});
+  if(activeScene==="writing")log("WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY");
   log("DEEPSEEK_LABEL_APPLIED");
   log("DEEPSEEK_RESPONSE_ATTEMPTED");
   done({status:200,headers:{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-store","X-AIES-Answer-Source":"deepseek"},body:rewritten});
