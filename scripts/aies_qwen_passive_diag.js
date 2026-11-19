@@ -113,21 +113,49 @@ function strict60Preflight(raw){
   "session.response.choices[].completed",
   "session.response.choices[].done","session.response.done"
  ];
- var frames=raw.replace(/\r\n/g,"\n").split("\n\n"),rows=[],i;
+ // Complex Siri responses can stream Qwen citation annotations. The new 60
+ // discards them only in the observed location after text.value.done and
+ // before content.done. Their values must never reach DeepSeek or its output.
+ var annotation="session.response.choices[].items[].message.content[].text.annotations[].added";
+ var frames=raw.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n\n"),rows=[],i;
  for(i=0;i<frames.length;i++){
   var trimmed=frames[i].trim();
   if(!trimmed)continue;
-  var lines=trimmed.split("\n");
-  if(lines.length!==2||lines[0].slice(0,7)!=="event: "||
-     lines[1].slice(0,6)!=="data: ")return "FRAME_LAYOUT_UNSUPPORTED";
-  var name=lines[0].slice(7);
-  if(events.indexOf(name)<0)return "EVENT_UNKNOWN";
+  var lines=trimmed.split("\n"),name="",data=[],j;
+  for(j=0;j<lines.length;j++){
+   var line=lines[j],colon=line.indexOf(":"),field=colon<0?line:line.slice(0,colon);
+   if(line.charAt(0)===":"||!line.trim())continue;
+   var value=colon<0?"":line.slice(colon+1).replace(/^ /,"");
+   if(field==="event"){if(name)return "FRAME_LAYOUT_UNSUPPORTED";name=value;}
+   else if(field==="data"){data.push(value);if(data.length>16)return "FRAME_LAYOUT_UNSUPPORTED";}
+   else if(field!=="id"&&field!=="retry")return "FRAME_LAYOUT_UNSUPPORTED";
+  }
+  if(!name||!data.length)return "FRAME_LAYOUT_UNSUPPORTED";
+  if(events.indexOf(name)<0&&name!==annotation)return "EVENT_UNKNOWN";
   var obj;
-  try{obj=JSON.parse(lines[1].slice(6));}catch(e){return "EVENT_JSON_INVALID";}
+  try{obj=JSON.parse(data.join("\n"));}catch(e){return "EVENT_JSON_INVALID";}
   if(!obj||obj.type!==name||!Object.prototype.hasOwnProperty.call(obj,name))
    return "EVENT_ENVELOPE_INVALID";
   rows.push({name:name,payload:obj[name]});
  }
+ if(rows.length<12||rows.length>256)return "EVENT_COUNT_UNSUPPORTED";
+ var cleaned=[],seenTextDone=false,seenContentDone=false,annotations=0;
+ for(i=0;i<rows.length;i++){
+  var r=rows[i];
+  if(r.name===annotation){
+   if(!seenTextDone||seenContentDone||++annotations>64||
+      !r.payload||typeof r.payload!=="object"||Array.isArray(r.payload))
+    return "ANNOTATION_POSITION_OR_TYPE_UNSUPPORTED";
+   continue;
+  }
+  if(r.name===events[6]){
+   if(seenTextDone)return "EVENT_ORDER_UNSUPPORTED";
+   seenTextDone=true;
+  }
+  if(r.name===events[7])seenContentDone=true;
+  cleaned.push(r);
+ }
+ rows=cleaned;
  if(rows.length<12||rows.length>256)return "EVENT_COUNT_UNSUPPORTED";
  for(i=0;i<5;i++)if(rows[i].name!==events[i])return "EVENT_ORDER_UNSUPPORTED";
  for(i=0;i<6;i++)if(rows[rows.length-6+i].name!==events[6+i])
@@ -140,7 +168,7 @@ function strict60Preflight(raw){
   return "SESSION_OR_RESPONSE_ID_INVALID";
  if(response.session_id!==session.id)return "SESSION_LINK_MISMATCH";
  var expiry=session.expires_at;
- if(typeof expiry!=="number"||!isFinite(expiry)||expiry<0||
+ if(typeof expiry!=="number"||!isFinite(expiry)||expiry<0||expiry>9999999999999||
     Math.floor(expiry)!==expiry)return "SESSION_EXPIRY_INVALID";
  return "MATCHES_60_PREFLIGHT";
 }
