@@ -1,6 +1,6 @@
 # Apple Intelligence Exchange Secure (AIES)
 
-**Experimental Shadowrocket Siri text → DeepSeek response rewriting.** Not affiliated with Apple, Qwen, Shadowrocket or DeepSeek.
+**Experimental Shadowrocket Siri and Apple Writing Tools text → DeepSeek response rewriting.** Not affiliated with Apple, Qwen, Shadowrocket or DeepSeek.
 
 > **v0.6.0-beta (2026-11-19). A simple Siri answer visibly carried the DeepSeek source marker; complex/continuous calls are NOT yet reliable.** A real iPad has confirmed the `siri.multimodal.noRTI` request group, a text-only JSON input, and a 13-event Qwen SSE response. One native Qwen stream passed the existing strict preflight. A historical DeepSeek call reached the script's response-attempt stage, but a simple device-visible reply has since been observed, but complex requests remain unreliable.
 
@@ -42,3 +42,7 @@ The 60 module now includes a third, narrowly scoped **response-only SSE guard** 
 ## Same-question Siri Qwen / DeepSeek A-B experiment (2026-11-19)
 
 A new 2,987-line device log confirmed four main Siri requests, two DeepSeek rewrite attempts, one missing correlation tag, one unsupported upstream SSE, and **four intentional failures from the session-scoped follow-up guard**. Native Qwen baseline must be tested with 60/61 fully off; the separate read-only 61 setup captures the Qwen event schema and visible example answer (now including session-scoped requests), and the 60 setup captures opted-in DeepSeek finish_reason, usage, answer text, transformed SSE stages and guard events. [Complete Chinese procedure](docs/AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md). Neither monitoring mode should be confused with the fully uninstrumented control. Never share personal prompts, authorization headers or keys.
+
+## Writing Tools Compose Beta / third-party protocol research
+
+A guarded `WritingTools` User-Agent path now accepts only the **SAIR-reverse-engineered** `compose_selectedAndAllText` JSON text envelope, and emits a distinct `{body,refinements}` payload instead of Siri's `{content,suggestions,summary}`. This is a hypothesis-driven Beta: the user's Writing Tools full JSON/SSE has **not** been independently captured/verified. Other Writing Tools modes, media and non-text roles fail closed. The code-enforced `【DeepSeek · AIES】` prefix will appear in writing output. Both Siri and Writing Tools may send their original queries to Qwen and the selected text to DeepSeek. [Cross-site research/evidence matrix (ZH)](docs/COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md) and [dated routine / next steps](docs/routine/2026-11-19-AppleIntelligence-web-community-and-WritingTools-Compose.md).
