@@ -270,7 +270,9 @@ test("passive 61 strict60 preflight classifier matches current rewriteSse branch
  const first=stream.split("\n\n")[0];
  assert.equal(observedPreflight(first+"\n\n"),"EVENT_COUNT_UNSUPPORTED");
  const addedId=stream.replace("event: session.created\n","id: PRIVATE_ID\nevent: session.created\n");
- assert.equal(observedPreflight(addedId),"FRAME_LAYOUT_UNSUPPORTED");
+ assert.equal(observedPreflight(addedId),"MATCHES_60_PREFLIGHT"); // 60 already allows standard SSE id fields
+ const unknownFrame=stream.replace("event: session.created\n","private-field: data\nevent: session.created\n");
+ assert.equal(observedPreflight(unknownFrame),"FRAME_LAYOUT_UNSUPPORTED");
  const unknown=stream.replace("event: session.created","event: unknown");
  assert.equal(observedPreflight(unknown),"EVENT_UNKNOWN");
  const malformed=stream.replace(/data: \{[^\n]+/,"data: {");
