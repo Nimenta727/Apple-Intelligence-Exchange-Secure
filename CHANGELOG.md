@@ -1,5 +1,13 @@
 # Changelog / 更新日志
 
+## 2026-11-19 — 真机 noRTI 结构键名本地探针
+
+- 新日志显示 `NORTI_SHAPE_ROOT_FIELDS` 和 `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`，既有安全诊断码无法判断具体键名，不能安全放宽原始 JSON 白名单。
+- 新增**用户手动开启、10 分钟、仅设备本地**的 `siri_schema_probe_ONCE.js` 与独立 STOP，存储经过敏感名过滤、长度限制的字段**名称与数据类型**，不读取/保存字段值、问题正文、请求头、令牌或 DeepSeek Key。
+- 捕获结果只在手动运行脚本时显示一次并清空；正常 HTTP 日志仍只有固定 `NORTI_SCHEMA_CAPTURED_LOCAL`。
+- 增加自动化隐私/有效期/身份隔离测试，并更新双钩子不可变脚本 SHA。**真实 noRTI 字段尚未知，功能仍未通过真机端到端验证**。
+
+
 ## 2026-11-19 — noRTI 真机输入结构细分诊断
 
 - Siri 组名已匹配，但新日志连续两次出现 `REQUEST_DIAG_INPUT_UNSUPPORTED`，并没有进入 DeepSeek。
