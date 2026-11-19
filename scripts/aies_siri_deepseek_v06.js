@@ -620,7 +620,8 @@ function rewriteSse(original,answer,scene,route,expectedSession){
  var choiceDone=entries[entries.length-2].payload&&entries[entries.length-2].payload.choice;
  var lastResponse=entries[entries.length-1].payload;
  var lastChoice=lastResponse&&Array.isArray(lastResponse.choices)&&lastResponse.choices[0];
- if(!lastResponse||lastResponse.id!==r.id||lastResponse.session_id!==s.id||
+ if(!lastResponse||lastResponse.id!==r.id||
+    (typeof lastResponse.session_id!=="undefined"&&lastResponse.session_id!==s.id)||
     !emptyOrMissing(r.notices)||!emptyOrMissing(lastResponse&&lastResponse.notices)||
     !emptyOrMissing(choiceCompleted&&choiceCompleted.moderation)||
     !emptyOrMissing(choiceDone&&choiceDone.moderation)||
