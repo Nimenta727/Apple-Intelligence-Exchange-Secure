@@ -1,6 +1,6 @@
 # AIES v0.6 发布与真机验收清单（2026-11-19 更新）
 
-> **目前不是稳定版，不得宣称“已替换所有 Siri/Qwen 回答”。** 新版 60 的字段对齐 SSE 已通过离线 mock，真实 Siri UI 尚未验收；Shadowrocket 响应阶段间歇性丢失关联标记仍是 P0。
+> **目前不是稳定版，不得宣称“已替换所有 Siri/Qwen 回答”。** 新版 60 的字段对齐 SSE 已通过离线 mock，简单问题至少一次显示来源标记，但复杂问题及稳定性尚未验收；Shadowrocket 响应阶段间歇性丢失关联标记仍是 P0。
 
 | 发布条件 | 当前实证状态 | 下一步必须取得的证据 |
 |---|---|---|
@@ -32,3 +32,8 @@
 - [真实请求 JSON](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)
 - [真实响应 SSE](OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)
 - [根因与未完成问题](ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)
+
+## 2026-11-19 15:51 新证据更新
+
+已取得至少一次真正显示 `【DeepSeek · AIES】` 的 Siri 截图，故“完全没有 Siri UI 证据”已过时；但并没有完成**复杂问题、连续会话、会话级 Guard、跨 Hook 关联**的稳定性验收。日志主接口 2 次成功改写、2 次关联缺失、1 次 SSE 不兼容；额外会话级接口有 2 次未覆盖记录。60 新增第三条仅拦截 Siri SSE 的轻量 Guard，可能减少 Qwen 原文展示但增加失败提示。用户本轮要求不进行额外测试，因此最新改动均不得写成设备已验证。
+

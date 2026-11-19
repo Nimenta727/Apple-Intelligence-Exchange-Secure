@@ -8,10 +8,10 @@
 .github/workflows/ci.yml
 README.md / README_EN.md / CHANGELOG.md
 shadowrocket/
-  60-AIES-SIRI-DEEPSEEK-V06.sgmodule      实验 DeepSeek 回答改写：双 Hook
+  60-AIES-SIRI-DEEPSEEK-V06.sgmodule      实验 DeepSeek 回答改写：两条主 Hook + 第三条 SSE Guard
   61-AIES-QWEN-PASSIVE-DIAG.sgmodule      互斥的原生 Qwen 被动协议诊断：双 Hook
 scripts/
-  aies_siri_deepseek_v06.js                60 两个 Hook 使用的同一个不可变 JS
+  aies_siri_deepseek_v06.js                60 三个 Hook 使用的同一个不可变 JS
   aies_qwen_passive_diag.js                61 两个 Hook 使用的同一个不可变 JS
   provision_key_ONCE.js / clear_key_ONCE.js    DeepSeek Key 手动本机管理
   siri_group_probe_ONCE.js / siri_group_probe_STOP_ONCE.js
@@ -70,6 +70,12 @@ Siri 用户请求
 - 明确拒绝工具调用、非文本消息和非空审核/通知；对未经证实的 SSE 变体不进行有损猜测。
 - 构造回答 JSON 时统一生成 `content`、`suggestions`、`summary`（当前 `summary="DeepSeek"`），所有 `delta`、`done.value`、`content.done`、`items.done`、`choice.completed/done`、`response.done` 都基于这一个来源值。
 - 旧版 60 曾只生成简化字段，离线 SSE 事件测试无法识别这类兼容性差异；现在加入按真实字段名称/类型对齐的测试。**仍需真实 Siri 验收。**
+
+## 60 新增会话级 SSE 防漏响应钩子
+
+代理库 15:52:47 与 15:53:06 有 Siri `/v1/sessions/{opaque-id}/responses`，旧 60 只覆盖 `/v1/sessions/responses`。第三条响应脚本规则在会话级路径、Siri User-Agent、HTTP 200 且确认为 SSE 时返回固定 502。它不是 DeepSeek 改写，不封锁普通 Qwen 域名和非 SSE 信息；可以阻断部分原文，却也可能让复杂问答无法显示。
+
+主路径 SSE 解析现在接受规范的注释、`id:`、`retry:`、多行 `data:` 和换行方式，但仍严格校验事件白名单、顺序、会话关联和媒体/工具类型，不能把未知 Qwen 事件直接复制到 DeepSeek SSE。
 
 ## 61 被动诊断与本地临时探针
 

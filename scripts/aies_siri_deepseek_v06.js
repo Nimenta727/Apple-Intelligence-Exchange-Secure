@@ -12,11 +12,13 @@
 var C={
   version:"0.6.0-beta",
   target:/^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?[^#]*)?$/i,
+  // Real Siri also used session-scoped response URLs, absent from old Hook.
+  followup:/^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?[^#]*)?$/i,
   endpoint:"https://api.deepseek.com/chat/completions",
   model:"deepseek-flash",
   keyName:"SAIRS_DEEPSEEK_API_KEY",
   maxRequest:300000,maxPrompt:14000,maxSse:900000,maxAnswer:12000,
-  timeoutMs:11000,sessionTtlMs:45000
+  timeoutMs:15000,sessionTtlMs:45000
 };
 // Only add this human-visible source label to successfully validated DeepSeek
 // replies. Siri/Qwen service branding is controlled upstream and may not change.
@@ -441,7 +443,11 @@ function verifiedDeepSeekAnswerWithLabel(answer){
  // Never infer provenance from Siri UI. This function is called exclusively
  // after modelReply has verified a successful DeepSeek API completion.
  if(typeof answer!=="string"||!answer.trim())return null;
- var result=DEEPSEEK_SOURCE_LABEL+"\n"+answer.trim();
+ var plain=answer.trim();
+ // Code-enforced provenance (not prompt-dependent), exactly once at start.
+ while(plain.indexOf(DEEPSEEK_SOURCE_LABEL)===0)plain=plain.slice(DEEPSEEK_SOURCE_LABEL.length).trim();
+ if(!plain)return null;
+ var result=DEEPSEEK_SOURCE_LABEL+"\n"+plain;
  return result.length<=C.maxAnswer?result:null;
 }
 function safeJson(v){return JSON.stringify(v);}
@@ -483,15 +489,25 @@ function rewriteSse(original,answer){
  // variants fail CLOSED. Never copy a full original SSE payload.
  if(typeof original!=="string"||original.length>C.maxSse||!original.length||
     typeof answer!=="string"||!answer.trim())return null;
- var frames=original.replace(/\r\n/g,"\n").split("\n\n"),entries=[],i;
+ // Tolerate normal SSE framing (CR/LF, comment, id/retry fields,
+ // multiline data and field order) but keep known event names and order.
+ // Never copy original Qwen answer-bearing payloads into the output.
+ var frames=original.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n\n"),entries=[],i;
  for(i=0;i<frames.length;i++){
   var f=frames[i].trim();if(!f)continue;
-  var lines=f.split("\n");
-  if(lines.length!==2||lines[0].slice(0,7)!=="event: "||
-     lines[1].slice(0,6)!=="data: ")return null;
-  var name=lines[0].slice(7),obj;
-  if(Object.keys(E).every(function(k){return E[k]!==name;}))return null;
-  try{obj=JSON.parse(lines[1].slice(6));}catch(e){return null;}
+  var lines=f.split("\n"),name="",data=[],j;
+  for(j=0;j<lines.length;j++){
+   var line=lines[j],colon=line.indexOf(":"),field=colon<0?line:line.slice(0,colon);
+   if(line.charAt(0)===":"||!line.trim())continue;
+   var value=colon<0?"":line.slice(colon+1).replace(/^ /,"");
+   if(field==="event"){if(name)return null;name=value;}
+   else if(field==="data"){data.push(value);if(data.length>16)return null;}
+   else if(field!=="id"&&field!=="retry")return null;
+  }
+  if(!name||!data.length||
+     Object.keys(E).every(function(k){return E[k]!==name;}))return null;
+  var obj;
+  try{obj=JSON.parse(data.join("\n"));}catch(e){return null;}
   if(!obj||obj.type!==name||!Object.prototype.hasOwnProperty.call(obj,name))return null;
   entries.push({name:name,payload:obj[name]});
  }
@@ -568,7 +584,7 @@ function rewriteSse(original,answer){
  var choiceId=choiceAdded&&validId(choiceAdded.id)?choiceAdded.id:
    "choice_aies_"+rid.slice(0,80);
  var continuation=safeContinueUrl(choiceAdded&&choiceAdded.continue_url);
- var content=safeJson({content:answer,suggestions:[],summary:"DeepSeek"});
+ var content=safeJson({content:answer,suggestions:[],summary:"【DeepSeek · AIES】"});
  var textContent={type:"text",text:{annotations:[],value:content}};
  var outputItem={type:"message",message:{role:"assistant",content:[textContent]}};
  var choiceOpen={output:[],id:choiceId,continue_url:continuation,status:"in_progress"};
@@ -610,9 +626,34 @@ function randomToken(){
 function storeWrite(key,val){try{return !!(store&&store.write&&store.write(val,key));}catch(e){return false;}}
 function storeRead(key){try{return store&&store.read?store.read(key):null;}catch(e){return null;}}
 function isTarget(){return !!(req&&typeof req.url==="string"&&C.target.test(req.url));}
-if(!isTarget()){done({});return;}
-// WritingTools uses this endpoint too, but is outside this Siri-only product.
+function isFollowup(){return !!(req&&typeof req.url==="string"&&C.followup.test(req.url));}
+function isFollowupTextSse(){
+ if(!res||statusCode(res)!==200)return false;
+ var ct=header(res.headers,"Content-Type");
+ if(/(?:^|[;,\s])text\/event-stream(?:[;,\s]|$)/i.test(ct))return true;
+ // A bounded protocol prefix check when upstream Content-Type is unavailable.
+ // Never log/store response body or opaque session identifiers.
+ return typeof res.body==="string"&&
+  /(?:^|\n)event:\s*session\.response\./.test(res.body.slice(0,65536));
+}
+if(!isTarget()&&!isFollowup()){done({});return;}
+// WritingTools shares the host but must remain outside Siri interception.
 if(isWritingTools()){probeObserveWritingTools();log("WRITINGTOOLS_SKIPPED");done({});return;}
+// Light native-Qwen leak guard: extra session-scoped URL observed in the user
+// device proxy DB. Unlike the base request, we cannot safely rewrite these
+// responses with DeepSeek without confirmed same-transaction correlation.
+// Block only Siri HTTP-200 SSE responses on this specific path, not requests,
+// non-SSE metadata, other clients or the whole Qwen domain.
+if(isFollowup()){
+ if(res&&isSiriForProbe()&&isFollowupTextSse()){
+  log("QWEN_SESSION_FOLLOWUP_SSE_BLOCKED");
+  error("QWEN_FOLLOWUP_UNVERIFIED_SOURCE");
+ }else{
+  if(res&&isSiriForProbe())log("QWEN_SESSION_FOLLOWUP_NON_SSE_SKIPPED");
+  done({});
+ }
+ return;
+}
 if(!res){
  // Phase 1: capture a prompt and explicitly couple request/response using
  // an opaque ID. Unlike "latest prompt", concurrent requests never share a slot.
@@ -666,12 +707,12 @@ if(typeof setTimeout==="function")timer=setTimeout(function(){error("MODEL_TIMEO
 log("DEEPSEEK_STARTED");
 try{
  http.post({
-  url:C.endpoint,method:"POST",timeout:10,"auto-redirect":false,
+  url:C.endpoint,method:"POST",timeout:14,"auto-redirect":false,
   headers:{"Content-Type":"application/json","Accept":"application/json","Authorization":"Bearer "+key},
   body:safeJson({
-   model:C.model,stream:false,thinking:{type:"disabled"},max_tokens:500,
+   model:C.model,stream:false,thinking:{type:"disabled"},max_tokens:1000,
    messages:[
-    {role:"system",content:"你是通过 AIES 提供回答的 DeepSeek 中文问答助手。回答应简短准确，不要自称千问或 Qwen；用户询问回答来源时，如实说明答案由 DeepSeek API 生成、经 AIES 转发。不要自行在答案里重复添加固定来源标签，代理脚本会统一添加。"},
+    {role:"system",content:"你是通过 AIES 转发的 DeepSeek 中文 Siri 问答助手。仅回答用户问题，内容尽量准确、清晰，并在复杂问题中保留必要推理步骤。不要自称千问或 Qwen。用户问来源时如实说明这条回答来自 DeepSeek API，经 AIES 转发；不要自己重复固定来源前缀，AIES 会在每条验证成功的回答正文开头强制添加【DeepSeek · AIES】。"},
     {role:"user",content:prompt2}
    ]
   })

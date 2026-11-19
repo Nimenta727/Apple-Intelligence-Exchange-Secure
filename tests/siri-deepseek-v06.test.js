@@ -1023,13 +1023,13 @@ test("DeepSeek Flash is requested in documented disabled-thinking mode for short
  assert.equal(sent.model,"deepseek-flash");
  assert.equal(sent.thinking.type,"disabled");
  assert.equal(sent.stream,false);
- assert.equal(sent.max_tokens,500);
+ assert.equal(sent.max_tokens,1000);
 });
 
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
- assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/087211c1858eb77d90fd6583de46a2b4f6bcb77a/scripts/aies_siri_deepseek_v06.js")));
+ assert.equal(scripts.length,3);
+ assert.ok(scripts.every(x=>x.includes("/d8472b61e546da447b64f16bf1580933b4dce368/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{

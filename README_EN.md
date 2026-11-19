@@ -2,7 +2,7 @@
 
 **Experimental Shadowrocket Siri text → DeepSeek response rewriting.** Not affiliated with Apple, Qwen, Shadowrocket or DeepSeek.
 
-> **v0.6.0-beta (2026-11-19). Native Siri UI acceptance is NOT VERIFIED.** A real iPad has confirmed the `siri.multimodal.noRTI` request group, a text-only JSON input, and a 13-event Qwen SSE response. One native Qwen stream passed the existing strict preflight. A historical DeepSeek call reached the script's response-attempt stage, but successful native Siri rendering has not been observed.
+> **v0.6.0-beta (2026-11-19). A simple Siri answer visibly carried the DeepSeek source marker; complex/continuous calls are NOT yet reliable.** A real iPad has confirmed the `siri.multimodal.noRTI` request group, a text-only JSON input, and a 13-event Qwen SSE response. One native Qwen stream passed the existing strict preflight. A historical DeepSeek call reached the script's response-attempt stage, but a simple device-visible reply has since been observed, but complex requests remain unreliable.
 
 [Chinese documentation hub](docs/README.md) · [Installation / rollback (ZH)](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [Device validation matrix (ZH)](docs/VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)
 
@@ -31,3 +31,10 @@ npm test
 ## Limitations
 
 The original Siri query may reach Qwen before DeepSeek is invoked. The product does **not** guarantee Qwen bypass protection if the proxy or scripts do not run. A visible Qwen service badge cannot establish which model authored the text; nor does a log such as `DEEPSEEK_RESPONSE_ATTEMPTED` prove that Siri displayed it. A failed request/response correlation remains a known device-level blocker, and the client UI's acceptance of the newly schema-aligned synthetic SSE still needs live testing. Never upload raw PacketTunnel, proxy databases, private question text, API keys or certificates.
+
+## 2026-11-19 update: first device-visible DeepSeek text and limited Qwen follow-up guard
+
+A Siri screenshot now visibly contains the code-inserted `【DeepSeek · AIES】` answer prefix, while the system's Qwen-branded service badge remains unchanged. The latest five main Siri requests produced two attempted DeepSeek response rewrites, two missing request-correlation tags, and one unsupported SSE. The local proxy database revealed two additional Siri requests to `/v1/sessions/{opaque-id}/responses` that were not covered by the old rewrite rules.
+
+The 60 module now includes a third, narrowly scoped **response-only SSE guard** for this session-scoped URL. It returns a generic error only for Siri HTTP-200 SSE answers; it cannot convert these extra Qwen sessions to DeepSeek and can increase failed complex Siri interactions. The primary SSE parser also tolerates standard framing variants, increases output budget to 1000 tokens/15 seconds, and enforces the source marker in answer and summary data. The intermittent loss of request correlation remains unresolved. No new manual/on-device testing was performed at the user's request.
+
