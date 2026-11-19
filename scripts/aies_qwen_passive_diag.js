@@ -86,7 +86,8 @@ function requestSummary(){
 }
 function eventName(raw){
  if(typeof raw==="string"&&raw.length<=105&&
-   /^[A-Za-z][A-Za-z0-9_.\[\]-]*$/.test(raw))return raw;
+   /^[A-Za-z][A-Za-z0-9_.\[\]-]*$/.test(raw)&&
+   /^(?:session|response|message|content|completion|error|ping|done)(?:\.|\[|$)/i.test(raw))return raw;
  return "UNSAFE_EVENT_NAME";
 }
 function responseSummary(){
@@ -108,7 +109,7 @@ function responseSummary(){
  }
  out.format="SSE";
  var chunks=raw.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n\n");
- var seq=[],counts={},examples=[],names=[],last=[],ok=0,bad=0,framing={id:false,comments:false,retry:false,multiData:false,missingEvent:false},done=false;
+ var seq=[],counts=[],examples=[],names=[],last=[],ok=0,bad=0,framing={id:false,comments:false,retry:false,multiData:false,missingEvent:false},done=false;
  for(var i=0;i<chunks.length&&i<500;i++){
   var frame=chunks[i];if(!frame.trim())continue;
   var lines=frame.split("\n"),ename="",data=[],seenData=false;
