@@ -24,7 +24,8 @@
 | L4 | 同环境中的长答案/多行段落 | SSE JSON 转义正确、无 502 | Siri 实显正确换行与来源前缀 |
 | L5 | 连续单题 3–5 轮（非并发） | 关联稳定，错答和上下文串线为 0 | 每轮来源前缀及固定状态码；无 `PROMPT_UNAVAILABLE` |
 | L6 | **并发**两个不同的无隐私提问（受控测试） | 不能把 A 答案配给 B | 若无法安全关联，宁可拒绝，也不能显示另一问题的回答 |
-| L7 | WritingTools/非 Siri 同域事件 | 不进入 60 模型改写，不额外计费 | `WRITINGTOOLS_SKIPPED`、无模型调用 |
+| L7 | WritingTools 已知 Compose 纯文本 | **Beta**：精确 `compose_selectedAndAllText`，模型成功时生成 `body/refinements` 且 Siri 回归不受影响 | `WRITINGTOOLS_COMPOSE_SCOPED`、`WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY`、编辑器实际显示（**真机待验**） |
+| L7b | WritingTools 未知组/媒体、其它非 Siri 同域事件 | 未证实场景不向 DeepSeek 转发，失败关闭；同域非 Siri 仍不接受 | `REQUEST_DIAG_WRITING_*` 或 `REQUEST_DIAG_GROUP_UNSUPPORTED`，无模型调用 |
 | L8 | 工具/音频/图片/未知组名 | 安全拒绝，不转发私密或非文本数据到 DeepSeek | 固定 `REQUEST_DIAG_*` 或错误码 |
 | L9 | 原生 SSE 内含审核/通知或工具事件 | 不输出伪造正常 DeepSeek 答案，不含原 Qwen 正文 | 502 和固定错误码；无模型调用 |
 | L10 | DeepSeek 超时、非 200、空回答 | 固定失败关闭，不以 Qwen 回答冒充 DeepSeek | `ERROR_MODEL_*`，无来源标记 |
