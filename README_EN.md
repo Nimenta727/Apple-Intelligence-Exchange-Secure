@@ -2,7 +2,7 @@
 
 **Experimental Shadowrocket Siri text → DeepSeek response rewriting.** Not affiliated with Apple, Qwen, Shadowrocket or DeepSeek.
 
-> **v0.6.0-beta (2026-11-19). Native Siri UI acceptance is NOT VERIFIED.** A real iPad has confirmed the `siri.multimodal.noRTI` request group, a text-only JSON input, and a 13-event Qwen SSE response. One native Qwen stream passed the existing strict preflight. A historical DeepSeek call reached the script's response-attempt stage, but successful native Siri rendering has not been observed.
+> **v0.6.0-beta (2026-11-19). A simple Siri answer visibly carried the DeepSeek source marker; complex/continuous calls are NOT yet reliable.** A real iPad has confirmed the `siri.multimodal.noRTI` request group, a text-only JSON input, and a 13-event Qwen SSE response. One native Qwen stream passed the existing strict preflight. A historical DeepSeek call reached the script's response-attempt stage, but a simple device-visible reply has since been observed, but complex requests remain unreliable.
 
 [Chinese documentation hub](docs/README.md) · [Installation / rollback (ZH)](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [Device validation matrix (ZH)](docs/VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)
 
