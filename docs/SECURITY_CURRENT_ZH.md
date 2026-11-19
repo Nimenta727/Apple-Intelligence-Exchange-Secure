@@ -51,3 +51,9 @@
 ## WritingTools 写作文本的额外安全边界（2026-11-19）
 
 WritingTools 可能包含用户选中的完整文字，涉及草稿或其他隐私。60 只为 SAIR 逆向记录的 `compose_selectedAndAllText` 文本分组提供实验转发；严格要求 UA、user 角色、文本对象、已知根键、长度和 `stream:true`，未知模式、工具输出和媒体不进入 DeepSeek。成功时用户文字**仍可能同时发送 Qwen 与 DeepSeek**，不能假定仅在设备本地处理。若无安全的同事务响应关联，保持 502，而非采用原 SAIR `SAIR_LATEST_PROMPT` 全局最近内容兜底，防止 Siri 和写作工具交叉暴露。强制 DeepSeek 来源标签会留在生成正文中，用户需人工检查。 [协议证据与不确定性](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。
+
+## WritingTools 结构型探针：默认关闭与最小化数据（2026-11-19）
+
+为核对 SAIR 逆向分组与真实设备请求是否一致，61 增加独立键 `AIES_WRITING_SCHEMA_V1`，只允许用户通过 Shadowrocket **本地 Script Test 手动运行** `writing_schema_probe_ONCE.js` 打开 600 秒观测窗口，随后从目标 Qwen 的 WritingTools HTTP POST 记录**软件场景标识（安全字符过滤）、请求字段名/类型、响应 SSE 事件类型与状态**。不保存用户选中的任何文字、原生 Qwen 回答、认证 Header、Cookie、原始请求体或原始 SSE；不会调用 DeepSeek，四个 61 Hook 始终 `$done({})`。本地读出前先逻辑清空，不等于闪存物理擦除。
+
+WritingTools 可能默认拿到整个编辑区的上下文，故只用主动编写的完全无隐私测试文本。安全分组值本身也应先在本地检查后分享。官方 Writing Tools API 不保证所有“校对、摘要、改写”操作都经过可抓到的千问接口；本工具不会提供系统级覆盖承诺。操作指南：[61 结构探针](QWEN_PASSIVE_DIAG_ZH.md)。
