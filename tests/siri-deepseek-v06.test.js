@@ -159,6 +159,86 @@ function sirireq(e,group,ua="Siri (iPad - Version 27.3.0)",content="SAFE_QUESTIO
  const body=JSON.stringify({configuration:{response_configuration_group_id:group},input:[{content}]});
  return e.invoke({...e.request,headers:{"User-Agent":ua,Authorization:"Bearer PRIVATE_SECRET"},body});
 }
+test("observed iPadOS noRTI Siri group supports strict text through both hooks in offline mock",()=>{
+ const e=env();
+ const body=JSON.stringify({
+  configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},
+  input:[{type:"message",role:"user",content:[{type:"text",text:{value:"Why is the sky blue?"}}]}]
+ });
+ const request={...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body};
+ const a=e.invoke(request);
+ assert.equal(a.returned.length,1);
+ assert.ok(a.returned[0].headers["X-AIES-Request-ID"]);
+ assert.ok(e.logs.includes("[AIES_V06] REQUEST_CAPTURED"));
+ assert.equal(e.requests.length,0);
+ const b=e.invoke({...request,headers:{...request.headers,...a.returned[0].headers}},
+  {status:200,body:fixture});
+ assert.equal(b.returned.length,1);
+ assert.equal(b.returned[0].status,200);
+ assert.equal(b.returned[0].headers["X-AIES-Answer-Source"],"deepseek");
+ assert.ok(b.returned[0].body.includes("DEEPSEEK_EXCLUSIVE_REPLY"));
+ assert.ok(!b.returned[0].body.includes("QWEN_ORIGINAL_ANSWER_TEST"));
+ assert.equal(e.requests.length,1);
+ assert.deepEqual(JSON.parse(e.requests[0].body).messages[1].content,"Why is the sky blue?");
+ assert.ok(e.logs.every(x=>!x.includes("Why is the sky blue?")));
+});
+test("noRTI is denied for non-Siri clients and WritingTools remains bypassed",()=>{
+ const body=JSON.stringify({
+  configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},
+  input:[{content:"SAFE_NONPRIVATE"}]
+ });
+ for(const userAgent of ["OtherClient (iPad - Version 27.3.0)","", "siri-like (iPad)"]){
+  const e=env();
+  const r=e.invoke({...e.request,headers:{"User-Agent":userAgent},body});
+  assert.equal(r.returned[0].response.status,502);
+  assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_GROUP_UNSUPPORTED"));
+  assert.ok(!e.logs.includes("[AIES_V06] REQUEST_CAPTURED"));
+  assert.equal(e.requests.length,0);
+ }
+ const e=env();
+ const req={...e.request,headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)"},body};
+ assert.deepEqual(JSON.stringify(e.invoke(req).returned),JSON.stringify([{}]));
+ assert.deepEqual(JSON.stringify(e.invoke(req,{status:200,body:fixture}).returned),JSON.stringify([{}]));
+ assert.equal(e.requests.length,0);
+ assert.ok(e.logs.every(x=>x==="[AIES_V06] WRITINGTOOLS_SKIPPED"));
+});
+test("noRTI fail-closes unverified and multimodal request shapes without billing model",()=>{
+ const group="siri.multimodal.noRTI";
+ const configs=[
+  {configuration:{response_configuration_group_id:group},input:[{content:"SAFE"}],attachments:[{type:"image",data:"PRIVATE"}]},
+  {configuration:{response_configuration_group_id:group},input:[{content:"SAFE",audio:"PRIVATE"}]},
+  {configuration:{response_configuration_group_id:group},input:[{content:"SAFE",metadata:{file:"PRIVATE"}}]},
+  {configuration:{response_configuration_group_id:group},input:[{message:{content:"SAFE",image_url:"PRIVATE"}}]},
+  {configuration:{response_configuration_group_id:group},input:[{role:"assistant",content:"SAFE"}]},
+  {configuration:{response_configuration_group_id:group},input:[{type:"image",content:"SAFE"}]},
+  {configuration:{response_configuration_group_id:group},input:[{message:{content:"SAFE"},attachment:"PRIVATE"}]},
+  {configuration:{response_configuration_group_id:group},input:[{content:{type:"image",url:"PRIVATE"}}]},
+  {configuration:{response_configuration_group_id:group},input:[{content:"data:audio/mp3;base64,PRIVATE"}]},
+  {configuration:{response_configuration_group_id:group},input:[]}
+ ];
+ for(const obj of configs){
+  const e=env();
+  const r=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)",
+   Authorization:"Bearer TEST_PRIVATE_AUTH"},body:JSON.stringify(obj)});
+  assert.equal(r.returned[0].response.status,502,JSON.stringify(obj).slice(0,75));
+  assert.ok(e.logs.some(x=>x==="[AIES_V06] REQUEST_DIAG_INPUT_UNSUPPORTED"||
+   x==="[AIES_V06] REQUEST_DIAG_CONTENT_UNSUPPORTED"||
+   x==="[AIES_V06] REQUEST_DIAG_MEDIA_UNSUPPORTED"));
+  assert.equal(e.requests.length,0);
+  assert.ok(e.logs.every(x=>!x.includes("PRIVATE")&&!x.includes("TEST_PRIVATE_AUTH")));
+ }
+});
+test("noRTI accepted group does not silently accept unknown neighboring groups",()=>{
+ for(const group of ["siri.multimodal","siri.multimodal.noRTI.extra","SIRI.MULTIMODAL.NORTI"]){
+  const e=env();
+  const body=JSON.stringify({configuration:{response_configuration_group_id:group},input:[{content:"SAFE"}]});
+  const r=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body});
+  assert.equal(r.returned[0].response.status,502);
+  assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_GROUP_UNSUPPORTED"));
+  assert.equal(e.requests.length,0);
+ }
+});
+
 test("WritingTools bypasses both hooks without DeepSeek, even when diagnostic is armed",()=>{
  const e=env();
  runLocal(e);
@@ -362,7 +442,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/c0975113a0a142fbce42cad39856491e69e8e173/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/e79d05c3b8ef788abc92d3f1626426914c9dc7ce/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
