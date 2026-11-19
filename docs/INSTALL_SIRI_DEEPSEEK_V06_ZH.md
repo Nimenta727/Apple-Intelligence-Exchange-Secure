@@ -26,7 +26,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 诊断版更新（2026-11-19）
 
-如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `b0994a5b30b69ef8d67dd96a2f6c36577f81c946`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
+如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `087211c1858eb77d90fd6583de46a2b4f6bcb77a`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
 
 额外的 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) **仅供手动 Script Test**，不是模块自动安装的第三条钩子。**必须在 iPad 本地把旧版同名 JS 覆盖为最新版**；仅刷新远程 60 模块不够。手动运行一次开启 **600 秒**，问一次非隐私 Siri 问题，再运行同一个脚本查看结果、剩余时间和命中次数；重复检查**不自动取消**。需要停止时专门手动运行 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js)。不要把任何辅助脚本放入启用的 `event`、`cron` 或 HTTP 自动规则。详见[完整步骤](SIRI_GROUP_PROBE_ZH.md)。
 
@@ -74,7 +74,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 来源标签与失败阶段诊断（2026-11-19）
 
-本版本加入仅在 DeepSeek 验证成功时生成的正文前缀 `【DeepSeek · AIES】`，及响应阶段缺失关联标记/存储关联/请求正文恢复情况的**固定码**。更新设备上已经安装的 60 模块，让两条 HTTP Hook 都引用 `b0994a5b30b69ef8d67dd96a2f6c36577f81c946`；本次不需要重装本地探针、API Key 或 CA。问一次非隐私问题后核对 Siri **实际显示的正文**与 `[AIES_V06]` 日志。Qwen 的系统品牌卡片可能保持不变；若只出现卡片但没有 DeepSeek 前缀，来源仍无法确认。不要上传完整 PacketTunnel 或凭据。
+本版本加入仅在 DeepSeek 验证成功时生成的正文前缀 `【DeepSeek · AIES】`，及响应阶段缺失关联标记/存储关联/请求正文恢复情况的**固定码**。更新设备上已经安装的 60 模块，让两条 HTTP Hook 都引用 `087211c1858eb77d90fd6583de46a2b4f6bcb77a`；本次不需要重装本地探针、API Key 或 CA。问一次非隐私问题后核对 Siri **实际显示的正文**与 `[AIES_V06]` 日志。Qwen 的系统品牌卡片可能保持不变；若只出现卡片但没有 DeepSeek 前缀，来源仍无法确认。不要上传完整 PacketTunnel 或凭据。
 
 ## 仅观测 Qwen 原生协议时的临时 61 模式
 
