@@ -61,3 +61,7 @@
 ## DeepSeek 回答可见来源标记（2026-11-19）
 
 在满足已验证的 DeepSeek HTTP 200 正常完成、回答文本合法且 SSE 原始结构可识别的条件后，脚本才将 `【DeepSeek · AIES】` 作为正文前缀插入要提交给 Siri 的重写 SSE，且保留 `X-AIES-Answer-Source: deepseek` 响应头。提示词的身份描述不能替代这一代码级保证，也无法控制 Siri 的固定 Qwen UI 品牌。错误、Qwen 原文、未知 SSE、DeepSeek 失败均不标成 DeepSeek。新增的响应阶段关联诊断只打印常量，不输出临时 ID、认证头或请求正文。系统级旁路仍可能展示原生 Qwen 内容，非端到端来源保护承诺。
+
+## 独立 61 原生 Qwen 被动协议诊断
+
+临时实验模块只对目标 `prod-yabuli.qianwen.com/v1/sessions/responses` 的 Siri POST 与对应 Response Hook 做采样，默认关闭，用户手动开启 600 秒。一份请求字段**类型/受限键名**、少量白名单系统版本，以及一份 SSE **事件名/事件顺序/数量/嵌套键类型**在本地保存并于手动读取前逻辑清除。不会保存问题或回答文字、HTTP Header/Token/Cookie/Key、原始 SSE 或请求体，不调用模型或任何网络上传。所有 HTTP 钩子始终 `$done({})` 不改写流量。该模块应仅在停用生产 60 和任何同域旧 REJECT 后启用；响应缓冲和 HTTPS MITM 本身仍有风险，对原生连接的影响需基线对照，采样后的逻辑清空不保证物理擦除。详细流程：[独立诊断指南](QWEN_PASSIVE_DIAG_ZH.md)。
