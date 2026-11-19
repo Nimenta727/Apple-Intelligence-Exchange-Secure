@@ -52,6 +52,7 @@ const activeNames=[
  "scripts/writing_schema_probe_ONCE.js","scripts/writing_schema_probe_STOP_ONCE.js",
  "scripts/siri_followup_schema_probe_ONCE.js","scripts/siri_followup_schema_probe_STOP_ONCE.js",
  "shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule",
+ "shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule",
  "tests/siri-deepseek-v06.test.js","tests/qwen-passive-diag.test.js","tests/fixtures/siri-sse.js"
 ];
 for(const item of activeNames)if(!fs.existsSync(path.join(root,item)))fail("missing active file: "+item);
@@ -61,9 +62,9 @@ const obsolete=["src","docs/history","docs/MAINTENANCE_ZH.md","docs/PROJECT_HAND
  "tools/build.js","tools/check-boundary.js","tools/evaluate-boundary.js"];
 for(const file of obsolete)if(fs.existsSync(path.join(root,file)))fail("obsolete file still tracked: "+file);
 const modules=all.filter(x=>x.endsWith(".sgmodule")).map(relative);
-const expectedModules=["shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule"];
-if(modules.length!==2||expectedModules.some(x=>modules.indexOf(x)<0))
- fail("expected one production module and one opt-in passive diagnostic module, got "+modules.join(","));
+const expectedModules=["shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule","shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule"];
+if(modules.length!==3||expectedModules.some(x=>modules.indexOf(x)<0))
+ fail("expected one remote production, one opt-in passive and one local fallback module, got "+modules.join(","));
 const scripts=all.filter(x=>relative(x).startsWith("scripts/")&&x.endsWith(".js")).map(relative);
 if(scripts.length!==20)fail("expected production runtime, passive runtime, two Key scripts and sixteen manual diagnostic helpers: "+scripts.join(","));
 const tests=all.filter(x=>relative(x).startsWith("tests/")&&x.endsWith(".test.js")).map(relative);
@@ -84,6 +85,20 @@ if(urls.length!==4||!urls[0]||urls.some(x=>x!==urls[0]))
  fail("all four 60 hooks must share one version-pinned script");
 if(urls.some(x=>!/^https:\/\/raw\.githubusercontent\.com\/Nimenta727\/Apple-Intelligence-Exchange-Secure\/[0-9a-f]{40}\/scripts\/aies_siri_deepseek_v06\.js$/.test(x)))
  fail("runtime URL must be pinned to a full immutable commit");
+const localModule=fs.readFileSync(path.join(root,"shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule"),"utf8");
+const localHooks=localModule.match(/^AIES60 .+type=http-(?:request|response).+script-path=.+$/gm)||[];
+if(localHooks.length!==4||
+ localHooks.filter(x=>x.includes("type=http-request")).length!==2||
+ localHooks.filter(x=>x.includes("type=http-response")).length!==2||
+ localHooks.some(x=>!x.includes("script-path=aies_siri_deepseek_v06.js")))
+ fail("local fallback must have four main/followup hooks for same local script file");
+if(/https:\/\/raw\.githubusercontent\.com|https:\/\/cdn\.jsdelivr\.net/.test(localModule))
+ fail("local fallback must not reference remote runtime URL");
+if(localHooks.some(x=>!hooks.some(remote=>remote.slice(0,remote.indexOf(",script-path="))===
+     x.slice(0,x.indexOf(",script-path=")))))
+ fail("local and remote production route matching must remain identical");
+if(!localModule.includes("7a698fbaadeb37431d9bd1d43df359292ee78ba0"))
+ fail("local module must disclose reviewed script pin in comments");
 const passiveModule=fs.readFileSync(path.join(root,"shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule"),"utf8");
 const passiveScript=fs.readFileSync(path.join(root,"scripts/aies_qwen_passive_diag.js"),"utf8");
 const passiveHooks=passiveModule.match(/^AIES61 Passive (?:Followup )?(?:Request|Response) = .*type=http-(?:request|response).*script-path=.+$/gm)||[];
