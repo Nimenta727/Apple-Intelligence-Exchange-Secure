@@ -848,6 +848,70 @@ function abModel(reply,body,err){
  abRecord("DEEPSEEK_API",info);
 }
 
+// The previous_choice_id is an opaque Qwen continuation pointer, never
+// submitted to DeepSeek. A valid followup can use ONLY prior locally verified
+// DeepSeek text, scoped to the same session, with a five-minute logical TTL.
+// This transient device-local context contains plain user/model text; it is
+// not logged, and its TTL does not claim physical secure erasure.
+function followupSessionId(){
+ if(!req||typeof req.url!=="string")return "";
+ var m=req.url.match(/^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/([^\/?#]{1,160})\/responses(?:\?[^#]*)?$/i);
+ return m&&validId(m[1])?m[1]:"";
+}
+function followupIds(){
+ var sid=followupSessionId(),obj=null;
+ if(!sid||!req||typeof req.body!=="string"||
+    !req.body.length||req.body.length>C.maxRequest)return null;
+ try{obj=JSON.parse(req.body);}catch(e){return null;}
+ if(!obj||typeof obj!=="object"||Array.isArray(obj)||
+    !validId(obj.previous_choice_id)||
+    !obj.configuration||
+    obj.configuration.response_configuration_group_id!=="siri.multimodal.noRTI")return null;
+ return {sid:sid,prev:obj.previous_choice_id};
+}
+function verifiedHistory(prev,sid){
+ if(!validId(prev)||!validId(sid))return null;
+ var raw=storeRead("AIES_CTX_"+prev),v=null,now=Date.now();
+ if(typeof raw!=="string"||raw.length>36000)return null;
+ try{v=JSON.parse(raw);}catch(e){return null;}
+ if(!v||v.v!==1||v.sid!==sid||v.exp<=now||
+    v.exp>now+C.followupContextTtlMs||!Array.isArray(v.messages)||
+    !v.messages.length||v.messages.length>6||v.messages.length%2!==0)return null;
+ var size=0;
+ for(var i=0;i<v.messages.length;i++){
+  var msg=v.messages[i],role=i%2===0?"user":"assistant";
+  if(!msg||msg.role!==role||typeof msg.content!=="string"||
+     !msg.content.length||msg.content.length>C.maxPrompt)return null;
+  size+=msg.content.length;
+ }
+ return size<=30000?v.messages:null;
+}
+function saveVerifiedHistory(rewritten,prompt,answer,previous){
+ if(typeof rewritten!=="string"||typeof prompt!=="string"||
+    typeof answer!=="string"||prompt.length>C.maxPrompt||
+    answer.length>C.maxAnswer)return false;
+ var frames=rewritten.split("\n\n"),sid="",choiceId="";
+ for(var i=0;i<frames.length;i++){
+  var lines=frames[i].split("\n"),name="",json=null;
+  for(var j=0;j<lines.length;j++)if(lines[j].indexOf("event: ")===0)
+   name=lines[j].slice(7);
+  if(name!==E.session&&name!==E.created&&name!==E.choice)continue;
+  for(var k=0;k<lines.length;k++)if(lines[k].indexOf("data: ")===0){
+   try{json=JSON.parse(lines[k].slice(6));}catch(e){}
+  }
+  var p=json&&json[name];
+  if(!p)continue;
+  if(name===E.session&&validId(p.id))sid=p.id;
+  if(name===E.created&&validId(p.session_id))sid=p.session_id;
+  if(name===E.choice&&p.choice&&validId(p.choice.id))choiceId=p.choice.id;
+ }
+ if(!validId(sid)||!validId(choiceId))return false;
+ var msgs=Array.isArray(previous)?previous.slice(-4):[];
+ msgs.push({role:"user",content:prompt},{role:"assistant",content:answer});
+ var packed=safeJson({v:1,sid:sid,exp:Date.now()+C.followupContextTtlMs,messages:msgs});
+ if(packed.length>32000)return false;
+ return storeWrite("AIES_CTX_"+choiceId,packed);
+}
 function randomToken(){
  return "aies_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,14)+"_"+Math.random().toString(36).slice(2,14);
 }
