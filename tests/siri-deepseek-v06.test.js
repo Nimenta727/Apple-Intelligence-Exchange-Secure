@@ -7,6 +7,7 @@ const path=require("node:path");
 const Sse=require("./fixtures/siri-sse");
 const script=fs.readFileSync(path.join(__dirname,"../scripts/aies_siri_deepseek_v06.js"),"utf8");
 const moduleText=fs.readFileSync(path.join(__dirname,"../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");
+const localModuleText=fs.readFileSync(path.join(__dirname,"../shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule"),"utf8");
 const localProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_group_probe_ONCE.js"),"utf8");
 const localStop=fs.readFileSync(path.join(__dirname,"../scripts/siri_group_probe_STOP_ONCE.js"),"utf8");
 const schemaProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_schema_probe_ONCE.js"),"utf8");
@@ -42,6 +43,20 @@ test("single install module exposes both HTTP hooks",()=>{
  assert.match(moduleText,/requires-body=true/);
  assert.match(moduleText,/type=http-response/);
  assert.ok(!/DOMAIN,prod-yabuli\.qianwen\.com,DIRECT/.test(moduleText));
+});
+test("offline Shadowrocket fallback has identical four hooks but no remote runtime downloads",()=>{
+ const remote=moduleText.split("\n").filter(x=>x.startsWith("AIES60 "));
+ const local=localModuleText.split("\n").filter(x=>x.startsWith("AIES60 "));
+ assert.equal(remote.length,4);
+ assert.equal(local.length,4);
+ assert.ok(local.every(x=>x.endsWith(",script-path=aies_siri_deepseek_v06.js")));
+ assert.ok(!localModuleText.includes("script-path=https://"));
+ assert.ok(localModuleText.includes("7a698fbaadeb37431d9bd1d43df359292ee78ba0"));
+ for(let i=0;i<remote.length;i++){
+  assert.equal(remote[i].slice(0,remote[i].indexOf(",script-path=")),
+   local[i].slice(0,local[i].indexOf(",script-path=")));
+ }
+ assert.ok(localModuleText.includes("[MITM]"));
 });
 test("complete dual-hook mock returns only DeepSeek answer and preserves source marker",()=>{
  const e=env(),a=e.invoke(e.request);
