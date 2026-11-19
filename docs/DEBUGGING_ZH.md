@@ -101,3 +101,9 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 | `ROLE_UNSUPPORTED` / `ITEM_TYPE_UNSUPPORTED` | 角色或消息类型不是严格允许的文本值 |
 
 复测：只刷新 60 模块（两个 Hook SHA 应以 `bc726e60` 开头），直接问 Siri 一次，不需要重跑组名探针；只反馈 `[AIES_V06] NORTI_SHAPE_*`、`REQUEST_DIAG_*` 和 `ERROR_*` 行。**即使新的 INPUT_UNSUPPORTED 消失，也必须继续验证原始 SSE 与 DeepSeek，不能宣称成功。**
+
+## 2026-11-19 11:14：进一步确定 noRTI 的两处结构差异
+
+真实 PacketTunnel 只包含固定诊断码，观察到 `NORTI_SHAPE_ROOT_FIELDS`、`NORTI_SHAPE_ITEM_WRAPPER_FIELDS`、`REQUEST_DIAG_INPUT_UNSUPPORTED`、`ERROR_UNSUPPORTED_SIRI_REQUEST`。这些分类**不能告诉我们需要支持的具体键名，也不能证明所有额外字段都安全**。
+
+已添加严格本地、需要用户主动手动启用的 [JSON 结构键名/类型探针](SIRI_SCHEMA_PROBE_ZH.md)：**先刷新 60 模块，下载新的** `siri_schema_probe_ONCE.js` 到本机，运行一次开启 600 秒、问 Siri 一次、再运行一次本机查看结果。普通主日志只会打印固定的 `NORTI_SCHEMA_CAPTURED_LOCAL`，不会打印字段名、字段值或正文；字段名也会进行疑似敏感内容筛查。不得上传完整抓包，不要盲目放宽或跳过媒体校验。
