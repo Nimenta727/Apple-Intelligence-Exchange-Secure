@@ -58,3 +58,7 @@ npm run docs:check
 - 如果脚本未运行就会直接返回千问，必须在文档中明确此系统级限制。
 
 参考 [架构](ARCHITECTURE_CURRENT_ZH.md)、[调试](DEBUGGING_ZH.md)、[安全](SECURITY_CURRENT_ZH.md)。
+
+## 61 临时 Qwen 被动诊断模块的维护约束
+
+该模块必须与原有 60 Siri→DeepSeek 改写模块互斥，在设备操作指南中要求先验证不插入脚本的 Qwen 原生基线；不得在同一请求上并行安装两个模块。61 的 Request/Response 钩子始终 `$done({})`，不能添加 DeepSeek HTTP 调用、Header 注入、错误状态注入、原始问题/答案持久化或未知 SSE 的直接白名单放行。模块 URL 必须固定到与被审查运行脚本一致的不可变 SHA，新增测试检查单次/时效、信息脱敏、WritingTools 跳过与响应只读。出错回滚应停用 61、恢复用户配置，不能以原生 Qwen 回复证明 DeepSeek 改写版已成功。
