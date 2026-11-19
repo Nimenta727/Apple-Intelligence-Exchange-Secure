@@ -50,6 +50,7 @@ const activeNames=[
  "scripts/ab_deepseek_trace_ONCE.js","scripts/ab_deepseek_trace_STOP_ONCE.js",
  "scripts/ab_native_trace_ONCE.js","scripts/ab_native_trace_STOP_ONCE.js",
  "scripts/writing_schema_probe_ONCE.js","scripts/writing_schema_probe_STOP_ONCE.js",
+ "scripts/siri_followup_schema_probe_ONCE.js","scripts/siri_followup_schema_probe_STOP_ONCE.js",
  "shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule",
  "tests/siri-deepseek-v06.test.js","tests/qwen-passive-diag.test.js","tests/fixtures/siri-sse.js"
 ];
@@ -64,7 +65,7 @@ const expectedModules=["shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadow
 if(modules.length!==2||expectedModules.some(x=>modules.indexOf(x)<0))
  fail("expected one production module and one opt-in passive diagnostic module, got "+modules.join(","));
 const scripts=all.filter(x=>relative(x).startsWith("scripts/")&&x.endsWith(".js")).map(relative);
-if(scripts.length!==18)fail("expected production runtime, passive runtime, two Key scripts and fourteen manual diagnostic helpers: "+scripts.join(","));
+if(scripts.length!==20)fail("expected production runtime, passive runtime, two Key scripts and sixteen manual diagnostic helpers: "+scripts.join(","));
 const tests=all.filter(x=>relative(x).startsWith("tests/")&&x.endsWith(".test.js")).map(relative);
 if(tests.length!==2||!tests.includes("tests/siri-deepseek-v06.test.js")||!tests.includes("tests/qwen-passive-diag.test.js"))fail("unexpected unit tests present: "+tests.join(","));
 const moduleText=fs.readFileSync(path.join(root,"shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");

@@ -357,6 +357,37 @@ function writingShapeProbe(){
   fixed(res?"WRITING_RESPONSE_SCHEMA_CAPTURED_LOCAL":"WRITING_REQUEST_SCHEMA_CAPTURED_LOCAL");
 }
 
+// Independently armed, structure-only Siri *session follow-up* observer.
+// Request and response are separate observations, NEVER presumed same txn.
+// No user text, answers, URLs, session IDs, headers or model credentials saved.
+// The 60 production guard remains unchanged until device schema is confirmed.
+var FOLLOWUP_STATE="AIES_SIRI_FOLLOWUP_SCHEMA_V1",FOLLOWUP_WINDOW=600000;
+function followupShapeProbe(){
+ if(!req||!abNativeTarget()||isTarget()||!uaSiri())return;
+ if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST")return;
+ var raw=store&&store.read?store.read(FOLLOWUP_STATE):null,st=null,now=Date.now();
+ try{st=raw&&JSON.parse(raw);}catch(e){return;}
+ if(!st||st.v!==1||st.phase!=="armed"||!Array.isArray(st.records)||
+    typeof st.createdAt!=="number"||typeof st.expiresAt!=="number"||
+    st.createdAt>now||st.expiresAt<=now||st.expiresAt>now+FOLLOWUP_WINDOW||
+    st.records.length>=8)return;
+ var rec={tMs:Math.max(0,now-st.createdAt),
+  stage:res?"FOLLOWUP_RESPONSE":"FOLLOWUP_REQUEST",route:"SESSION_FOLLOWUP"};
+ if(res){
+  var summary=responseSummary();
+  rec.shape={status:summary.status,bodyStatus:summary.bodyStatus,
+   format:summary.format||"UNAVAILABLE",lengthBand:summary.lengthBand||"UNAVAILABLE",
+   strict60Preflight:summary.strict60Preflight||"UNAVAILABLE",
+   orderFirst:summary.orderFirst||[],orderLast:summary.orderLast||[],
+   eventCounts:summary.eventCounts||[],jsonDataFrames:summary.jsonDataFrames||0,
+   unparsedFrames:summary.unparsedFrames||0,framing:summary.framing||{}};
+ }else rec.shape=requestSummary(); // field types only; no text values
+ st.records.push(rec);
+ var packed=JSON.stringify(st);
+ if(packed.length>45000)return;
+ if(store&&store.write&&store.write(packed,FOLLOWUP_STATE))
+  fixed(res?"FOLLOWUP_RESPONSE_SCHEMA_CAPTURED_LOCAL":"FOLLOWUP_REQUEST_SCHEMA_CAPTURED_LOCAL");
+}
 function main(){
  if(!isTarget()||!req||String(req.method||req.httpMethod||"").toUpperCase()!=="POST"||!uaSiri())return;
  var st=null,now=Date.now(),raw=read();
@@ -380,7 +411,7 @@ function main(){
  if(write(JSON.stringify(st)))fixed("RESPONSE_SSE_SCHEMA_CAPTURED_LOCAL");
  else fixed("STORE_FAILED");
 }
-try{try{writingShapeProbe();}catch(e){fixed("WRITING_SCHEMA_CAPTURE_FAILED");}try{abNativeCapture();}catch(e){fixed("AB_NATIVE_CAPTURE_FAILED");}main();}catch(e){fixed("DIAGNOSTIC_EXCEPTION");}finally{
+try{try{followupShapeProbe();}catch(e){fixed("FOLLOWUP_SCHEMA_CAPTURE_FAILED");}try{writingShapeProbe();}catch(e){fixed("WRITING_SCHEMA_CAPTURE_FAILED");}try{abNativeCapture();}catch(e){fixed("AB_NATIVE_CAPTURE_FAILED");}main();}catch(e){fixed("DIAGNOSTIC_EXCEPTION");}finally{
  // THE ONLY SCRIPT OUTCOME: preserve original Qwen request/response.
  if(typeof $done==="function")$done({});
 }

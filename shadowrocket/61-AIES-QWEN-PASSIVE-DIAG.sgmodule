@@ -1,18 +1,18 @@
 #!name=AIES 61 - Qwen Original PASSIVE Protocol Diagnostic (no rewrite)
-#!desc=Passive Siri structure capture; manual-only WritingTools structure capture and controlled Siri A/B. Always pass through. Disable AIES 60/old REJECT first. Always passes traffic unchanged. Manual 600s opt-in required.
+#!desc=Passive Siri structure capture; manual-only WritingTools/followup structure capture and controlled Siri A/B. Always pass through. Disable AIES 60/old REJECT first. Always passes traffic unchanged. Manual 600s opt-in required.
 #!system=ios
 
 # ISOLATED diagnostic mode; never run together with AIES 60 or 00 REJECT.
 # Siri probe keeps existing behavior. WritingTools shape capture requires separate manual 600s opt-in.
-# WritingTools capture never records selected text or answer text; only group/field types/SSE events.
+# WritingTools and Siri followup shape probes never record prompt/answer text; only bounded field types/SSE events.
 # Does NOT route traffic, call DeepSeek, inject headers, change body/status or block Qwen.
 # Requires trusted local Shadowrocket MITM for target host; disable afterward.
 [MITM]
 hostname = %APPEND% prod-yabuli.qianwen.com
 
 [Script]
-AIES61 Passive Request = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/955fe4f7cec2471042469cdb7de740015db850bf/scripts/aies_qwen_passive_diag.js
-AIES61 Passive Response = type=http-response,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=921600,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/955fe4f7cec2471042469cdb7de740015db850bf/scripts/aies_qwen_passive_diag.js
+AIES61 Passive Request = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/506e51ad1ad549722242611f174b527cc12c4d21/scripts/aies_qwen_passive_diag.js
+AIES61 Passive Response = type=http-response,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=921600,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/506e51ad1ad549722242611f174b527cc12c4d21/scripts/aies_qwen_passive_diag.js
 # A/B capture only; unmodified pass-through even when not armed.
-AIES61 Passive Followup Request = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/955fe4f7cec2471042469cdb7de740015db850bf/scripts/aies_qwen_passive_diag.js
-AIES61 Passive Followup Response = type=http-response,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?.*)?$,requires-body=true,max-size=921600,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/955fe4f7cec2471042469cdb7de740015db850bf/scripts/aies_qwen_passive_diag.js
+AIES61 Passive Followup Request = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/506e51ad1ad549722242611f174b527cc12c4d21/scripts/aies_qwen_passive_diag.js
+AIES61 Passive Followup Response = type=http-response,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?.*)?$,requires-body=true,max-size=921600,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/506e51ad1ad549722242611f174b527cc12c4d21/scripts/aies_qwen_passive_diag.js
