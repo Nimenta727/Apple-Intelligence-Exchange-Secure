@@ -998,10 +998,38 @@ test("opaque Qwen choices and continuation URLs never introduce a foreign endpoi
  assert.ok(!r.returned[0].body.includes("PRIVATE_EXFILTRATION"));
 });
 
+test("legacy Siri.tqa cannot promote tool/assistant content into DeepSeek user prompt",()=>{
+ for(const item of [
+  {role:"tool",content:"PRIVATE_TOOL_OUTPUT"},
+  {role:"assistant",content:"PRIVATE_ASSISTANT_TEXT"},
+  {type:"function_call",content:"PRIVATE_FUNCTION"},
+  {type:"image",content:"PRIVATE_IMAGE"}
+ ]){
+  const e=env();
+  const req={...e.request,body:JSON.stringify({
+   configuration:{response_configuration_group_id:"siri.tqa"},input:[item]})};
+  const result=e.invoke(req);
+  assert.equal(result.returned[0].response.status,502);
+  assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_INPUT_UNSUPPORTED"));
+  assert.equal(e.requests.length,0);
+  assert.ok(e.logs.every(x=>!x.includes("PRIVATE_")));
+ }
+});
+test("DeepSeek Flash is requested in documented disabled-thinking mode for short voice answers",()=>{
+ const e=env(),a=e.invoke(e.request);
+ e.invoke({...e.request,headers:a.returned[0].headers},{status:200,body:fixture});
+ assert.equal(e.requests.length,1);
+ const sent=JSON.parse(e.requests[0].body);
+ assert.equal(sent.model,"deepseek-flash");
+ assert.equal(sent.thinking.type,"disabled");
+ assert.equal(sent.stream,false);
+ assert.equal(sent.max_tokens,500);
+});
+
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/b0994a5b30b69ef8d67dd96a2f6c36577f81c946/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/087211c1858eb77d90fd6583de46a2b4f6bcb77a/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
