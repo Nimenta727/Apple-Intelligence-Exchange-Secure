@@ -2,7 +2,7 @@
 
 > 版本：**v0.6.0-beta**。仅供受控真机验证，尚未证明 Siri 原生回答和 DeepSeek API 的完整兼容性。**原始问题可能发送千问与 DeepSeek**；不保证脚本未运行时的答案来源。
 
-## 当前唯一模块
+## DeepSeek 改写的当前 60 模块（与 61 被动诊断互斥）
 
 - [Shadowrocket 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)
 - [实际运行的脚本](../scripts/aies_siri_deepseek_v06.js)
@@ -75,3 +75,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 ## 来源标签与失败阶段诊断（2026-11-19）
 
 本版本加入仅在 DeepSeek 验证成功时生成的正文前缀 `【DeepSeek · AIES】`，及响应阶段缺失关联标记/存储关联/请求正文恢复情况的**固定码**。更新设备上已经安装的 60 模块，让两条 HTTP Hook 都引用 `187d755bf0f76032df162f4a9f25855b4f2a594f`；本次不需要重装本地探针、API Key 或 CA。问一次非隐私问题后核对 Siri **实际显示的正文**与 `[AIES_V06]` 日志。Qwen 的系统品牌卡片可能保持不变；若只出现卡片但没有 DeepSeek 前缀，来源仍无法确认。不要上传完整 PacketTunnel 或凭据。
+
+## 仅观测 Qwen 原生协议时的临时 61 模式
+
+若要正常使用 Qwen，同时分析上游 SSE 结构，请**先停用此文档的 60 改写模块**、旧同域 REJECT，再验证原生 Qwen 是否回答正常。随后启用独立 [61 Qwen 被动诊断模块](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) 并按[手动一次性诊断指南](QWEN_PASSIVE_DIAG_ZH.md)操作。**不要同时启用 60 和 61**。61 只返回 `$done({})`，不调用 DeepSeek，不更改请求或响应正文、Headers、Status；但 MITM/响应缓冲本身仍需真机验证。完成后关闭 61 再恢复原配置。
