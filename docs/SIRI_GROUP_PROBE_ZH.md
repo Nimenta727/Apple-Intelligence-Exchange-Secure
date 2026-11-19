@@ -85,3 +85,6 @@
 ## 真机组名已确认后的下一步
 
 目前 iPad 已确认 `siri.multimodal.noRTI`；如遇 `NORTI_SHAPE_ROOT_FIELDS`、`NORTI_SHAPE_ITEM_WRAPPER_FIELDS`，**无需再重复本组名探针**，请使用**单独的**[Siri 结构字段探针](SIRI_SCHEMA_PROBE_ZH.md)。
+
+
+> **2026-11-19 已确认**：主要实际 Siri 组名为 `siri.multimodal.noRTI`。日常不需重复运行组名诊断，参见[请求协议归档](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)；未知组名仍应坚持先收集安全结构，不能一次性放开全部 multimodal。
