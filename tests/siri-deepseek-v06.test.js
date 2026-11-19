@@ -8,6 +8,7 @@ const Sse=require("./fixtures/siri-sse");
 const script=fs.readFileSync(path.join(__dirname,"../scripts/aies_siri_deepseek_v06.js"),"utf8");
 const moduleText=fs.readFileSync(path.join(__dirname,"../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");
 const localProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_group_probe_ONCE.js"),"utf8");
+const localStop=fs.readFileSync(path.join(__dirname,"../scripts/siri_group_probe_STOP_ONCE.js"),"utf8");
 const URL="https://prod-yabuli.qianwen.com/v1/sessions/responses";
 const fixture=Sse.candidateSse("QWEN_ORIGINAL_ANSWER_TEST","Sample","siri",{now:()=>1730000000000,id:()=>"beta-test"});
 const promptBody=JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:[{content:"Explain why the sky is blue"}]});
@@ -143,93 +144,166 @@ test("oversized body rejection is bounded and does not echo input",()=>{
 });
 
 
-function runLocalProbe(e){
+function runLocal(e,source=localProbe,storeOverride=null){
  const output=[],logs=[];
- const store={
+ const store=storeOverride||{
   read:k=>e.data[k]||null,
   write:(v,k)=>{e.data[k]=v;return true;}
  };
- vm.runInNewContext(localProbe,{$persistentStore:store,Date,
+ vm.runInNewContext(source,{$persistentStore:store,Date,
   console:{log:v=>logs.push(v)},$done:()=>output.push(true)},{timeout:1000});
  return {logs,output};
 }
-test("WritingTools is bypassed on request and response without model calls",()=>{
+function probeState(e){return JSON.parse(e.data.AIES_SIRI_GROUP_PROBE_V2_STATE);}
+function sirireq(e,group,ua="Siri (iPad - Version 27.3.0)",content="SAFE_QUESTION"){
+ const body=JSON.stringify({configuration:{response_configuration_group_id:group},input:[{content}]});
+ return e.invoke({...e.request,headers:{"User-Agent":ua,Authorization:"Bearer PRIVATE_SECRET"},body});
+}
+test("WritingTools bypasses both hooks without DeepSeek, even when diagnostic is armed",()=>{
  const e=env();
+ runLocal(e);
  const req={...e.request,headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)"}};
  const first=e.invoke(req);
  const second=e.invoke(req,{status:200,body:fixture});
- assert.equal(JSON.stringify(first.returned),JSON.stringify([{}]));
- assert.equal(JSON.stringify(second.returned),JSON.stringify([{}]));
+ assert.deepEqual(JSON.stringify(first.returned),JSON.stringify([{}]));
+ assert.deepEqual(JSON.stringify(second.returned),JSON.stringify([{}]));
+ assert.equal(probeState(e).writingToolsSeen,1);
+ assert.equal(probeState(e).siriSeen,0);
  assert.equal(e.requests.length,0);
- assert.ok(e.logs.every(x=>x==="[AIES_V06] WRITINGTOOLS_SKIPPED"));
+ assert.ok(e.logs.includes("[AIES_V06] WRITINGTOOLS_SKIPPED"));
 });
-test("unarmed unknown Siri group stays denied and is never stored",()=>{
- const e=env(),id="siri.actual_variant";
- const body=JSON.stringify({configuration:{response_configuration_group_id:id},input:[{content:"NONPRIVATE_QUESTION"}]});
- const result=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body});
- assert.equal(result.returned[0].response.status,502);
- assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,undefined);
- assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_GROUP_UNSUPPORTED"));
- assert.equal(e.requests.length,0);
- assert.ok(!e.logs.some(x=>x.includes(id)||x.includes("NONPRIVATE_QUESTION")));
-});
-test("manual probe arm, single Siri sample, deliberate local read, and clear",()=>{
+test("unarmed unknown Siri group fails closed and creates no v2 diagnostic state",()=>{
  const e=env();
- const armed=runLocalProbe(e);
- assert.ok(armed.logs.includes("[AIES_SIRI_GROUP_LOCAL] ARMED_180_SECONDS"));
- assert.ok(e.data.AIES_SIRI_GROUP_PROBE_ARM);
- const id="siri.sample_group";
- const body=JSON.stringify({configuration:{response_configuration_group_id:id},input:[{content:"VERY_PRIVATE_PROMPT"}]});
- const request={...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)",Authorization:"Bearer PRIVATE_AUTH"},body};
- const r=e.invoke(request);
+ const r=sirireq(e,"siri.unknown");
+ assert.equal(r.returned[0].response.status,502);
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_V2_STATE,undefined);
+ assert.equal(e.requests.length,0);
+ assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_GROUP_UNSUPPORTED"));
+});
+test("probe arms 600s and status checks never disarm it",()=>{
+ const e=env();
+ const first=runLocal(e);
+ assert.ok(first.logs.includes("[AIES_SIRI_GROUP_LOCAL] ARMED_600_SECONDS"));
+ assert.ok(first.logs.includes("[AIES_SIRI_GROUP_LOCAL] PERSISTENCE_ROUNDTRIP_OK"));
+ const before=e.data.AIES_SIRI_GROUP_PROBE_V2_STATE;
+ for(let i=0;i<3;i++){
+  const status=runLocal(e);
+  assert.ok(status.logs.some(v=>v.includes("ACTIVE_REMAINING_SECONDS=")));
+  assert.ok(status.logs.includes("[AIES_SIRI_GROUP_LOCAL] STILL_ARMED"));
+  assert.ok(status.logs.includes("[AIES_SIRI_GROUP_LOCAL] SIRI_REQUESTS_SEEN=0"));
+  assert.equal(e.data.AIES_SIRI_GROUP_PROBE_V2_STATE,before);
+ }
+});
+test("probe captures Siri group and discloses it only during explicit manual test, then clears",()=>{
+ const e=env();
+ runLocal(e);
+ const id="siri.real_group";
+ const r=sirireq(e,id,"Siri (iPad - Version 27.3.0)","VERY_PRIVATE_PROMPT");
  assert.equal(r.returned[0].response.status,502);
  assert.equal(e.requests.length,0);
  assert.ok(e.logs.includes("[AIES_V06] SIRI_GROUP_CAPTURED_LOCAL"));
  assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_GROUP_UNSUPPORTED"));
- assert.ok(!e.logs.some(x=>x.includes(id)||x.includes("VERY_PRIVATE_PROMPT")||x.includes("PRIVATE_AUTH")));
- assert.equal(e.data.AIES_SIRI_GROUP_PROBE_ARM,"");
- assert.equal(JSON.parse(e.data.AIES_SIRI_GROUP_PROBE_RESULT).id,id);
- const consumed=runLocalProbe(e);
- assert.deepEqual(consumed.logs,["[AIES_SIRI_GROUP_LOCAL] GROUP_ID="+id]);
- assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
- assert.equal(e.data.AIES_SIRI_GROUP_PROBE_ARM,"");
+ assert.ok(e.logs.every(x=>!x.includes(id)&&!x.includes("VERY_PRIVATE_PROMPT")&&!x.includes("PRIVATE_SECRET")));
+ assert.equal(probeState(e).phase,"captured");
+ assert.equal(probeState(e).groupId,id);
+ const result=runLocal(e);
+ assert.ok(result.logs.includes("[AIES_SIRI_GROUP_LOCAL] GROUP_ID="+id));
+ assert.ok(result.logs.includes("[AIES_SIRI_GROUP_LOCAL] SIRI_REQUESTS_SEEN=1"));
+ assert.ok(result.logs.includes("[AIES_SIRI_GROUP_LOCAL] LAST_STAGE=GROUP_CAPTURED"));
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_V2_STATE,"");
+ // Additional manual run starts a new session; no accidental empty-state cancellation.
+ assert.ok(runLocal(e).logs.includes("[AIES_SIRI_GROUP_LOCAL] ARMED_600_SECONDS"));
 });
-test("armed probe never captures WritingTools or suspicious identifiers",()=>{
+test("one-shot capture persists until manual inspection and is never overwritten",()=>{
  const e=env();
- runLocalProbe(e);
- const body=JSON.stringify({configuration:{response_configuration_group_id:"writingtools.generic"},input:[{content:"PRIVATE"}]});
- e.invoke({...e.request,headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)"},body});
- assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
- assert.ok(e.data.AIES_SIRI_GROUP_PROBE_ARM);
- const badId="PRIVATEACCESS"+("A".repeat(50));
- const siriBody=JSON.stringify({configuration:{response_configuration_group_id:badId},input:[{content:"SAFE_TEST"}]});
- e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body:siriBody});
- assert.equal(e.data.AIES_SIRI_GROUP_PROBE_ARM,"");
- assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
+ runLocal(e);
+ sirireq(e,"siri.first");
+ const first=e.data.AIES_SIRI_GROUP_PROBE_V2_STATE;
+ sirireq(e,"siri.second");
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_V2_STATE,first);
+ assert.ok(runLocal(e).logs.includes("[AIES_SIRI_GROUP_LOCAL] GROUP_ID=siri.first"));
+});
+test("unexpected clients do not capture identifiers, but are counted without logging headers",()=>{
+ const e=env();
+ runLocal(e);
+ const r=sirireq(e,"siri.actual","OtherClient (iPad - Version 27.3.0)");
+ assert.equal(r.returned[0].response.status,502);
+ assert.equal(probeState(e).phase,"armed");
+ assert.equal(probeState(e).otherClientSeen,1);
+ assert.equal(probeState(e).siriSeen,0);
+ assert.equal(probeState(e).groupId,undefined);
+ assert.ok(e.logs.includes("[AIES_V06] SIRI_PROBE_OTHER_CLIENT_SEEN"));
+ assert.ok(e.logs.every(x=>!x.includes("OtherClient")&&!x.includes("PRIVATE_SECRET")));
+});
+test("unsafe group identifiers are not stored; safer later Siri group can still be captured",()=>{
+ const e=env();
+ runLocal(e);
+ const unsafe="PRIVATEACCESS"+("A".repeat(50));
+ sirireq(e,unsafe);
+ assert.equal(probeState(e).phase,"armed");
+ assert.equal(probeState(e).groupId,undefined);
+ assert.equal(probeState(e).lastCode,"GROUP_ID_UNSAFE");
  assert.ok(e.logs.includes("[AIES_V06] SIRI_GROUP_PROBE_UNSAFE_ID"));
- assert.ok(!e.logs.some(x=>x.includes(badId)));
- assert.deepEqual(runLocalProbe(e).logs,["[AIES_SIRI_GROUP_LOCAL] ARMED_180_SECONDS"]);
+ const status=runLocal(e);
+ assert.ok(status.logs.includes("[AIES_SIRI_GROUP_LOCAL] STILL_ARMED"));
+ assert.ok(status.logs.includes("[AIES_SIRI_GROUP_LOCAL] LAST_STAGE=GROUP_ID_UNSAFE"));
+ sirireq(e,"siri.safe_id");
+ assert.equal(probeState(e).phase,"captured");
+ assert.ok(!e.logs.some(x=>x.includes(unsafe)));
 });
-test("response hook cannot consume local probe opt-in",()=>{
+test("Siri parse failure stages are reported without storing request text",()=>{
  const e=env();
- runLocalProbe(e);
+ runLocal(e);
+ const req={...e.request,body:"PRIVATE_INVALID_JSON",headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"}};
+ const a=e.invoke(req);
+ assert.equal(a.returned[0].response.status,502);
+ assert.equal(probeState(e).lastCode,"JSON_INVALID");
+ assert.equal(probeState(e).siriSeen,1);
+ const status=runLocal(e);
+ assert.ok(status.logs.includes("[AIES_SIRI_GROUP_LOCAL] LAST_STAGE=JSON_INVALID"));
+ assert.ok(status.logs.includes("[AIES_SIRI_GROUP_LOCAL] STILL_ARMED"));
+ assert.ok(status.logs.every(x=>!x.includes("PRIVATE_INVALID_JSON")));
+});
+test("response hook cannot consume opt-in or update counters",()=>{
+ const e=env();
+ runLocal(e);
  const body=JSON.stringify({configuration:{response_configuration_group_id:"siri.unrecognized"},input:[{content:"SAFE"}]});
- const result=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body},{status:200,body:fixture});
- assert.equal(result.returned[0].status,502);
- assert.ok(e.data.AIES_SIRI_GROUP_PROBE_ARM);
- assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
+ const res=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body},{status:200,body:fixture});
+ assert.equal(res.returned[0].status,502);
+ assert.equal(probeState(e).siriSeen,0);
+ assert.equal(probeState(e).phase,"armed");
 });
-
-test("expired and malformed opt-in state never stores Siri group",()=>{
+test("expired status is explicit and cleanup never silently re-arms",()=>{
  const e=env();
- for(const value of ['not-json',JSON.stringify({expiresAt:Date.now()-1000}),JSON.stringify({expiresAt:Date.now()+900000})]){
-  e.data.AIES_SIRI_GROUP_PROBE_ARM=value;
-  e.data.AIES_SIRI_GROUP_PROBE_RESULT="";
-  const body=JSON.stringify({configuration:{response_configuration_group_id:"siri.unrecognized"},input:[{content:"SAFE"}]});
-  e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body});
-  assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
- }
- assert.equal(e.requests.length,0);
+ runLocal(e);
+ const st=probeState(e);
+ st.expiresAt=Date.now()-1;
+ st.siriSeen=2;
+ st.lastCode="GROUP_UNSUPPORTED";
+ e.data.AIES_SIRI_GROUP_PROBE_V2_STATE=JSON.stringify(st);
+ const out=runLocal(e);
+ assert.ok(out.logs.includes("[AIES_SIRI_GROUP_LOCAL] INVALID_OR_EXPIRED_STATE_CLEARED")||out.logs.includes("[AIES_SIRI_GROUP_LOCAL] EXPIRED_CLEARED"));
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_V2_STATE,"");
+ assert.ok(runLocal(e).logs.includes("[AIES_SIRI_GROUP_LOCAL] ARMED_600_SECONDS"));
+});
+test("manual STOP clears probe, legacy keys, and never touches DeepSeek Key",()=>{
+ const e=env();
+ runLocal(e);
+ e.data.AIES_SIRI_GROUP_PROBE_ARM="legacy";
+ e.data.AIES_SIRI_GROUP_PROBE_RESULT="old_group_string";
+ const result=runLocal(e,localStop);
+ assert.ok(result.logs.includes("[AIES_SIRI_GROUP_LOCAL] PROBE_STOPPED_AND_CLEARED"));
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_V2_STATE,"");
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_ARM,"");
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
+ assert.equal(e.data.SAIRS_DEEPSEEK_API_KEY,KEY);
+ assert.ok(runLocal(e).logs.includes("[AIES_SIRI_GROUP_LOCAL] ARMED_600_SECONDS"));
+});
+test("local helper detects write failure instead of claiming it is armed",()=>{
+ const e=env();
+ const noWrite={read:()=>null,write:()=>false};
+ assert.ok(runLocal(e,localProbe,noWrite).logs.includes("[AIES_SIRI_GROUP_LOCAL] PERSISTENCE_ROUNDTRIP_FAILED"));
+ assert.ok(runLocal(e,localStop,noWrite).logs.includes("[AIES_SIRI_GROUP_LOCAL] PROBE_STOP_FAILED"));
 });
 
 test("out-of-scope URL is untouched",()=>{
