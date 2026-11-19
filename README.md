@@ -25,6 +25,8 @@
 
 ## Qwen 原生通行与被动 SSE 诊断（临时模式）
 
+**13:50 真机新证据：** Qwen 原生 SSE 13 个完整 JSON 数据事件、两次文本 delta、事件名和事件顺序符合当前预期；但 60 的合成 SSE 内部结构与真机 Qwen 结构存在差异。61 最新版新增不记录 ID 值的 `strict60Preflight` 分类，进一步区分分帧、事件顺序、ID 格式和会话关联是否匹配。该诊断不修改原生 Qwen 回答，详见[61 指南](docs/QWEN_PASSIVE_DIAG_ZH.md)。
+
 **如果想先恢复正常 Siri→Qwen 回答并研究原始协议**：请先停用 DeepSeek 改写的 60 模块、旧 REJECT 或同域冲突规则，再验证一次**不启用诊断的原生 Qwen 基线**。之后可选独立的 [61 Qwen 被动诊断模块](shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule)；它只有 `$done({})` 的请求/响应钩子，不修改流量或调用 DeepSeek。手动开启 600 秒后，仅采集请求字段类型与 Qwen SSE 事件名称、顺序、结构和少量已白名单化的系统版本信息，不存储提问、回答、凭据。**60 与 61 不得同时启用**。完整流程：[Qwen 被动诊断使用说明](docs/QWEN_PASSIVE_DIAG_ZH.md)。
 
 ## 项目目标
