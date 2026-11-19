@@ -96,3 +96,7 @@ Siri 用户请求
 4. 单独验证合成 SSE 的 `choice.id`、`continue_url`、`object` 字段实际枚举是否被 Siri 严格要求；本次只掌握字段类型，不能对未公开枚举作必然保证。
 
 发布门槛见[验收回滚](VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)，历史原始依据见[调试时间线](DEBUG_HISTORY_2026-11-19_ZH.md)。
+
+## 新增 WritingTools 的双场景适配层（2026-11-19）
+
+主接口 `/v1/sessions/responses` 请求根据 UA 进入独立解析：Siri 按实测 `siri.multimodal.noRTI`/遗留 `siri.tqa`，WritingTools 仅接受 SAIR 逆向的 `compose_selectedAndAllText` 纯文本 user 消息。原主 SSE 预检、请求-响应 token 隔离、DeepSeek API 完成检查保持不变；区别只在模型的写作任务提示词与最后答案 JSON 的 `body/refinements` 或 Siri 的 `content/suggestions/summary`。关联存储保存 `scene` 并在响应钩子比较，不接受跨场景缓存；不会把 Qwen 的答案、引用、工具输出作为 DeepSeek 文本。后续其他写作模式必须先有真机 schema 类型采样，不能照搬 SAIR 的全局最近请求兜底或大范围 fallback。来源：[外部协议研究](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。

@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 2026-11-19 — 浏览器程序员社区 / Apple 请求结构调研，新增 WritingTools Compose Beta
+
+- 查阅 SAIR 源码与协议逆向、Apple WWDC25/WWDC26 官方资料、Eclectic Light Company 对 Apple Intelligence Report 的技术实测、Lumia AppleStorm 安全分析、V2EX/LINUX DO 社区帖子；**已区分私有千问协议一手逆向与仅讨论 UI/端云行为的资料**。详见 [跨站分析文档](docs/COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。
+- 60 移除对 WritingTools 的无条件跳过，新增**精确 `compose_selectedAndAllText` + `WritingTools` UA + user/text** 的严格实验分支；Siri 原有独立解析不变。
+- SSE 答案随场景分别构建 `{body,refinements}` 或 `{content,suggestions,summary}`，强制 `【DeepSeek · AIES】` 来源标记仅在有效模型回答后出现；按场景记录临时关联，防止跨 Siri / 写作工具串答。
+- 拒绝未验证组、工具/非文本/媒体和非法结构；**本机尚未实测 WritingTools 的完整 JSON / SSE，不能宣布全部系统写作工具已切换**。保持 Qwen session guard 和相关 P0 请求标记丢失问题不变。
+- [本次代码修改、判断、下一步计划](docs/routine/2026-11-19-AppleIntelligence-web-community-and-WritingTools-Compose.md)。
+
+
+
 ## 2026-11-19 17:12 — 复杂问题 text.annotations SSE 支持与 A/B 实验诊断
 
 - 17:04 本地 DeepSeek 采样三次主请求均未调用模型；其中两次 Qwen SSE 因新增的 `text.annotations[].added` 等严格事件约束被拒绝，一次因为跨 Hook 关联丢失；旧短问答 13 事件和新复杂 24/26 事件不是相同协议实例。

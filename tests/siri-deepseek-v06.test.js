@@ -514,7 +514,7 @@ test("noRTI unsupported nested content types produce only fixed diagnostics",()=
  }
 });
 
-test("noRTI is denied for non-Siri clients and WritingTools remains bypassed",()=>{
+test("noRTI is denied for non-Siri clients including WritingTools",()=>{
  const body=JSON.stringify({
   configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},
   input:[{content:"SAFE_NONPRIVATE"}]
@@ -529,11 +529,68 @@ test("noRTI is denied for non-Siri clients and WritingTools remains bypassed",()
  }
  const e=env();
  const req={...e.request,headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)"},body};
- assert.deepEqual(JSON.stringify(e.invoke(req).returned),JSON.stringify([{}]));
- assert.deepEqual(JSON.stringify(e.invoke(req,{status:200,body:fixture}).returned),JSON.stringify([{}]));
+ assert.equal(e.invoke(req).returned[0].response.status,502);
+ assert.equal(e.invoke(req,{status:200,body:fixture}).returned[0].status,502);
  assert.equal(e.requests.length,0);
- assert.ok(e.logs.every(x=>x==="[AIES_V06] WRITINGTOOLS_SKIPPED"));
+ assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_WRITING_GROUP_UNVERIFIED"));
 });
+const writingBody=JSON.stringify({
+ configuration:{response_configuration_group_id:"compose_selectedAndAllText"},
+ input:[{type:"message",message:{role:"user",content:[{type:"text",text:"请把这段短文改写得清晰自然。"}]}}],
+ client_tools:[],server_tools:[],response_format:{type:"json_schema"},stream:true
+});
+function writingReq(e,body=writingBody){
+ return {...e.request,headers:{"Content-Type":"application/json",
+  "User-Agent":"WritingTools (iPad - Version 27.3.0)"},body};
+}
+function completedWritingAnswer(sse){
+ const name="session.response.choices[].items[].message.content[].text.value.done";
+ const line=sse.split("\n").find(x=>x.startsWith("data: ")&&x.includes('"'+name+'"'));
+ return line?JSON.parse(JSON.parse(line.slice(6))[name].value):null;
+}
+test("exact SAIR WritingTools Compose group is rewritten as body/refinements, not Siri JSON",()=>{
+ const e=env(),req=writingReq(e),a=e.invoke(req);
+ assert.equal(a.returned.length,1);
+ assert.ok(a.returned[0].headers["X-AIES-Request-ID"].startsWith("aies_"));
+ const b=e.invoke({...req,headers:{...req.headers,...a.returned[0].headers}},
+  {status:200,headers:{"Content-Type":"text/event-stream"},body:fixture});
+ assert.equal(b.returned[0].status,200);
+ const out=completedWritingAnswer(b.returned[0].body);
+ assert.ok(out);
+ assert.ok(out.body.startsWith("【DeepSeek · AIES】\n"));
+ assert.ok(out.body.includes("DEEPSEEK_EXCLUSIVE_REPLY"));
+ assert.ok(Array.isArray(out.refinements)&&out.refinements.length===3);
+ assert.equal(Object.prototype.hasOwnProperty.call(out,"content"),false);
+ assert.equal(Object.prototype.hasOwnProperty.call(out,"suggestions"),false);
+ assert.equal(JSON.parse(e.requests[0].body).messages[1].content,"请把这段短文改写得清晰自然。");
+ assert.ok(!b.returned[0].body.includes("QWEN_ORIGINAL_ANSWER_TEST"));
+ assert.ok(e.logs.includes("[AIES_V06] WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY"));
+ assert.equal(e.data["AIES_R1_"+a.returned[0].headers["X-AIES-Request-ID"]],"");
+});
+test("WritingTools Compose rejects media, non-user roles and unverified groups before DeepSeek",()=>{
+ const all=[
+  {...JSON.parse(writingBody),input:[{type:"message",message:{role:"tool",content:[{type:"text",text:"PRIVATE_TOOL"}]}}]},
+  {...JSON.parse(writingBody),input:[{type:"message",message:{role:"user",content:[{type:"image",data:"PRIVATE_MEDIA"}]}}]},
+  {...JSON.parse(writingBody),configuration:{response_configuration_group_id:"compose_unverified"}},
+  {...JSON.parse(writingBody),input:[{type:"message",message:{role:"user",content:[{type:"text",text:"PRIVATE"}]}}],stream:false},
+  {...JSON.parse(writingBody),context:{private:"SECRET_HIDDEN"}}
+ ];
+ for(const payload of all){
+  const e=env(),v=e.invoke(writingReq(e,JSON.stringify(payload)));
+  assert.equal(v.returned[0].response.status,502);
+  assert.equal(e.requests.length,0);
+  assert.ok(e.logs.every(x=>!x.includes("PRIVATE")&&!x.includes("SECRET_HIDDEN")));
+ }
+});
+test("Siri and WritingTools correlation cannot use one another's temporary prompt",()=>{
+ const e=env(),wa=e.invoke(writingReq(e)),id=wa.returned[0].headers["X-AIES-Request-ID"];
+ const bad=e.invoke({...e.request,headers:{...e.request.headers,"X-AIES-Request-ID":id}},
+  {status:200,body:fixture});
+ assert.equal(bad.returned[0].status,502);
+ assert.equal(e.requests.length,0);
+ assert.ok(!JSON.stringify(bad.returned[0]).includes("请把这段"));
+});
+
 test("noRTI fail-closes unverified and multimodal request shapes without billing model",()=>{
  const group="siri.multimodal.noRTI";
  const configs=[
@@ -571,18 +628,19 @@ test("noRTI accepted group does not silently accept unknown neighboring groups",
  }
 });
 
-test("WritingTools bypasses both hooks without DeepSeek, even when diagnostic is armed",()=>{
+test("WritingTools unknown groups fail closed without DeepSeek, even when diagnostic is armed",()=>{
  const e=env();
  runLocal(e);
  const req={...e.request,headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)"}};
  const first=e.invoke(req);
  const second=e.invoke(req,{status:200,body:fixture});
- assert.deepEqual(JSON.stringify(first.returned),JSON.stringify([{}]));
- assert.deepEqual(JSON.stringify(second.returned),JSON.stringify([{}]));
+ assert.equal(first.returned[0].response.status,502);
+ assert.equal(second.returned[0].status,502);
  assert.equal(probeState(e).writingToolsSeen,1);
  assert.equal(probeState(e).siriSeen,0);
  assert.equal(e.requests.length,0);
- assert.ok(e.logs.includes("[AIES_V06] WRITINGTOOLS_SKIPPED"));
+ assert.ok(e.logs.includes("[AIES_V06] WRITINGTOOLS_COMPOSE_SCOPED"));
+ assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_WRITING_GROUP_UNVERIFIED"));
 });
 test("unarmed unknown Siri group fails closed and creates no v2 diagnostic state",()=>{
  const e=env();
@@ -1158,7 +1216,7 @@ test("DeepSeek Flash is requested in documented disabled-thinking mode for short
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,3);
- assert.ok(scripts.every(x=>x.includes("/454556947d1a9a9615f587b5a1b4847e3fb5308a/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/be915df98261d3bf2e5eb65fd4827efae760643b/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{

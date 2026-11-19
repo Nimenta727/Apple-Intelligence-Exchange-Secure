@@ -41,3 +41,7 @@
 ## 16:15 A/B 真实故障分类基线
 
 最新 4 次主请求中 2 次已提交 DeepSeek SSE、1 次关联丢失、1 次 Qwen SSE 预检失败；另有 4 次会话级 SSE 被 60 Guard 主动阻断。仅凭现有日志不能宣称模型有新的输出格式，也不能宣称 Guard 不影响复杂回答。增加 [A/B 同题实验](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)来收集原生 Qwen 和 DeepSeek 的有限客户端可见答案、HTTP/SSE 结构及 `finish_reason` 等。必须看到真正的 Siri UI 结果才能修改“已验收”的状态。
+
+## WritingTools Compose Beta 新增验收门槛
+
+新增 `WritingTools` 适配的离线通过**不能**证明系统 Apple 写作工具端到端已经可用。发布前要求：(1) 本机实测 `response_configuration_group_id` 与 `input` 类型符合 SAIR 假设；(2) 原生 WritingTools Qwen SSE 符合受支持的 60 预检；(3) DeepSeek API 真实正常完成；(4) Apple 写作工具编辑界面实际显示 `body/refinements` 内容；(5) Siri 原有文字问答和复杂注释 SSE 正反回归无破坏；(6) WritingTools UA 与 Siri UA 不可跨请求串答。更多见 [跨站证据分级](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。

@@ -1,12 +1,18 @@
 # Apple Intelligence Exchange Secure (AIES)
 
-**实验性 Shadowrocket Siri → DeepSeek 文本回答改写项目。**
+**实验性 Shadowrocket Siri + Apple 写作工具 → DeepSeek 文本回答改写项目。**
 
 > **v0.6.0-beta · 2026-11-19 真实协议已观测，至少一次可见 DeepSeek 标记已成功；复杂问答仍不稳定。**
 >
-> 60 模块可尝试解析 Siri 请求，调用 DeepSeek 并将 DeepSeek 文本转换成 Qwen 形式的 SSE。61 模块只用于原生 Qwen 协议观测。**两者必须互斥启用。** 本项目不是 Apple、Shadowrocket、Qwen 或 DeepSeek 官方产品，也不能保证系统层不会绕过改写直接显示 Qwen。
+> 60 模块支持已实测的 Siri 文本，以及根据 SAIR 公开逆向结构新增的**实验性 WritingTools `compose_selectedAndAllText` 文本创作分支**：分别生成 `content/suggestions/summary` 和 `body/refinements` 结构；WritingTools 仍**未获本机真实端到端验证**。61 模块只用于原生 Qwen 协议观测。**两者必须互斥启用。** 本项目不是 Apple、Shadowrocket、Qwen 或 DeepSeek 官方产品，也不能保证系统层不会绕过改写直接显示 Qwen。
 
 [English](README_EN.md) · [文档中心](docs/README.md) · [安装与回滚](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [真机验收](docs/VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)
+
+## WritingTools 新增说明与跨站协议来源
+
+用户设备已确认 `WritingTools` UA 访问千问主接口；此前代码无条件输出 `WRITINGTOOLS_SKIPPED`。新版 60 不再对**所有** WritingTools 一概跳过，而是只允许**精确**的 `compose_selectedAndAllText` 纯文本创作协议进入 DeepSeek，使用独立的 `body/refinements` SSE 答案 schema。其他校对、摘要、未知写作分组、媒体仍未支持，不应误以为所有 Apple Intelligence 功能均已更换模型。写作正文会包含强制 `【DeepSeek · AIES】` 标记，可能不适合直接粘贴到文稿；请求可能先到 Qwen，再把文本发至用户授权的 DeepSeek API。
+
+公开参考：[跨浏览器社区与 Apple 协议研究](docs/COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md) · [GitHub routine 修改和下一步](docs/routine/2026-11-19-AppleIntelligence-web-community-and-WritingTools-Compose.md)。
 
 ## 最新真实设备进展
 
