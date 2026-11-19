@@ -3,7 +3,9 @@
 #!system=ios
 
 # OFFLINE-LOCAL DEPLOYMENT: all four hooks reference one local Script file, not GitHub raw.
-# LOCAL file must be saved in Shadowrocket's Script folder, verified against commit 7a698fbaadeb37431d9bd1d43df359292ee78ba0.
+# Shadowrocket looks up local script-path in its cloud driver: check Files > iCloud Drive > Shadowrocket > Script > aies_siri_deepseek_v06.js.
+# A file visible only in On My iPad/Script Test may NOT be found by the module HTTP hooks.
+# LOCAL JS must match reviewed commit 7a698fbaadeb37431d9bd1d43df359292ee78ba0; iCloud file must be fully downloaded.
 # Do not turn on together with remote 60, diagnostic 61 or any historical 00 REJECT.
 # Local file resolution varies by Shadowrocket version: verify in actual device logs BEFORE any Siri trial.
 # Two main Siri/WritingTools hooks and two Siri session-followup request/response hooks.
