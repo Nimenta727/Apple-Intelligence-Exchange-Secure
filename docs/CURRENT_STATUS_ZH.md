@@ -44,3 +44,9 @@
 - [安装 60](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) / [被动 61 指南](QWEN_PASSIVE_DIAG_ZH.md)
 
 **补充边界**：无法证明 Shadowrocket 在所有连接阶段都把临时请求 Header 原样带入 Response Hook；这依赖真实设备而非 Node mock。若要继续验证来源和显示效果，使用少量不涉及个人信息的 Siri 测试即可；不需要重复向仓库提交 PacketTunnel、代理数据库或私密请求值。
+
+## 16:15 复杂问题仍不稳定：新增 A/B 可比性实验
+
+最新 `PacketTunnel-20261119161456.log` 共有 **2,987 行**，主接口四次请求中两次最终提交 DeepSeek SSE、一次关联标记丢失、一次上游 SSE 严格校验失败。四次会话级 Qwen SSE 被 60 新增 Guard 主动拦截。对应代理数据库有 175 条记录，其中四条主接口 Siri 记录、四条会话级 Siri 记录。**这提示轻量屏蔽会破坏部分复杂会话的后续流程，但不证明所有失败都只因 Guard。**
+
+新增[同题 A/B 实验](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)：(A) 60/61 全关闭基线，(A') 61 只读采集真实 Qwen 可见答案与 SSE，(B) 60 记录 DeepSeek 模型完成原因/用量/正文、合成 SSE 和失败阶段。所有数据只在用户手动授权的 600 秒窗口本机保存，官方密钥/原始请求/响应 Header 不采集。此功能与修复复杂问题是不同任务。
