@@ -7,7 +7,7 @@
 | 模式 | 模块 | Runtime 固定 SHA |
 |---|---|---|
 | **60 Siri / 写作工具 → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `be915df98261d3bf2e5eb65fd4827efae760643b` |
-| **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `9ea939df59a95b471b7034f5b1bf71a755d8bf88` |
+| **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `955fe4f7cec2471042469cdb7de740015db850bf` |
 
 **60 的 Shadowrocket 模块 Raw URL：**
 
@@ -71,7 +71,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 同题 A/B 实验（2026-11-19 16:15 后）
 
-为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `be915df98261d3bf2e5eb65fd4827efae760643b`；61 的四条原样放行规则均固定到 `9ea939df59a95b471b7034f5b1bf71a755d8bf88`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
+为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `be915df98261d3bf2e5eb65fd4827efae760643b`；61 的四条原样放行规则均固定到 `955fe4f7cec2471042469cdb7de740015db850bf`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
 
 ## 写作工具 Compose Beta（2026-11-19 浏览器协议研究后新增）
 
