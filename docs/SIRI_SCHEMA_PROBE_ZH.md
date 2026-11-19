@@ -57,4 +57,7 @@
 
 ## 已获取结构后的使用说明
 
+**2026-11-19 14:56 更新：** 当前请求和主要 SSE 字段已经通过真机采样核实，不需要为了常规 60 测试重复运行本探针。完整请求结构见[字段归档](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)；当前模块固定 SHA 以安装说明和仓库 60 文件为准。
+
+
 2026-11-19 11:54 已在 iPad 真机取得一次有效的结构摘要：根级为 `client_tools:array`、`response_format:object`、`server_tools:array`、`stream:boolean`；消息包装为 `type:string`；内部为 `content:array` 和 `role:string`。**无需再次运行本探针**，现在请刷新最新 60 模块，并只用非隐私问题观察下一阶段的固定错误码；本探针仍保留供其他版本的受控诊断。工具无法从字段类型推导字段值，因此最新代码没有无条件放行工具和媒体。
