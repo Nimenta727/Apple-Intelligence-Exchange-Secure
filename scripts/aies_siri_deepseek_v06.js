@@ -275,7 +275,7 @@ function captureQwenRequestBodyOnce(){
  // contribute only type/count descriptors, never their private contents.
  for(var i=0;i<ks.length;i++){
   var key=ks[i],val=parsed[key];
-  if(key==="client_tools"||key==="server_tools"||key==="response_format")
+  if(["configuration","input","input_hint","stream"].indexOf(key)<0)
    clean[key]={omitted:true,type:qwenBodyType(val),
     count:Array.isArray(val)?Math.min(val.length,99):undefined};
   else clean[key]=qwenBodyScrub(val,key,0,counts);
