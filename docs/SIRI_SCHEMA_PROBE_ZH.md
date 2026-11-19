@@ -12,7 +12,7 @@
 
 ## 操作步骤
 
-1. 首先备份配置，确保 Shadowrocket VPN、目标域名的 HTTPS MITM 和唯一 60 模块工作，其他同域冲突模块已停用。**刷新/重新导入 [唯一的 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)**，检查双钩子脚本路径都锁定到 `bf11ab5bdb6d039d0f68d528676eaf2f3986f891`。
+1. 首先备份配置，确保 Shadowrocket VPN、目标域名的 HTTPS MITM 和唯一 60 模块工作，其他同域冲突模块已停用。**刷新/重新导入 [唯一的 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)**，检查双钩子脚本路径都锁定到 `13dab6261fc5bf834e286b4e1878faca2941867e`。
 
    模块 URL：
 
