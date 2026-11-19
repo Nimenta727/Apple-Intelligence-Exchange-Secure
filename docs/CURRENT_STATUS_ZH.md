@@ -58,3 +58,10 @@
 ## WritingTools Compose Beta：外部技术社区逆向适配（2026-11-19）
 
 之前两份日志确定 UA 为 `WritingTools`，但旧 60 输出 `WRITINGTOOLS_SKIPPED`，不会进入模型。根据 SAIR 公开逆向的场景识别与 `{body,refinements}` 输出，新增**精确 `compose_selectedAndAllText`、纯文本、WritingTools UA** 分支；Siri 使用既有 `{content,suggestions,summary}`。两种客户端的本地请求关联增加 `scene`，严禁混用。**当前仅有外部逆向和离线测试条件，尚未通过此用户设备的 WritingTools 完整 JSON/SSE 或真实 UI 验收**。跨站社区分析详见 [研究表](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。
+
+## 22:05 PR #31 已合并：WritingTools 响应场景的受限恢复（仍是 Beta）
+
+- [PR #31](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/31) 已合并至 `main`（`61b6112f1f912f6f918b15f3d0912474bbee4574`），GitHub Actions [检查](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44539513032) **93/93 tests 通过**。
+- 60 的三条 Hook 统一固定到新增的 `975599163bafeb8c6ba8aa60624577e2a861d9f0` 脚本提交。若响应阶段的 `User-Agent` 被 Shadowrocket 省略，但请求阶段的有效同事务 `X-AIES-Request-ID` 仍存在，则恢复存储的 WritingTools/Siri 场景；明确冲突 UA、不同请求正文、过期或缺失关联仍失败关闭。
+- `WRITINGTOOLS_COMPOSE_SCOPED` 现在只在请求通过确切 Compose 纯文本 schema 校验后出现，且新增 `WRITINGTOOLS_SCENE_RECOVERED_FROM_TAG` 作为受限恢复的固定诊断码。
+- 本次修复**并未证明**响应阶段真的有 UA 丢失，也**不能解决 token 也丢失的情形**；真实 WritingTools Qwen 协议、SSE 和编辑器显示继续待真机验证。61 提供只读、手动开启、仅保存字段类型与事件名称的 WritingTools 探针。完整维护记录：[PR #31 代码和测试](routine/2026-11-19-22-00-WritingTools-response-UA-recovery.md)。
