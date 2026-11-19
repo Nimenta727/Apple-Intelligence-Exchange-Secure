@@ -103,6 +103,10 @@ function probeObserveRequest(){
  if(res)return;
  var state=readArmedProbe();
  if(!state)return;
+ // Never record group IDs from non-POST traffic, even with a Siri-looking UA.
+ if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){
+  log("SIRI_PROBE_NON_POST_IGNORED");return;
+ }
  if(!isSiriForProbe()){
   state.otherClientSeen=cappedCount(state.otherClientSeen);
   if(storeWrite(GROUP_PROBE_STATE,JSON.stringify(state)))
