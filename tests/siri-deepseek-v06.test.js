@@ -9,6 +9,8 @@ const script=fs.readFileSync(path.join(__dirname,"../scripts/aies_siri_deepseek_
 const moduleText=fs.readFileSync(path.join(__dirname,"../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");
 const localProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_group_probe_ONCE.js"),"utf8");
 const localStop=fs.readFileSync(path.join(__dirname,"../scripts/siri_group_probe_STOP_ONCE.js"),"utf8");
+const schemaProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_schema_probe_ONCE.js"),"utf8");
+const schemaStop=fs.readFileSync(path.join(__dirname,"../scripts/siri_schema_probe_STOP_ONCE.js"),"utf8");
 const URL="https://prod-yabuli.qianwen.com/v1/sessions/responses";
 const fixture=Sse.candidateSse("QWEN_ORIGINAL_ANSWER_TEST","Sample","siri",{now:()=>1730000000000,id:()=>"beta-test"});
 const promptBody=JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:[{content:"Explain why the sky is blue"}]});
@@ -435,6 +437,132 @@ test("local helper detects write failure instead of claiming it is armed",()=>{
  assert.ok(runLocal(e,localStop,noWrite).logs.includes("[AIES_SIRI_GROUP_LOCAL] PROBE_STOP_FAILED"));
 });
 
+function schemaState(e){return JSON.parse(e.data.AIES_NORTI_SCHEMA_PROBE_V1_STATE);}
+function schemaBadRequest(e,extras={}){
+ const req={...e.request,
+  headers:{"User-Agent":"Siri (iPad - Version 27.3.0)",Authorization:"Bearer PRIVATE_SECRET"},
+  body:JSON.stringify({
+   configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},
+   input:[{message:{content:"PRIVATE_SIRI_QUESTION",role:"user"},type:"message",index:1}],
+   metadata:{client:"PRIVATE_CLIENT_DETAIL"},stream:false,...extras
+  })};
+ return e.invoke(req);
+}
+test("schema probe manual arm is opt-in, repeat status does not cancel",()=>{
+ const e=env();
+ schemaBadRequest(e);
+ assert.equal(e.data.AIES_NORTI_SCHEMA_PROBE_V1_STATE,undefined);
+ assert.ok(!e.logs.includes("[AIES_V06] NORTI_SCHEMA_CAPTURED_LOCAL"));
+ const a=runLocal(e,schemaProbe);
+ assert.ok(a.logs.includes("[AIES_SIRI_SCHEMA_LOCAL] ARMED_600_SECONDS"));
+ assert.ok(a.logs.includes("[AIES_SIRI_SCHEMA_LOCAL] PERSISTENCE_ROUNDTRIP_OK"));
+ const saved=e.data.AIES_NORTI_SCHEMA_PROBE_V1_STATE;
+ for(let i=0;i<2;i++){
+  const b=runLocal(e,schemaProbe);
+  assert.ok(b.logs.includes("[AIES_SIRI_SCHEMA_LOCAL] STILL_ARMED"));
+  assert.ok(b.logs.some(x=>x.includes("ACTIVE_REMAINING_SECONDS=")));
+  assert.equal(saved,e.data.AIES_NORTI_SCHEMA_PROBE_V1_STATE);
+ }
+});
+test("opt-in schema probe stores only bounded field names and fixed types; manual read erases before display",()=>{
+ const e=env();
+ runLocal(e,schemaProbe);
+ const response=schemaBadRequest(e);
+ assert.equal(response.returned[0].response.status,502);
+ assert.equal(e.requests.length,0);
+ assert.ok(e.logs.includes("[AIES_V06] NORTI_SCHEMA_CAPTURED_LOCAL"));
+ const state=schemaState(e);
+ assert.equal(state.phase,"captured");
+ assert.equal(state.inputType,"array");
+ assert.ok(state.root.some(x=>x.name==="metadata"&&x.type==="object"));
+ assert.ok(state.root.some(x=>x.name==="stream"&&x.type==="boolean"));
+ assert.ok(state.wrapper.some(x=>x.name==="type"&&x.type==="string"));
+ assert.ok(state.wrapper.some(x=>x.name==="index"&&x.type==="number"));
+ assert.ok(state.message.some(x=>x.name==="content"&&x.type==="string"));
+ assert.ok(!JSON.stringify(state).includes("PRIVATE"));
+ assert.ok(!e.logs.some(x=>x.includes("PRIVATE")||x.includes("metadata")||x.includes("stream")));
+ const manual=runLocal(e,schemaProbe);
+ assert.ok(manual.logs.includes("[AIES_SIRI_SCHEMA_LOCAL] SCHEMA_CAPTURED"));
+ assert.ok(manual.logs.includes("[AIES_SIRI_SCHEMA_LOCAL] ROOT_EXTRA_FIELDS=metadata:object,stream:boolean"));
+ assert.ok(manual.logs.includes("[AIES_SIRI_SCHEMA_LOCAL] ITEM_WRAPPER_EXTRA_FIELDS=type:string,index:number"));
+ assert.ok(manual.logs.includes("[AIES_SIRI_SCHEMA_LOCAL] MESSAGE_FIELD_TYPES=content:string,role:string"));
+ assert.ok(manual.logs.includes("[AIES_SIRI_SCHEMA_LOCAL] SCHEMA_CLEARED"));
+ assert.ok(manual.logs.every(x=>!x.includes("PRIVATE")));
+ assert.equal(e.data.AIES_NORTI_SCHEMA_PROBE_V1_STATE,"");
+ assert.ok(runLocal(e,schemaProbe).logs.includes("[AIES_SIRI_SCHEMA_LOCAL] ARMED_600_SECONDS"));
+});
+test("schema key screening hides identifiers and secret-looking field names",()=>{
+ const e=env();
+ runLocal(e,schemaProbe);
+ schemaBadRequest(e,{
+  Authorization:"PRIVATE_ACCESS",
+  session_id:"PRIVATE_SESSION_VALUE",
+  ["A".repeat(26)]:"PRIVATE_DANGEROUS_VALUE"
+ });
+ const st=schemaState(e);
+ assert.ok(st.root.some(x=>x.name==="REDACTED"));
+ assert.ok(!JSON.stringify(st).includes("Authorization"));
+ assert.ok(!JSON.stringify(st).includes("session_id"));
+ assert.ok(!JSON.stringify(st).includes("PRIVATE"));
+ const logs=runLocal(e,schemaProbe).logs.join("\n");
+ assert.ok(logs.includes("REDACTED:string"));
+ assert.ok(!logs.includes("Authorization")&&!logs.includes("session_id")&&!logs.includes("PRIVATE"));
+});
+test("schema probe never records WritingTools, other clients, response hooks or non-POST",()=>{
+ const cases=[
+  {ua:"WritingTools (iPad - Version 27.3.0)",method:"POST"},
+  {ua:"OtherClient (iPad - Version 27.3.0)",method:"POST"},
+  {ua:"Siri (iPad - Version 27.3.0)",method:"GET"}
+ ];
+ for(const c of cases){
+  const e=env();
+  runLocal(e,schemaProbe);
+  const request={...e.request,method:c.method,headers:{"User-Agent":c.ua},
+   body:JSON.stringify({configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},
+    input:[{message:{content:"SAFE"},index:1}],metadata:{safe:false}})};
+  e.invoke(request);
+  assert.equal(schemaState(e).phase,"armed");
+  assert.ok(!e.logs.includes("[AIES_V06] NORTI_SCHEMA_CAPTURED_LOCAL"));
+  assert.equal(e.requests.length,0);
+ }
+ const e=env();
+ runLocal(e,schemaProbe);
+ e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},
+  body:JSON.stringify({configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},input:[{message:{content:"SAFE"},index:1}]})},
+  {status:200,body:fixture});
+ assert.equal(schemaState(e).phase,"armed");
+});
+test("captured schema metadata is single-shot and unaffected by later rejected requests",()=>{
+ const e=env();
+ runLocal(e,schemaProbe);
+ schemaBadRequest(e);
+ const first=e.data.AIES_NORTI_SCHEMA_PROBE_V1_STATE;
+ schemaBadRequest(e,{metadata:"PRIVATE_SECOND_QUESTION"});
+ assert.equal(e.data.AIES_NORTI_SCHEMA_PROBE_V1_STATE,first);
+});
+test("schema probe expires with explicit status and STOP does not touch model Key",()=>{
+ const e=env();
+ runLocal(e,schemaProbe);
+ const state=schemaState(e);
+ state.createdAt=Date.now()-1200000;
+ state.expiresAt=Date.now()-600000;
+ e.data.AIES_NORTI_SCHEMA_PROBE_V1_STATE=JSON.stringify(state);
+ const expired=runLocal(e,schemaProbe);
+ assert.ok(expired.logs.includes("[AIES_SIRI_SCHEMA_LOCAL] EXPIRED_CLEARED"));
+ assert.equal(e.data.AIES_NORTI_SCHEMA_PROBE_V1_STATE,"");
+ assert.ok(runLocal(e,schemaProbe).logs.includes("[AIES_SIRI_SCHEMA_LOCAL] ARMED_600_SECONDS"));
+ const stop=runLocal(e,schemaStop);
+ assert.ok(stop.logs.includes("[AIES_SIRI_SCHEMA_LOCAL] SCHEMA_PROBE_STOPPED_AND_CLEARED"));
+ assert.equal(e.data.AIES_NORTI_SCHEMA_PROBE_V1_STATE,"");
+ assert.equal(e.data.SAIRS_DEEPSEEK_API_KEY,KEY);
+});
+test("schema probe persistence errors never claim a successful arm or stop",()=>{
+ const e=env();
+ const bad={read:()=>null,write:()=>false};
+ assert.ok(runLocal(e,schemaProbe,bad).logs.includes("[AIES_SIRI_SCHEMA_LOCAL] PERSISTENCE_ROUNDTRIP_FAILED"));
+ assert.ok(runLocal(e,schemaStop,bad).logs.includes("[AIES_SIRI_SCHEMA_LOCAL] STOP_FAILED"));
+});
+
 test("out-of-scope URL is untouched",()=>{
  const e=env();
  const r=e.invoke({url:"https://unrelated.example/test",method:"GET",headers:{}},undefined);
@@ -478,7 +606,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/bc726e60bdbf810d1edf1dbb62d8e6dc79b69d2d/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/a9912de69bc4ced1b6ccdd3d1de7360d807335cf/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{

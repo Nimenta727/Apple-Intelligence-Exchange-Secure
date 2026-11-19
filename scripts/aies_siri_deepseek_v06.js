@@ -145,6 +145,70 @@ function probeObserveRequest(){
 // accidentally routing images, audio, sidecar attachments or hidden context to
 // the text-only model, support only explicit text envelopes for this group.
 // The real Siri JSON envelope remains unverified: reject unknown structures.
+// Separate one-shot, opt-in *schema metadata* diagnostic for the real noRTI
+// parser mismatch. NEVER store request values, text, IDs, headers or secrets.
+// Key names are bounded and secret-looking names are redacted. All captured
+// material remains in Shadowrocket's local persistent store until manual read.
+var NORTI_SCHEMA_PROBE_STATE="AIES_NORTI_SCHEMA_PROBE_V1_STATE";
+var NORTI_SCHEMA_PROBE_TTL=600000;
+function safeSchemaFieldName(k){
+ return typeof k==="string"&&k.length>0&&k.length<=40&&
+  /^[A-Za-z_][A-Za-z0-9_-]*$/.test(k)&&
+  !/[A-Za-z0-9]{22,}/.test(k)&&
+  !/(?:secret|token|auth|bearer|cookie|passwd|password|private|credential|api.?key|session|account|user|email|phone|address|location|uuid|identifier)/i.test(k);
+}
+function schemaTypeName(v){
+ if(v===null)return "null";
+ if(Array.isArray(v))return "array";
+ var t=typeof v;
+ return t==="string"||t==="number"||t==="boolean"||t==="object"?t:"other";
+}
+function schemaKeysOnly(obj,excluded){
+ if(!obj||typeof obj!=="object"||Array.isArray(obj))return [];
+ var out=[],keys=Object.keys(obj);
+ for(var i=0;i<keys.length;i++){
+  var k=keys[i];
+  if(excluded.indexOf(k)>=0)continue;
+  if(out.length>=8){out.push({name:"TRUNCATED",type:"other"});break;}
+  out.push({name:safeSchemaFieldName(k)?k:"REDACTED",type:schemaTypeName(obj[k])});
+ }
+ return out;
+}
+function captureNortiSchemaLocally(o){
+ // This executes ONLY during a rejected Siri POST request hook, and only
+ // after manual opt-in; never use response, WritingTools or other clients.
+ if(res||!isSiriForProbe()||
+    String(req.method||req.httpMethod||"").toUpperCase()!=="POST")return;
+ var state=null,raw=storeRead(NORTI_SCHEMA_PROBE_STATE),now=Date.now();
+ try{state=raw&&JSON.parse(raw);}catch(e){return;}
+ if(!state||state.v!==1||state.phase!=="armed"||
+    typeof state.createdAt!=="number"||typeof state.expiresAt!=="number"||
+    !isFinite(state.createdAt)||!isFinite(state.expiresAt)||
+    state.createdAt>now||state.expiresAt<=now||state.expiresAt>now+NORTI_SCHEMA_PROBE_TTL)return;
+ var item=null,message=null,items=Array.isArray(o.input)?o.input:[];
+ // Select first item with an extra message wrapper (if present), otherwise
+ // first object item. Do not enumerate content objects or any values.
+ for(var i=0;i<items.length&&i<12;i++){
+  var candidate=items[i];
+  if(!candidate||typeof candidate!=="object"||Array.isArray(candidate))continue;
+  if(!item)item=candidate;
+  if(Object.prototype.hasOwnProperty.call(candidate,"message")&&
+     Object.keys(candidate).length>1){item=candidate;break;}
+ }
+ if(item&&item.message&&typeof item.message==="object"&&!Array.isArray(item.message))
+  message=item.message;
+ var result={
+  v:1,phase:"captured",createdAt:state.createdAt,
+  expiresAt:now+NORTI_SCHEMA_PROBE_TTL,
+  inputType:schemaTypeName(o.input),
+  root:schemaKeysOnly(o,["configuration","input"]),
+  wrapper:schemaKeysOnly(item,["message","content"]),
+  message:schemaKeysOnly(message,[])
+ };
+ if(storeWrite(NORTI_SCHEMA_PROBE_STATE,JSON.stringify(result)))
+  log("NORTI_SCHEMA_CAPTURED_LOCAL");
+ else log("NORTI_SCHEMA_STORE_FAILED");
+}
 function observedSiriTextEnvelopeReasons(o){
  // Report *only* fixed categories, never unknown field names or field values.
  // Check independent layers even after one failure, so a single Siri request
@@ -214,6 +278,7 @@ function parseRequest(raw){
   if(observedGroup){
    var shapeReasons=observedSiriTextEnvelopeReasons(o);
    if(shapeReasons.length){
+    captureNortiSchemaLocally(o);
     shapeReasons.forEach(function(code){log("NORTI_SHAPE_"+code);});
     requestDiagnostic="INPUT_UNSUPPORTED";return null;
    }

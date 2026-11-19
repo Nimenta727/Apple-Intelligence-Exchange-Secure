@@ -18,8 +18,10 @@
 
 产品支持范围：特定 Siri 文本问答，不支持写作工具、视觉智能、音频文件、多模型或本地离线模型。用户接受原始请求可能由千问处理，DeepSeek 也会收到问题。
 
-**真机新阻塞（2026-11-19 11:06）**：noRTI 组名已被接受，但真实 Siri 在 11:06:40 和 11:06:46 两次出现 `REQUEST_DIAG_INPUT_UNSUPPORTED`；未到 DeepSeek。本次新增 `NORTI_SHAPE_*` 固定码细分顶层字段、input 类型和消息包装，不存储或输出实际 JSON。**修复尚未完成，需一次非隐私真机复测确认形状差异。**
+**真机最新定位（2026-11-19 11:14）**：新版结构诊断明确报告 `NORTI_SHAPE_ROOT_FIELDS` + `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`。本次增加单独的 [本机字段名/类型探针](SIRI_SCHEMA_PROBE_ZH.md)，只在明确手动授权时保存筛选过的字段键名/类型，不保存值。**不能仅据此认为输入已兼容**。
 
-当前下一步：刷新 60 模块以启用新增的 `siri.multimodal.noRTI` 严格纯文本分支；**本地探针 JS 不必再次更新**。使用非隐私 Siri 问题检查是否出现 `REQUEST_CAPTURED`，若看到 `REQUEST_DIAG_INPUT_UNSUPPORTED`、`CONTENT_UNSUPPORTED` 或 `MEDIA_UNSUPPORTED` 则说明真实结构仍超出安全白名单，停止该分支的测试并仅反馈固定错误码。之后再分别验证上游 SSE、DeepSeek 和 Siri 原生 UI；详见[调试说明](DEBUGGING_ZH.md)。达到 [发布清单](RELEASE_CHECKLIST_ZH.md) 的门槛后再决定是否发布稳定版。
+**真机前次阻塞（2026-11-19 11:06）**：noRTI 组名已被接受，但真实 Siri 在 11:06:40 和 11:06:46 两次出现 `REQUEST_DIAG_INPUT_UNSUPPORTED`；未到 DeepSeek。本次新增 `NORTI_SHAPE_*` 固定码细分顶层字段、input 类型和消息包装，不存储或输出实际 JSON。**修复尚未完成，需一次非隐私真机复测确认形状差异。**
+
+当前下一步：刷新 60 模块，下载**新的** `siri_schema_probe_ONCE.js` 并遵循 [本地结构诊断流程](SIRI_SCHEMA_PROBE_ZH.md)。此脚本与此前组名探针不同，需要第一次手动开启、问 Siri、第二次手动读出经过筛选的键名与类型。使用非隐私 Siri 问题检查是否出现 `REQUEST_CAPTURED`，若看到 `REQUEST_DIAG_INPUT_UNSUPPORTED`、`CONTENT_UNSUPPORTED` 或 `MEDIA_UNSUPPORTED` 则说明真实结构仍超出安全白名单，停止该分支的测试并仅反馈固定错误码。之后再分别验证上游 SSE、DeepSeek 和 Siri 原生 UI；详见[调试说明](DEBUGGING_ZH.md)。达到 [发布清单](RELEASE_CHECKLIST_ZH.md) 的门槛后再决定是否发布稳定版。
 
 仓库只保留当前 v0.6 的运行文件、测试与文档，不再维护不相关的旧实验代码。删除仓库中的旧文件**不等于清除设备上此前导入的模块**，实际设备仍需停用冲突配置。

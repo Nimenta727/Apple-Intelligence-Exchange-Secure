@@ -11,6 +11,8 @@
 
 ## 2026-11-19：Siri 组名已确认，真实文本结构仍待适配
 
+**11:14 真机进展：** 新日志确认 `NORTI_SHAPE_ROOT_FIELDS` 与 `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`。原始 PacketTunnel 不包含安全可用的字段名称；因此新增**完全本地、手动开启、只采集字段名及数据类型**的 [noRTI 结构探针](docs/SIRI_SCHEMA_PROBE_ZH.md)。此工具不采集字段值、问题正文或认证信息；实际解析仍失败，DeepSeek/Siri 端到端尚未修复。需要先刷新 60 模块，再下载 [本地新脚本](scripts/siri_schema_probe_ONCE.js) 手动运行。
+
 最新日志确认 Siri 与 WritingTools 共享同一个接口，并且二者均可能触发 `REQUEST_DIAG_GROUP_UNSUPPORTED`。已在 iPad 实际捕获 Siri `response_configuration_group_id=siri.multimodal.noRTI`。现仅为**匹配 Siri User-Agent、受限纯文本输入形状**的这一精确组名加入离线验证过的支持；媒体和未知字段仍被拒绝。WritingTools 继续跳过，**端到端 Siri/DeepSeek 功能尚未验证**。
 
 **如需再次诊断（v2）**：先[刷新 60 模块](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，同时**用新版覆盖 iPad 本地同名 JS**。手动测试 [`siri_group_probe_ONCE.js`](scripts/siri_group_probe_ONCE.js) 一次开启 **600 秒（10 分钟）**，然后实际问 Siri 一次，再手动测试同一个脚本读取结果或查看剩余时间。反复检查不会取消采样；需要取消时专门运行 [`siri_group_probe_STOP_ONCE.js`](scripts/siri_group_probe_STOP_ONCE.js)。不使用 event/cron/HTTP 自动规则，不提交完整 PacketTunnel 日志，已有 API Key 不需重设。详细步骤见[本地诊断指南](docs/SIRI_GROUP_PROBE_ZH.md)。

@@ -47,3 +47,7 @@ API keys, CA private keys, real prompts, Authorization headers and traffic captu
 ## Latest noRTI on-device input diagnosis (2026-11-19)
 
 The observed Siri group is accepted, but two real requests still failed at `REQUEST_DIAG_INPUT_UNSUPPORTED`. The new runtime adds fixed `NORTI_SHAPE_*` categories for top-level fields, input containers and message wrappers, without recording actual field names or values or widening the allowed media payloads. Refresh the 60 module and share fixed AIES diagnostic codes only. DeepSeek/SSE/native Siri remain unverified.
+
+## Device-local schema-only probe (2026-11-19)
+
+The latest Siri failure yields `NORTI_SHAPE_ROOT_FIELDS` and `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`. To avoid loosening media handling without evidence, a new **explicitly armed, ten-minute on-device** [schema probe](docs/SIRI_SCHEMA_PROBE_ZH.md) stores only bounded, screened JSON field **names and types**, not values, prompts or headers. It is inspected once through [manual Script Test](scripts/siri_schema_probe_ONCE.js), then erased. Requires updated 60 module and local helper. This is a diagnostic aid, **not** an end-to-end Siri/DeepSeek fix.
