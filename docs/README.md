@@ -1,5 +1,7 @@
 # AIES 文档中心（2026-11-19 调试重构归档）
 
+**新增浏览器技术社区研究与 WritingTools Compose Beta：** [国行 Apple Intelligence/Qwen 请求结构交叉调查](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)；来源包括 SAIR 逆向、Apple 开发者文档、Eclectic Light Company、AppleStorm、V2EX 与 LINUX DO。**只有 SAIR 提供写作工具的详细私有 JSON/SSE 逆向结构，本机 WritingTools 全量 schema 尚未复测。** [本次 routine 记录与下一步](routine/2026-11-19-AppleIntelligence-web-community-and-WritingTools-Compose.md)。
+
 > **当前可用的是实验性 60 DeepSeek SSE 改写和互斥的 61 Qwen 原生被动诊断**。本轮离线模拟测试用于验证代码安全，不代表 Siri 原生 UI 已通过验收。真实设备请求与 Qwen SSE 的主要字段结构已有证据，历史日志只留脱敏摘要，不把抓包或 Token 提交到仓库。
 
 ## 2026-11-19 17:12 维护记录
