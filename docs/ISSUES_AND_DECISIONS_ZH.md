@@ -22,6 +22,7 @@
 | I3 | 官方 API 已列出 `deepseek-flash`，但用户账户实际调用尚未验证 | 先解决请求解析，再核对模型 HTTP 响应与额度 |
 | I4 | 脚本未执行时仍可能出现千问内容 | 需要明确系统级能力边界，不能宣称保证 |
 | I5 | `$persistentStore` 中的问题正文可能残留 | 在下一次安全重构中减少存储和完善清理 |
-| I6 | 真机 `ERROR_UNSUPPORTED_SIRI_REQUEST`，请求 JSON schema 未确定 | 已加入保密原因码与有限纯文本兼容；下次真机验证前不得宣称已解决 |
+| I6 | 真机 Siri 和 WritingTools 均出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，真实 Siri 组名仍未知 | 新增需手动两次执行的一次性本地探针，下一轮以脱敏方式确认，禁止盲目放宽白名单 |
+| I7 | WritingTools 与 Siri 使用同一目标 URL，容易被错误接管 | 新版识别 WritingTools 后跳过请求和响应；兼容性仍需真机确认 |
 
 任何修复应加回归测试，按 [调试说明](DEBUGGING_ZH.md) 定位并经 [维护流程](OPERATIONS_ZH.md) 审查。当前风险与发布状态以 [当前状态](CURRENT_STATUS_ZH.md) 和 [发布清单](RELEASE_CHECKLIST_ZH.md) 为准。
