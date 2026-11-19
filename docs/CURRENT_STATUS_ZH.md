@@ -65,3 +65,11 @@
 - 60 的三条 Hook 统一固定到新增的 `975599163bafeb8c6ba8aa60624577e2a861d9f0` 脚本提交。若响应阶段的 `User-Agent` 被 Shadowrocket 省略，但请求阶段的有效同事务 `X-AIES-Request-ID` 仍存在，则恢复存储的 WritingTools/Siri 场景；明确冲突 UA、不同请求正文、过期或缺失关联仍失败关闭。
 - `WRITINGTOOLS_COMPOSE_SCOPED` 现在只在请求通过确切 Compose 纯文本 schema 校验后出现，且新增 `WRITINGTOOLS_SCENE_RECOVERED_FROM_TAG` 作为受限恢复的固定诊断码。
 - 本次修复**并未证明**响应阶段真的有 UA 丢失，也**不能解决 token 也丢失的情形**；真实 WritingTools Qwen 协议、SSE 和编辑器显示继续待真机验证。61 提供只读、手动开启、仅保存字段类型与事件名称的 WritingTools 探针。完整维护记录：[PR #31 代码和测试](routine/2026-11-19-22-00-WritingTools-response-UA-recovery.md)。
+
+## 23:49 Siri 后续追问失败：两份新设备日志与 PR #32 诊断工具
+
+两份只开启 60 的 PacketTunnel 日志显示 10 次 `REQUEST_CAPTURED`、8 次 `DEEPSEEK_RESPONSE_ATTEMPTED`、2 次 `ERROR_PROMPT_UNAVAILABLE` 和 7 次 `QWEN_SESSION_FOLLOWUP_SSE_BLOCKED`。**用户真机观察到只有第一问显示 DeepSeek**，但模型脚本确实多次产生了新答案；最终 Siri UI 是否接收改写响应不能靠日志推断。阻断 Guard 导致会话级 502 是需要验证的重要问题，但并未证明它是所有失败的唯一原因。
+
+[PR #32](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/32) 已合并到 `main`（`49c7556b921525319e6e89bda5ab39e6c18b3aff`），GitHub Actions 96/96 模拟测试通过；新增可手动开启 600 秒、只记录字段类型与 SSE 事件的 61 Siri followup 探针和 `siri_followup_schema_probe_ONCE.js` / `STOP_ONCE.js`。61 四条 Hook 新 pin：`506e51ad1ad549722242611f174b527cc12c4d21`。**60 仍保持旧的 Guard 和单轮适配，不声称修复多轮。**
+
+下一步必须由用户在设备上使用 61（关闭 60）进行一次不含私密内容的连续两问会话级 schema/SSE 采样，再决定如何进行支持同事务关联的后续 DeepSeek 重写。详情 [61 诊断指南](QWEN_PASSIVE_DIAG_ZH.md) 与 [维护记录](routine/2026-11-19-23-49-Siri-multi-turn-followup-502-diagnostics.md)。
