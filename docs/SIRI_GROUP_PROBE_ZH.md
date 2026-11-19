@@ -1,6 +1,6 @@
 # Siri 场景组名：本地诊断 v2（10 分钟）
 
-> 2026-11-19 诊断改进版。真机已观察 Siri 的 REQUEST_DIAG_GROUP_UNSUPPORTED，实际 response_configuration_group_id 仍未知。本工具仅用于定位，不自动放宽白名单，不证明 DeepSeek/SSE/Siri UI 已经兼容。
+> 2026-11-19 诊断改进版。真机已观察 Siri 的 REQUEST_DIAG_GROUP_UNSUPPORTED，现已在 iPad 真机捕获 `response_configuration_group_id=siri.multimodal.noRTI`，这份指南保留作后续同类诊断。本工具仅用于定位，不自动放宽白名单，不证明 DeepSeek/SSE/Siri UI 已经兼容。
 
 ## 与旧版相比
 
@@ -13,7 +13,7 @@
 ## 一次性准备
 
 1. 备份 Shadowrocket 配置；确保 VPN、MITM 只针对 prod-yabuli.qianwen.com，并停用冲突规则。
-2. 更新 [唯一 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，确认双钩子固定脚本 SHA 为 **c0975113a0a142fbce42cad39856491e69e8e173**。模块原始 URL：
+2. 更新 [唯一 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，确认双钩子固定脚本 SHA 为 **e79d05c3b8ef788abc92d3f1626426914c9dc7ce**。模块原始 URL：
 
    https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule
 
@@ -77,7 +77,7 @@
 - 不采集、打印或上传用户问题正文、HTTP 原始请求、Headers、Authorization、Cookie、Private-Access-Token、DeepSeek Key 或 SSE。
 - 仅暂存固定状态码、有限计数和**最多一个受限格式的组名**。组名仍可能带敏感含义，人工检查之前不能认为绝对安全。
 - **不要上传完整 PacketTunnel 日志、数据库或包含 Bearer 的截图。** 只需要分享本地脚本测试里 [AIES_SIRI_GROUP_LOCAL] 前缀的几行；如果 GROUP_ID 看起来像令牌或个人信息，请遮挡。
-- 设备是否共享 Shadowrocket Script Test 与 Request Hook 的 $persistentStore 尚未真机复核；如始终 SIRI_REQUESTS_SEEN=0，应验证模块版本/命中时间/主日志固定码，而非反复导出敏感流量。
-- 未知 Siri 场景组仍不能访问 DeepSeek；真实 API、SSE 重建、Siri 原生 UI、系统级千问回退都尚未通过验收。
+- 当前 iPad 已在真实问答中观察到一次 `SIRI_REQUESTS_SEEN=1`、`LAST_STAGE=GROUP_CAPTURED` 和本地读取后的清空，证明本设备该轮状态共享确实工作；其他设备仍需验证。若始终 SIRI_REQUESTS_SEEN=0，应检查模块版本、时间与主日志，不要反复导出敏感流量。
+- 精确的 `siri.multimodal.noRTI` 现在仅在 Siri UA、POST 和严格纯文本输入结构符合时通过第一关；未知 Siri 场景组仍被拒绝，**不必为这个已确认的组名再次运行探针**。真实 API、SSE 重建、Siri 原生 UI、系统级千问回退都尚未通过验收。
 
 其他：[调试手册](DEBUGGING_ZH.md) · [当前状态](CURRENT_STATUS_ZH.md) · [安装与回滚](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [安全边界](SECURITY_CURRENT_ZH.md)。
