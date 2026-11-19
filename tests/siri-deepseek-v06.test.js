@@ -264,6 +264,18 @@ test("Siri parse failure stages are reported without storing request text",()=>{
  assert.ok(status.logs.includes("[AIES_SIRI_GROUP_LOCAL] STILL_ARMED"));
  assert.ok(status.logs.every(x=>!x.includes("PRIVATE_INVALID_JSON")));
 });
+test("non-POST Siri traffic cannot be used to collect group metadata",()=>{
+ const e=env();
+ runLocal(e);
+ const body=JSON.stringify({configuration:{response_configuration_group_id:"siri.unsafe_method"},input:[{content:"SAFE"}]});
+ const r=e.invoke({...e.request,method:"GET",headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body});
+ assert.equal(r.returned[0].response.status,502);
+ assert.equal(probeState(e).phase,"armed");
+ assert.equal(probeState(e).siriSeen,0);
+ assert.equal(probeState(e).groupId,undefined);
+ assert.ok(e.logs.includes("[AIES_V06] SIRI_PROBE_NON_POST_IGNORED"));
+});
+
 test("response hook cannot consume opt-in or update counters",()=>{
  const e=env();
  runLocal(e);
@@ -277,12 +289,13 @@ test("expired status is explicit and cleanup never silently re-arms",()=>{
  const e=env();
  runLocal(e);
  const st=probeState(e);
- st.expiresAt=Date.now()-1;
+ st.createdAt=Date.now()-1200000;
+ st.expiresAt=Date.now()-600000;
  st.siriSeen=2;
  st.lastCode="GROUP_UNSUPPORTED";
  e.data.AIES_SIRI_GROUP_PROBE_V2_STATE=JSON.stringify(st);
  const out=runLocal(e);
- assert.ok(out.logs.includes("[AIES_SIRI_GROUP_LOCAL] INVALID_OR_EXPIRED_STATE_CLEARED")||out.logs.includes("[AIES_SIRI_GROUP_LOCAL] EXPIRED_CLEARED"));
+ assert.ok(out.logs.includes("[AIES_SIRI_GROUP_LOCAL] EXPIRED_CLEARED"));
  assert.equal(e.data.AIES_SIRI_GROUP_PROBE_V2_STATE,"");
  assert.ok(runLocal(e).logs.includes("[AIES_SIRI_GROUP_LOCAL] ARMED_600_SECONDS"));
 });
@@ -349,7 +362,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/07021e460dfdbb963963ac0eb0e41902c47bf6ed/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/c0975113a0a142fbce42cad39856491e69e8e173/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
