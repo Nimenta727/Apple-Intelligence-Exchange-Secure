@@ -12,7 +12,7 @@
 
 ## 安全使用步骤：同一个文件只运行两次
 
-1. 备份 Shadowrocket 配置，停用同域旧探针模块。更新 [60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，确认两条 hook 指向修订后的固定脚本提交 `f94a2711ccf96457dbb7e532295666bf5dc31ddb`；保持 VPN、目标域名的 MITM 和本地 Key 不变。
+1. 备份 Shadowrocket 配置，停用同域旧探针模块。更新 [60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，确认两条 hook 指向修订后的固定脚本提交 `ca1842345ea90ce9b2d97e69675852614275404f`；保持 VPN、目标域名的 MITM 和本地 Key 不变。
 2. 从仓库下载 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) 到 iPad **本地临时文件**。不要修改文件，也不要在其中填写任何 Key。与之前验证 Key 的方法相同，使用 Shadowrocket 的 **Script Test / 脚本测试** 手动执行；**不要**把它添加为 HTTP、event、cron 或自动运行脚本。
 3. **第一次**运行：本机出现 `[AIES_SIRI_GROUP_LOCAL] ARMED_180_SECONDS`，表示已开启一次性 180 秒的采样窗口。
 4. 180 秒内只发起**一个不含隐私**的 Siri 纯文本问答（不要使用写作工具）；不要上传此过程的 PacketTunnel 原始日志。正常情况下，Siri 依旧可能显示错误，因为未知组名没有被放行。
