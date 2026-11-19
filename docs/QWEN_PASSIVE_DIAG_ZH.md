@@ -13,7 +13,7 @@
    
    `https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule`
 
-   模块中的四条脚本路径都应固定到 `955fe4f7cec2471042469cdb7de740015db850bf`。
+   模块中的四条脚本路径都应固定到 `506e51ad1ad549722242611f174b527cc12c4d21`。
 
 4. 61 模块对已观察的主接口及会话级响应路径启用四条 HTTP 钩子。旧的 Siri 结构探针仍只认 `Siri (`；额外的 WritingTools 结构探针仅在独立手动授权后工作，不混用采样数据。仍需在用户设备上对目标主机启用 HTTPS MITM，**不要将 MITM 扩展到更多域名**。HTTP 脚本可能影响流式响应缓冲与时间，故“代码不改写”**不等于**与完全关闭 MITM 的连接行为完全相同。首次测试后如 Qwen 失败，停用 61 并恢复基线。
 
@@ -87,13 +87,13 @@
 | `SESSION_EXPIRY_INVALID` | Session 过期字段类型/范围不符合 60 代码要求 |
 | `STREAM_UNAVAILABLE` | 非有效长度的原始响应文本 |
 
-此字段出现在手动读取的 `RESPONSE_SSE_PART_*` 拼接 JSON 里；正常 Hook 日志仍只出现 `RESPONSE_SSE_SCHEMA_CAPTURED_LOCAL`。只需刷新 **61 模块到固定提交 `955fe4f7cec2471042469cdb7de740015db850bf`**，再次手动启动十分钟窗口、用 Siri 问一个非隐私问题、手动读取；**保持 60 停用**。没有泄露问题、回答、ID 或 Headers。一次采集满足当前检查，不代表其他 Siri 问答同样兼容；如果预检通过但 DeepSeek 改写后原生 Siri 仍显示失败，则主要需审查**合成 SSE 内部字段结构与真实 Qwen Schema 的差异**。
+此字段出现在手动读取的 `RESPONSE_SSE_PART_*` 拼接 JSON 里；正常 Hook 日志仍只出现 `RESPONSE_SSE_SCHEMA_CAPTURED_LOCAL`。只需刷新 **61 模块到固定提交 `506e51ad1ad549722242611f174b527cc12c4d21`**，再次手动启动十分钟窗口、用 Siri 问一个非隐私问题、手动读取；**保持 60 停用**。没有泄露问题、回答、ID 或 Headers。一次采集满足当前检查，不代表其他 Siri 问答同样兼容；如果预检通过但 DeepSeek 改写后原生 Siri 仍显示失败，则主要需审查**合成 SSE 内部字段结构与真实 Qwen Schema 的差异**。
 
 ## 四、可选：只采集 WritingTools Compose 的字段/类型（不保存选中文本）
 
 > **用于研究未知写作分组，默认完全关闭。** 原生 Apple 写作工具可能传递用户选中的整段文字，所以仅使用本人编写的、完全不涉及隐私的一小段测试文本。
 
-1. **关闭 60，仅启用本 61 模块**。确认四条脚本运行路径均固定到 `955fe4f7cec2471042469cdb7de740015db850bf`，旧的 `00 REJECT` 和同域 Rewrite 关闭。
+1. **关闭 60，仅启用本 61 模块**。确认四条脚本运行路径均固定到 `506e51ad1ad549722242611f174b527cc12c4d21`，旧的 `00 REJECT` 和同域 Rewrite 关闭。
 2. 将 [`writing_schema_probe_ONCE.js`](../scripts/writing_schema_probe_ONCE.js) 保存到 Shadowrocket 本地 Script，只在**脚本测试**中执行一次，确认：
 
    ```text
@@ -105,3 +105,26 @@
 5. 本地检查输出后再选择性分享。如显示 `STILL_ARMED`，说明探针仍未看到符合条件的 `WritingTools` 请求，不等于写作工具本身没有执行。必要时手动运行 [`writing_schema_probe_STOP_ONCE.js`](../scripts/writing_schema_probe_STOP_ONCE.js) 取消采集。
 
 此探针只用于核实原 SAIR 对 `compose_selectedAndAllText` 的逆向推断是否符合你的设备。如果真实组名或输入形状不同，60 将按 `REQUEST_DIAG_WRITING_*` 失败关闭；不要通过关掉纯文本安全校验来猜测未知模式。其他 Apple 写作工具功能（校对、摘要、改写）可能使用系统内部模型而不访问此网关，**不能据此保证全部用 DeepSeek**。
+
+## 五、Siri 第二问不再显示 DeepSeek：会话级协议结构探针（2026-11-19）
+
+2026-11-19 23:42 与 23:45 两份设备 PacketTunnel 日志在 **只开启 60** 时分别显示：主请求捕获 4 / 6 次，DeepSeek SSE 成功提交 3 / 5 次，`RESPONSE_TAG_MISSING` 各一次，另有 `QWEN_SESSION_FOLLOWUP_SSE_BLOCKED` 6 / 1 次。**模型成功提交不代表 Siri UI 接收，后续会话级响应被返回 502 也不是 DeepSeek API 本身失败。** 目前不能断定所有第二问都由 Guard 导致，需要区分本次 Siri 对话是否真的走会话级 URL。
+
+因此 61 增加独立、默认关闭的 **Siri followup 字段类型探针**：仅当手动开启 600 秒并且在 `/v1/sessions/{id}/responses` 收到带 Siri UA 的 POST 时，分别收集请求 JSON 字段类型 / SSE 事件名称、顺序、数量、状态码，以及现有 60 SSE 预检的固定结果。**绝不保存完整 URL、会话 ID、提问、回复正文、Header、认证信息、模型密钥**。Request 和 Response 记录并不声称属于同一事务；后台仅输出固定成功/失败码。
+
+### 设备上如何运行
+
+1. 先关闭 **60** 和其他对 Qwen 同域的旧 REJECT / Rewrite，启用更新后的 **61**。确认四条 Hook 的 JS SHA 都是 `506e51ad1ad549722242611f174b527cc12c4d21`，先单问一个普通无隐私问题以确认原生 Qwen 可用。
+2. 打开 [`siri_followup_schema_probe_ONCE.js`](../scripts/siri_followup_schema_probe_ONCE.js) 的本地副本，在 Shadowrocket **Script Test** 中手动运行一次，确认 `[AIES_SIRI_FOLLOWUP_SCHEMA_LOCAL] ARMED_600_SECONDS`。
+3. **10 分钟以内**在同一个 Siri 交互中问两条不含个人信息的简单文本问题，例如先问一个普通概念，再追问它的应用。等待原生 Qwen 的 UI 回答，并记录第一问/第二问是否成功。不同时进行其他 Siri 会话，不上传实际问句。
+4. 再次手动运行同一 `ONCE.js`，查看 `CAPTURED_LOCAL_PROTOCOL_SCHEMA`、`TRACE_PART_001=...` 及 `CAPTURE_CLEARED`；报告仅含分组概括、字段类型、事件名称和 HTTP 数字状态。读取后应清空本地逻辑状态。
+5. 如显示 `STILL_ARMED`，说明尚未采集到符合此精确路径 / Siri UA / POST 的报文，**不代表**没有真实追问；先检查会话是否走了目标接口。可手动运行 [`siri_followup_schema_probe_STOP_ONCE.js`](../scripts/siri_followup_schema_probe_STOP_ONCE.js) 结束采集。
+6. 完成后停用 61；恢复以前备份的配置。只有取得真实 followup 请求 / SSE 结构、确认可证明的同事务关联后，才能讨论把这些响应安全改写为 DeepSeek。**不要直接删除 Guard 并把新的 Qwen 文字宣称为 DeepSeek**。
+
+### 诊断结果怎样理解
+
+- `FOLLOWUP_REQUEST_SCHEMA_CAPTURED_LOCAL` + `FOLLOWUP_RESPONSE_SCHEMA_CAPTURED_LOCAL`：确实有一类会话级请求/响应被 61 观察到，但两者未必一一配对。
+- `strict60Preflight=MATCHES_60_PREFLIGHT`：仅说明该响应符合主接口当前的局部 SSE 前置结构；**不意味着**可将其安全替换成第二问的答案，还需要明确 prompt、session / continuation 和客户端显示约定。
+- 有主请求 DeepSeek 成功提交，但第二问 UI 不显示：优先确认 **会话级 Guard 的 502**、同事务 token 丢失、Siri UI 是否接受 synthetic SSE。无法仅从主请求成功日志推断最终原因。
+
+原始 PacketTunnel 报文可能含 Authorization / Cookie 等敏感信息；仓库仅记录上述计数，不存任何原始日志或真实会话内容。
