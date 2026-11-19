@@ -43,3 +43,11 @@
 ## 验收口径
 
 离线 CI 通过仅表示在 SAIR 逆向请求形状/合成 fixture 下代码执行安全；Apple 写作工具的真实显示、系统自有写作功能、各种高复杂上下文和不同 iOS 版本**必须明确标记为未完成真机验收**。
+
+## 审查补充（2026-11-19，PR #29）
+
+- 已核对 [PR #29](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/29) 的三条 60 Hook 同一不可变运行版本 `be915df98261d3bf2e5eb65fd4827efae760643b`，并将测试/安装文档中的旧 SHA 同步；61 的四条原样放行 Hook 保持原样。
+- WritingTools 写作请求的任务/模型回复独立于 Siri：代码会按 `scene` 检查短期 store，发现带标记的**不同场景**返回立刻 `CORRELATION_MISMATCH`，不会使用另一场景的 `input` 正文兜底。
+- 新增正向 WritingTools Compose 模拟、未知写作组/媒体/工具输出拒绝、Siri—WritingTools 关联跨场景拒绝；旧版 WritingTools 永久旁路测试已调整为未知场景失败关闭。第一轮 GitHub Actions 已通过，但**没有 iPad 设备的 Compose 端到端证据**。
+- 已同步调试史和发布验收矩阵中原本“永久绕过 WritingTools”的过时说明；仍记录为当时旧版本的真实行为而非当前功能。
+- **下一步**：确认最终 PR CI；如果通过，合并代码和本记录。用户手动用无隐私短文本做真实 WritingTools Compose，并核对 `REQUEST_CAPTURED`、`SSE_PREFLIGHT_PASSED`、`WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY`、编辑器实际文字。若响应关联丢失，应先诊断 Shadowrocket 同事务元数据，不复制 SAIR 的 `LATEST_PROMPT` 兜底。其他写作功能先取得不含正文的安全 schema 结构再扩展。
