@@ -90,3 +90,9 @@ SAIR 推断一个常见包络（**示意键名，不是用户真机 WritingTools
 5. 如确需扩展到其他 WritingTools 功能，先取得一条无隐私真机字段/类型结构，再给每个操作建立独立的 schema 和正反回归测试。
 
 更多根因见 [调试史](DEBUG_HISTORY_2026-11-19_ZH.md) 与 [维护记录](routine/2026-11-19-AppleIntelligence-web-community-and-WritingTools-Compose.md)。
+
+## 6. 本轮补充的本地验证手段
+
+依据来源分级结果，当前尚缺乏可独立复验的真实 iPad `WritingTools` 请求正文。因此 61 的四条原生 Qwen Hook 继续**全部 `$done({})` 放行**，新增独立手动开启的 `writing_schema_probe_ONCE.js`：只有 600 秒窗口内，`WritingTools` User-Agent 的目标主/会话级 Qwen POST 才保存 JSON 字段名/类型、**软件场景 group ID（经过安全字符约束）**、SSE 事件/类型/状态；绝不记录写作选中文字、生成答案、原始 SSE、Token 或 Header。读取时逻辑清空。使用说明见[只读诊断指南](QWEN_PASSIVE_DIAG_ZH.md)及[本次维护 routine](routine/2026-11-19-21-30-WritingTools-Compose-SAİR-analysis-and-adapter.md)。
+
+这个探针的任务是检验 SAIR 对 `compose_selectedAndAllText` 与 `body/refinements` 的私人协议逆向是否在当前国行 iPadOS 27.3 上成立；它不会让无 Qwen 远程请求的系统内部写作操作自动切换 DeepSeek。

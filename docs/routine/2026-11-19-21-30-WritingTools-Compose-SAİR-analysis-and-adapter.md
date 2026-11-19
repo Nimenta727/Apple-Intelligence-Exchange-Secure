@@ -29,3 +29,24 @@
 - 用 Siri 的 `content/suggestions/summary` 替代写作工具的 `body/refinements`，或向未知组套用一个“通用”写作结构。
 
 **状态**：研究与开发分支进行中，尚未合并到 `main`；生产设备上 60 仍沿用原行为。
+
+## 21:45 追加：补齐可复验的 WritingTools 请求字段/类型探针
+
+**原因**：原 SAIR 给出了 `compose_selectedAndAllText` 逆向分组，但本项目的 61 原结构探针只认 Siri UA，无法在真实 iPad 写作工具上验证这一假设；直接放开全部 `WritingTools` 会有敏感选中文字与不兼容答案结构风险。
+
+**已修改**：
+1. 在 `scripts/aies_qwen_passive_diag.js` 添加 `writingShapeProbe()`，只识别目标主/会话级 Qwen URL、`WritingTools` UA、POST 且本机手动开启的 600 秒窗口，保存安全过滤的 group ID、请求 JSON **键/数据类型**与 SSE **键/数据类型和事件名/状态**。不保存选中文字、生成答案或原始 HTTP 包，所有四条 HTTP Hook 仍 `$done({})` 放行。
+2. 新增 `scripts/writing_schema_probe_ONCE.js` / `scripts/writing_schema_probe_STOP_ONCE.js`。第一运行手动 ARMED，第二读取并逻辑清理；STOP 单独取消且不会修改 DeepSeek Key。
+3. `tests/qwen-passive-diag.test.js` 增加未授权不采集、授权时不泄漏正文/答案/认证、仅 WritingTools 命中和 STOP 保护密钥等回归；`package.json` 与 `tools/check-docs.js` 将脚本计数更新为 18 并纳入语法检测。
+4. 四条 61 HTTP Hook 已重新固定到 `955fe4f7cec2471042469cdb7de740015db850bf`；60 Siri + WritingTools Compose 的三条规则仍使用各自固定脚本版本，不与 61 同时启用。
+5. `docs/QWEN_PASSIVE_DIAG_ZH.md`、`docs/COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md`、安装、安全、维护和 README 解释如何安全采集无隐私场景结构，不误称 Apple 官方协议。
+
+**下一步规划**：等全部 GitHub CI（尤其 61 不改写、Siri 原回归、WritingTools 失败关闭与双场景隔离）通过，再合并 PR #29。设备上先停 60、只启用 61 手动读取一次 WritingTools 非隐私 Compose 请求真实 group 和 SSE 结构；随后仅启用 60 验证 Compose Beta 是否实际调用 DeepSeek，最后回归 Siri。未知校对/摘要/视觉操作继续不宣称已支持；Request-ID 丢失场景仍失败关闭，不使用最近请求猜测。
+
+## 21:48 复查：CI 语法修复与验证结果
+
+- PR #30 首次自动 CI 在 `scripts/writing_schema_probe_STOP_ONCE.js` 的 `say()` 控制台输出函数中检测到 JavaScript `SyntaxError: Unexpected token ';'`。该错误**只存在于本地手动停止脚本**，并不改变 HTTP Hook 或用户写作内容的处理。已修改为先检测 `console.log` 存在再输出固定状态码。
+- 修复后 [GitHub Actions #44537157658](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44537157658) **91 项 Node 测试全部成功、0 失败**，28 份 Markdown / 211 条相对链接检查通过。涵盖原有 Siri 回归、WritingTools Compose 的 `body/refinements`、跨场景关联防混淆、61 原样透传及新独立结构探针不收集文本/凭据。
+- **尚未完成真机 WritingTools Compose 的 HTTP/SSE 结构核实和最终 UI 验收**。CI 只能证明当前假设结构下程序可运行，不能将“SAIR 逆向提及的 group”写成 Apple 官方规范。
+
+**合并后下一步**：先在 Shadowrocket 停用 60、启用 61，用新 `writing_schema_probe_ONCE.js` 手动打开 600 秒窗口，在写作工具“千问创作”输入一句无隐私文本，等待结束后读取本地 `AIES_WRITING_SCHEMA_LOCAL`；验证 `group` 是否为 `compose_selectedAndAllText` 以及响应 SSE 的字段类型。随后关闭 61、仅启用 60，用同一无隐私任务检查固定 `WRITINGTOOLS_*` / `DEEPSEEK_*` 状态码及编辑器的实际正文；最后回归 Siri 简单与复杂提问。其他写作模式只有取得结构证据后才能扩展。

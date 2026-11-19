@@ -308,6 +308,55 @@ function abNativeCapture(){
   fixed(res?"AB_NATIVE_RESPONSE_CAPTURED_LOCAL":"AB_NATIVE_REQUEST_CAPTURED_LOCAL");
 }
 
+// Separate, opt-in WritingTools-only request/SSE shape probe.
+// It NEVER captures selected text, model answers, secrets or raw HTTP bytes.
+// This preserves the default Siri-only and A/B diagnostic privacy boundaries.
+var WRITING_STATE="AIES_WRITING_SCHEMA_V1",WRITING_WINDOW=600000;
+function writingAgent(){
+ var headers=req&&req.headers;
+ if(!headers||typeof headers!=="object")return false;
+ var keys=Object.keys(headers);
+ for(var i=0;i<keys.length;i++)if(keys[i].toLowerCase()==="user-agent")
+  return typeof headers[keys[i]]==="string"&&
+   /^WritingTools(?:\s|\()/i.test(headers[keys[i]]);
+ return false;
+}
+function writingGroupId(){
+ if(!req||typeof req.body!=="string"||req.body.length>300000)return "BODY_UNAVAILABLE";
+ var obj=null;try{obj=JSON.parse(req.body);}catch(e){return "JSON_INVALID";}
+ var g=obj&&obj.configuration&&obj.configuration.response_configuration_group_id;
+ // This is a software SCENE ID, not prompt text. Never echo arbitrary JSON.
+ if(typeof g!=="string"||g.length<2||g.length>80||
+    !/^[a-z][a-z0-9_.-]*$/i.test(g)||
+    /(?:bearer|token|secret|password|api.?key|account|email|phone|private)/i.test(g)||
+    /[a-z0-9]{30,}/i.test(g))return "UNSAFE_OR_MISSING_GROUP";
+ return g;
+}
+function writingShapeProbe(){
+ if(!abNativeTarget()||!writingAgent())return;
+ var method=String(req&& (req.method||req.httpMethod)||"").toUpperCase();
+ if(method!=="POST")return;
+ var raw=store&&store.read?store.read(WRITING_STATE):null,st=null,now=Date.now();
+ try{st=raw&&JSON.parse(raw);}catch(e){return;}
+ if(!st||st.v!==1||st.phase!=="armed"||
+    typeof st.createdAt!=="number"||typeof st.expiresAt!=="number"||
+    st.createdAt>now||st.expiresAt<=now||st.expiresAt>now+WRITING_WINDOW||
+    !Array.isArray(st.records)||st.records.length>=6)return;
+ var record={tMs:Math.max(0,now-st.createdAt),
+  route:abNativeRoute(),stage:res?"WRITING_RESPONSE":"WRITING_REQUEST"};
+ if(res){
+  record.shape=responseSummary(); // event names and JSON types only, no answer
+ }else{
+  record.group=writingGroupId();
+  record.shape=requestSummary(); // whitelisted field/type hierarchy only
+ }
+ st.records.push(record);
+ var packed=JSON.stringify(st);
+ if(packed.length>45000)return;
+ if(store&&store.write&&store.write(packed,WRITING_STATE))
+  fixed(res?"WRITING_RESPONSE_SCHEMA_CAPTURED_LOCAL":"WRITING_REQUEST_SCHEMA_CAPTURED_LOCAL");
+}
+
 function main(){
  if(!isTarget()||!req||String(req.method||req.httpMethod||"").toUpperCase()!=="POST"||!uaSiri())return;
  var st=null,now=Date.now(),raw=read();
@@ -331,7 +380,7 @@ function main(){
  if(write(JSON.stringify(st)))fixed("RESPONSE_SSE_SCHEMA_CAPTURED_LOCAL");
  else fixed("STORE_FAILED");
 }
-try{try{abNativeCapture();}catch(e){fixed("AB_NATIVE_CAPTURE_FAILED");}main();}catch(e){fixed("DIAGNOSTIC_EXCEPTION");}finally{
+try{try{writingShapeProbe();}catch(e){fixed("WRITING_SCHEMA_CAPTURE_FAILED");}try{abNativeCapture();}catch(e){fixed("AB_NATIVE_CAPTURE_FAILED");}main();}catch(e){fixed("DIAGNOSTIC_EXCEPTION");}finally{
  // THE ONLY SCRIPT OUTCOME: preserve original Qwen request/response.
  if(typeof $done==="function")$done({});
 }

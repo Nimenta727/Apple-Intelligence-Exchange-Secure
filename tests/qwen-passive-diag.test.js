@@ -8,6 +8,8 @@ const moduleText=fs.readFileSync(path.join(root,"shadowrocket/61-AIES-QWEN-PASSI
 const Sse=require("./fixtures/siri-sse");
 const nativeReader=fs.readFileSync(path.join(root,"scripts/ab_native_trace_ONCE.js"),"utf8");
 const nativeStop=fs.readFileSync(path.join(root,"scripts/ab_native_trace_STOP_ONCE.js"),"utf8");
+const writingReader=fs.readFileSync(path.join(root,"scripts/writing_schema_probe_ONCE.js"),"utf8");
+const writingStop=fs.readFileSync(path.join(root,"scripts/writing_schema_probe_STOP_ONCE.js"),"utf8");
 const TARGET="https://prod-yabuli.qianwen.com/v1/sessions/responses";
 const KEY="AIES_QWEN_PASSIVE_V1_STATE",SECRET="PRIVATE_PERSONAL_PROMPT_OR_TOKEN";
 function env(){
@@ -147,6 +149,71 @@ test("61 strict60 parity rejects annotations before final answer text",()=>{
   prefix+"event: session.response.choices[].items[].message.content[].text.value.done\n");
  e.invoke(req,{status:200,body:misplaced});
  assert.equal(snap(e).response.strict60Preflight,"ANNOTATION_POSITION_OR_TYPE_UNSUPPORTED");
+});
+
+test("WritingTools structure probe is default OFF, 61 remains strict pass-through",()=>{
+ const e=env(),req=e.request({
+  headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)"},
+  body:JSON.stringify({
+   configuration:{response_configuration_group_id:"compose_selectedAndAllText"},
+   input:[{type:"message",message:{role:"user",
+    content:[{type:"text",text:"PRIVATE_SELECTED_TEXT_SSH"}]}}],
+   stream:true
+  })
+ });
+ const a=e.invoke(req),b=e.invoke(req,{status:200,body:Sse.candidateSse("PRIVATE_ANSWER","PRIVATE_ID","siri")});
+ assert.equal(value(a.returned[0]),"{}");
+ assert.equal(value(b.returned[0]),"{}");
+ assert.equal(e.data.AIES_WRITING_SCHEMA_V1,undefined);
+ assert.equal(e.sent.length,0);
+});
+test("manual WritingTools probe captures Compose group, field types and SSE events without private selected text or answer",()=>{
+ const e=env(),key="AIES_WRITING_SCHEMA_V1";
+ const begin=e.local(writingReader).prints;
+ assert.ok(begin.includes("[AIES_WRITING_SCHEMA_LOCAL] ARMED_600_SECONDS"));
+ assert.ok(begin.includes("[AIES_WRITING_SCHEMA_LOCAL] PERSISTENCE_ROUNDTRIP_OK"));
+ const req=e.request({
+  headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)",
+   "Authorization":"Bearer PRIVATE_AUTH_TOKEN"},
+  body:JSON.stringify({
+   configuration:{response_configuration_group_id:"compose_selectedAndAllText"},
+   input:[{type:"message",message:{role:"user",
+    content:[{type:"text",text:"PRIVATE_SELECTED_TEXT_SSH"}]}}],
+   client_tools:[{api_key:"PRIVATE_CREDENTIAL"}],
+   response_format:{type:"json_schema",json_schema:{name:"draft"}},
+   stream:true
+  })
+ });
+ assert.equal(value(e.invoke(req).returned[0]),"{}");
+ assert.equal(value(e.invoke(req,{status:200,body:Sse.candidateSse("PRIVATE_ANSWER","PRIVATE_ID","siri")}).returned[0]),"{}");
+ const state=JSON.parse(e.data[key]);
+ assert.equal(state.records.length,2);
+ assert.equal(state.records[0].stage,"WRITING_REQUEST");
+ assert.equal(state.records[0].group,"compose_selectedAndAllText");
+ assert.equal(state.records[0].shape.bodyStatus,"JSON_OBJECT");
+ assert.equal(state.records[1].stage,"WRITING_RESPONSE");
+ assert.equal(state.records[1].shape.format,"SSE");
+ assert.ok(state.records[1].shape.eventCounts.length>=1);
+ for(const leaked of ["PRIVATE_SELECTED_TEXT_SSH","PRIVATE_AUTH_TOKEN","PRIVATE_CREDENTIAL","PRIVATE_ANSWER","PRIVATE_ID"]){
+  assert.ok(!value(state).includes(leaked),leaked+" must never be recorded");
+ }
+ const report=e.local(writingReader).prints;
+ assert.ok(report.includes("[AIES_WRITING_SCHEMA_LOCAL] CAPTURED_LOCAL_PROTOCOL_SCHEMA"));
+ assert.ok(report.some(x=>x.includes("TRACE_PART_001=")));
+ assert.ok(report.includes("[AIES_WRITING_SCHEMA_LOCAL] CAPTURE_CLEARED"));
+ assert.equal(e.data[key],"");
+ assert.equal(e.sent.length,0);
+});
+test("WritingTools probe refuses non-WritingTools caller and STOP clears state without touching the API key",()=>{
+ const e=env(),key="AIES_WRITING_SCHEMA_V1";
+ e.local(writingReader);
+ const req=e.request();
+ e.invoke(req,{status:200,body:Sse.candidateSse("PRIVATE_CONTENT","PRIVATE_ID","siri")});
+ assert.equal(JSON.parse(e.data[key]).records.length,0);
+ const result=e.local(writingStop).prints;
+ assert.ok(result.includes("[AIES_WRITING_SCHEMA_LOCAL] STOPPED_AND_CLEARED"));
+ assert.equal(e.data[key],"");
+ assert.equal(e.data.SAIRS_DEEPSEEK_API_KEY,"PRIVATE_DEEPSEEK_API_KEY");
 });
 
 test("default unarmed mode always passes original Qwen traffic without observing body",()=>{

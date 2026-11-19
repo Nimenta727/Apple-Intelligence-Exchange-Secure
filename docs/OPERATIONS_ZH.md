@@ -34,7 +34,7 @@ Node.js >=20；没有旧式 bundle 构建步骤。CI 检查 JS 语法、60 主�
 
 ## 60 的第三条规则（2026-11-19 15:51）
 
-60 现在不是只有两条脚本规则，而是两条主接口 Request/Response 改写钩子，加一条只处理 Siri `/v1/sessions/{opaque-id}/responses` 的 SSE 响应 Guard。三条规则必须使用同一个完整不可变 SHA；61 的两个只读 Hook 保持不变。Guard 可能增加 Siri 失败率，因此严格禁止升级为全域 `REJECT` 或把会话级请求直接猜测关联到主请求。
+60 现在不是只有两条脚本规则，而是两条主接口 Request/Response 改写钩子，加一条只处理 Siri `/v1/sessions/{opaque-id}/responses` 的 SSE 响应 Guard。三条规则必须使用同一个完整不可变 SHA；61 的四个只读 Hook 保持不变。Guard 可能增加 Siri 失败率，因此严格禁止升级为全域 `REJECT` 或把会话级请求直接猜测关联到主请求。
 
 ## 真实调试记录格式与隐私
 
@@ -51,3 +51,11 @@ Node.js >=20；没有旧式 bundle 构建步骤。CI 检查 JS 语法、60 主�
 ## 2026-11-19 浏览器社区研究后的 WritingTools 维护约束
 
 WritingTools Compose 初步协议来自 SAIR 的公开逆向，不是 Apple 官方私有 API 文档。今后改变组名白名单时，必须在无隐私真机请求字段类型样本中确认新的值与其用途；不要把 `group.includes('compose')` 复制到生产，不能把所有 WritingTools UA 流量都当 Compose。Siri 与 WritingTools 的答案 schema、模型指令及跨 Hook `scene` 隔离要有独立正反回归。每次代码变更记录在 `docs/routine/`，新运行脚本完整 SHA 需同步 60 三条 Hook、静态测试和安装说明；61 被动诊断保持独立。详见 [来源分析](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md) 与 [routine](routine/2026-11-19-AppleIntelligence-web-community-and-WritingTools-Compose.md)。
+
+## WritingTools 结构采样与原生服务一致性（2026-11-19）
+
+- 新增 `scripts/writing_schema_probe_ONCE.js` 和 `scripts/writing_schema_probe_STOP_ONCE.js`，状态键为 `AIES_WRITING_SCHEMA_V1`。**只在手动 Script Test 中启用，且默认完全关闭**，不能添加为 HTTP/event/cron。
+- `aies_qwen_passive_diag.js` 的四条 Hook 永远不修改流量；只在 WritingTools 且手动授权时附带记录有限请求键/类型和 SSE 事件结构，避免记录写作正文、Qwen 回答、Header 或 API Key。
+- 修改 61 运行脚本后，四条 `script-path` 都必须固定到**同一个不可变提交 SHA**；静态文件清单、语法检查和被动隐私回归须同时更新。
+- 如真实 WritingTools 的 group 或 SSE 与 SAIR 逆向版本不同，先用结构摘要补充独立兼容分支，不得随意将所有 `WritingTools` 流量发送给 DeepSeek；不要照搬 SAIR 最新请求缓存。
+- 相关：[公开协议来源研究](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)、[结构采集说明](QWEN_PASSIVE_DIAG_ZH.md)、[本次维护记录](routine/2026-11-19-21-30-WritingTools-Compose-SAİR-analysis-and-adapter.md)。

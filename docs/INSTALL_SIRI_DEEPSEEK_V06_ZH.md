@@ -7,7 +7,7 @@
 | 模式 | 模块 | Runtime 固定 SHA |
 |---|---|---|
 | **60 Siri / 写作工具 → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `be915df98261d3bf2e5eb65fd4827efae760643b` |
-| **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `9ea939df59a95b471b7034f5b1bf71a755d8bf88` |
+| **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `955fe4f7cec2471042469cdb7de740015db850bf` |
 
 **60 的 Shadowrocket 模块 Raw URL：**
 
@@ -71,10 +71,16 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 同题 A/B 实验（2026-11-19 16:15 后）
 
-为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `be915df98261d3bf2e5eb65fd4827efae760643b`；61 的四条原样放行规则均固定到 `9ea939df59a95b471b7034f5b1bf71a755d8bf88`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
+为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `be915df98261d3bf2e5eb65fd4827efae760643b`；61 的四条原样放行规则均固定到 `955fe4f7cec2471042469cdb7de740015db850bf`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
 
 ## 写作工具 Compose Beta（2026-11-19 浏览器协议研究后新增）
 
 从系统的写作工具中选择**千问创作/Compose**，仅在其 Qwen 请求使用 SAIR 已逆向的 `configuration.response_configuration_group_id = compose_selectedAndAllText`，输入为明确的 user/text 包络、响应为目前支持的纯文本 SSE 时，60 才尝试调用 DeepSeek；成功正文输出 `body/refinements` JSON，并强制带 `【DeepSeek · AIES】`。这会把来源标记写进正文，插入文稿前请检查。*系统原有校对/摘要/本地处理不一定经过千问，不能保证已经全量替换。*
 
 请先用一段**无个人信息的普通测试文字**测试；`WRITINGTOOLS_COMPOSE_SCOPED` 表示经过对应分支，`REQUEST_DIAG_WRITING_*` 表示未知或不安全的结构被拒绝，只有 `WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY` 与实际写作工具正确展示共同成立，才算这一条写作工具实验成功。禁止上传选中文本原文、完整 PacketTunnel 或 API Key。所有来源及边界：[跨站请求分析](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。
+
+## WritingTools Compose Beta：真实请求不匹配时
+
+本版 60 在 `WritingTools` User-Agent 且 `configuration.response_configuration_group_id=compose_selectedAndAllText`、纯文本 `input` 已识别时，才向 DeepSeek 转发输入，并在 SSE 中返回 `body/refinements`；Siri 仍返回 `content/suggestions/summary`。真实 WritingTools 的完整 Qwen 请求 JSON 尚未在你的设备上逐字段核实，因此目前是 **Compose Beta**，不是校对/摘要/所有写作模式的完整替换。
+
+如果只得到 `REQUEST_DIAG_WRITING_GROUP_UNVERIFIED` 或 `WRITING_INPUT_UNSUPPORTED`，**不要上传包含选中文本/凭据的 PacketTunnel 全文**；可先停用 60，启用只读 61，在本地使用 [WritingTools 字段类型一次性探针](QWEN_PASSIVE_DIAG_ZH.md#四可选只采集-writingtools-compose-的字段类型不保存选中文本) 采集非隐私示例的结构。AIES 不使用原 SAIR 的最近一次全局请求缓存修补丢失关联，以避免跨 Siri/写作工具串答。
