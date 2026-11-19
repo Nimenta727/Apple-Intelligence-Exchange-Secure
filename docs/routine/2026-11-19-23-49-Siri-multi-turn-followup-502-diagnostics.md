@@ -28,3 +28,10 @@
 2. 用户 iPad 更新 61，保持 60 停用。用 `siri_followup_schema_probe_ONCE.js` 在 Shadowrocket Script Test 手动开启一次 600 秒窗口，做两条普通、无隐私的同会话 Siri 文本问答，第二次执行仅回传经过检查的 `TRACE_PART_*` 结构摘要；若不需要继续则运行 STOP。
 3. 分析 Request 的 group/schema 及 SSE event class、文本承载位置、Client UA 是否随阶段传递；针对确证协议增加 followup mock 正/负例并设计 session-safe correlated rewrite，同时不将 Siri/写作工具串答。
 4. 真机对比相同两问的 61 原生流、60 主接口改写及真实 UI 显示；确认 SSE 替换在 Siri 全部后续轮次实际可见之前，不发布稳定版。
+
+## 合并与回归补记（2026-11-19，PR #32）
+
+- [PR #32](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/32) 已在第二轮诊断实现后合并到 `main`，merge commit `49c7556b921525319e6e89bda5ab39e6c18b3aff`。
+- [GitHub Actions CI](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44560918996) 全部通过：**96 tests / 96 passed，0 failed**。61 四条 Hook 指向 `506e51ad1ad549722242611f174b527cc12c4d21`，60 三条 Hook 保持 `975599163bafeb8c6ba8aa60624577e2a861d9f0`。
+- `docs/CURRENT_STATUS_ZH.md` 已补充两份日志计数、用户真实 UI 现象与 PR 合并后的精确边界（`1749d940e0a2efc458f6c735a28600e075df186d`）。
+- **剩余核心任务**：用户亲自完成 61 非隐私连续两问的 followup schema-only 实测；确认后续接口的请求/响应结构和可证明会话身份，才能单独开始真正的多轮 DeepSeek 改写 PR。不能把本次诊断功能升级误称为解决了 Siri 第二问。
