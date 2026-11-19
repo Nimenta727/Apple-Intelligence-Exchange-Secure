@@ -22,7 +22,7 @@
 | I3 | 官方 API 已列出 `deepseek-flash`，但用户账户实际调用尚未验证 | 先解决请求解析，再核对模型 HTTP 响应与额度 |
 | I4 | 脚本未执行时仍可能出现千问内容 | 需要明确系统级能力边界，不能宣称保证 |
 | I5 | `$persistentStore` 中的问题正文可能残留 | 在下一次安全重构中减少存储和完善清理 |
-| I6 | 真机已确认 Siri 组名 `siri.multimodal.noRTI`，但具体 JSON 输入形状未知 | 新增 Siri-only 严格文本兼容分支；真机观察下一个 `REQUEST_DIAG_*`，禁止放宽附件与多模态结构 |
+| I6 | 真机已确认 Siri 组名 `siri.multimodal.noRTI`，但 11:54 本地诊断确认根级和消息包装层字段/类型，`type` 值和内容元素结构仍未知 | 已精确支持经确认的根级字段类型和可选消息包装 `type=message`；仍要求 Siri-only、严格纯文本，不放宽工具或媒体结构 |
 | I7 | WritingTools 与 Siri 使用同一目标 URL，容易被错误接管 | 新版识别 WritingTools 后跳过请求和响应；兼容性仍需真机确认 |
 
 任何修复应加回归测试，按 [调试说明](DEBUGGING_ZH.md) 定位并经 [维护流程](OPERATIONS_ZH.md) 审查。当前风险与发布状态以 [当前状态](CURRENT_STATUS_ZH.md) 和 [发布清单](RELEASE_CHECKLIST_ZH.md) 为准。
