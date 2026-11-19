@@ -78,3 +78,9 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 从系统的写作工具中选择**千问创作/Compose**，仅在其 Qwen 请求使用 SAIR 已逆向的 `configuration.response_configuration_group_id = compose_selectedAndAllText`，输入为明确的 user/text 包络、响应为目前支持的纯文本 SSE 时，60 才尝试调用 DeepSeek；成功正文输出 `body/refinements` JSON，并强制带 `【DeepSeek · AIES】`。这会把来源标记写进正文，插入文稿前请检查。*系统原有校对/摘要/本地处理不一定经过千问，不能保证已经全量替换。*
 
 请先用一段**无个人信息的普通测试文字**测试；`WRITINGTOOLS_COMPOSE_SCOPED` 表示经过对应分支，`REQUEST_DIAG_WRITING_*` 表示未知或不安全的结构被拒绝，只有 `WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY` 与实际写作工具正确展示共同成立，才算这一条写作工具实验成功。禁止上传选中文本原文、完整 PacketTunnel 或 API Key。所有来源及边界：[跨站请求分析](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。
+
+## WritingTools Compose Beta：真实请求不匹配时
+
+本版 60 在 `WritingTools` User-Agent 且 `configuration.response_configuration_group_id=compose_selectedAndAllText`、纯文本 `input` 已识别时，才向 DeepSeek 转发输入，并在 SSE 中返回 `body/refinements`；Siri 仍返回 `content/suggestions/summary`。真实 WritingTools 的完整 Qwen 请求 JSON 尚未在你的设备上逐字段核实，因此目前是 **Compose Beta**，不是校对/摘要/所有写作模式的完整替换。
+
+如果只得到 `REQUEST_DIAG_WRITING_GROUP_UNVERIFIED` 或 `WRITING_INPUT_UNSUPPORTED`，**不要上传包含选中文本/凭据的 PacketTunnel 全文**；可先停用 60，启用只读 61，在本地使用 [WritingTools 字段类型一次性探针](QWEN_PASSIVE_DIAG_ZH.md#四可选只采集-writingtools-compose-的字段类型不保存选中文本) 采集非隐私示例的结构。AIES 不使用原 SAIR 的最近一次全局请求缓存修补丢失关联，以避免跨 Siri/写作工具串答。
