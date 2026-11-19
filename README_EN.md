@@ -59,3 +59,7 @@ Explicit local-only schema probe established root field names/types: `client_too
 ## Local one-shot sanitized Siri-to-Qwen request-body capture (2026-11-19)
 
 The iPad schema probe also observed an `input_hint:string` field; the parser now accepts that key only as a string and discards its value. A separate, manual, ten-minute, one-shot [request-body probe](docs/SIRI_QWEN_BODY_CAPTURE_ZH.md) captures a **sanitized copy** of the Siri-bound Qwen JSON POST body, preserving a bounded `input` text structure while masking credentials and unrelated metadata. The capture is not a header dump, nor a general Qwen app/web chat interceptor. It does not establish that Qwen actually received the request or that DeepSeek/native Siri answers work.
+
+## Device-visible DeepSeek source marker and response diagnostics (2026-11-19)
+
+The observed Siri UI sometimes displayed a Qwen service badge and often failed to show an answer. A service badge alone is not proof of which model authored the content. The runtime now **deterministically prefixes** a verified, successfully rewritten DeepSeek answer with `【DeepSeek · AIES】`; a system instruction also asks the provider to explain its role accurately. It never marks failed responses or original Qwen text as DeepSeek, and cannot change system-controlled Siri/Qwen UI branding. Additional fixed codes distinguish missing response correlation headers, unavailable local prompt storage, request-body fallback and successful SSE preflight without exposing secrets. Native Siri success is still unverified.
