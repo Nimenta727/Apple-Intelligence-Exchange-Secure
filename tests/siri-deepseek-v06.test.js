@@ -67,7 +67,14 @@ test("verified DeepSeek answer is visibly labeled once in the rewritten Siri SSE
  assert.equal(response.returned[0].status,200);
  const body=response.returned[0].body;
  assert.ok(body.includes("【DeepSeek · AIES】"));
- assert.equal(body.split("【DeepSeek · AIES】").length-1,8);
+ const name="session.response.choices[].items[].message.content[].text.value.delta";
+ const frames=body.trim().split("\n\n");
+ const contentFrame=frames.find(frame=>frame.startsWith("event: "+name+"\n"));
+ assert.ok(contentFrame);
+ const answerJSON=JSON.parse(contentFrame.split("\n")[1].slice(6));
+ const visibleContent=JSON.parse(answerJSON[name].delta).content;
+ assert.ok(visibleContent.startsWith("【DeepSeek · AIES】\n"));
+ assert.equal(visibleContent.split("【DeepSeek · AIES】").length-1,1);
  assert.ok(body.includes("DEEPSEEK_EXCLUSIVE_REPLY"));
  assert.ok(!body.includes("QWEN_ORIGINAL_ANSWER_TEST"));
  assert.equal(response.returned[0].headers["X-AIES-Answer-Source"],"deepseek");
