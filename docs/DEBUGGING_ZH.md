@@ -1,5 +1,8 @@
 # AIES v0.6 调试与错误码
 
+> **最新真机现状**：已经观察到两次真实 Qwen 原生 13 事件 SSE，14:49 的一次通过 `MATCHES_60_PREFLIGHT`；60 新版 SSE 按实际字段结构重建，但仍**未通过 Siri 原生 UI 验收**，偶发的 `RESPONSE_TAG_MISSING` 也尚未修复。旧版错误码记录是调试历史，最新说明见[全日时间线](DEBUG_HISTORY_2026-11-19_ZH.md)、[请求结构](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)、[SSE 结构](OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)、[根因决策](ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)。
+
+
 > 仅用于受控 Beta 真机测试。不要上传真实问题、API Key、Authorization、完整 SSE、CA 私钥或抓包。日志不是 Siri 客户端成功显示的证据。
 
 ## 定位顺序

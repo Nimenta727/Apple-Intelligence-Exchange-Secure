@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 2026-11-19 — 真实协议对齐的 60 合成 SSE、安全收紧与全量排障归档（PR #25）
+
+- 重新审计设备上传的 15 份 PacketTunnel（含一份重复）、13:50 与 14:49 两次 61 SSE 采样，以及 PR #17–24 的代码/诊断演进；证据、不能推断的内容与遗漏问题分别归档，不提交原始包或 Token。
+- 60 的 SSE 重建器从“极简模拟事件”升级为**字段结构与已观测真机 Qwen SSE 对齐**：Session 创建/过期元数据、Response 元数据、Choice ID/输出状态、Item/Content 索引、文本 annotations、Choices 完成和 Response 完成全部重建。原 Qwen 的回答字符串不会进入任何合成输出字段；仅使用有界非答案元数据。
+- 增加工具调用、媒体内容及通知/审核分支的前后期安全校验，不将非文本上游流伪装成 DeepSeek 回答；补充多 delta、真实字段键名、Qwen 文本排除、并发隔离与失败关闭回归测试。
+- 历史的 Siri.tqa 分支也会拒绝非用户角色、函数调用和非消息类型；DeepSeek Flash 使用[官方支持的非思考配置](https://api-docs.deepseek.com/api/create-chat-completion/)以降低短问答延迟，不保证固定响应时长。
+- 归档[真实请求 JSON](docs/OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)、[13 事件 SSE](docs/OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)、[全日排障史](docs/DEBUG_HISTORY_2026-11-19_ZH.md)、[根因及限制](docs/ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)与[真机验收/回滚](docs/VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)。
+- **P0 请求关联偶发丢失仍未解决**；无 Request-ID 且无同事务 Request body 时继续 502，不冒险用“最新问题”关联。合成 SSE 的 Siri 原生 UI 验收仍未完成。
+
+
 ## 2026-11-19 — 真实 Qwen SSE 与 60 模块预检差异诊断
 
 - 13:50 真机 61 被动探针记录 Qwen HTTP 200、13 个可解析 SSE 数据事件（两次文本 delta），事件顺序符合当前 60 代码的预期；原 SSE 确认没有多行 data、SSE id/comment/retry。

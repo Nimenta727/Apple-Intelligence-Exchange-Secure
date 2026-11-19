@@ -1,43 +1,38 @@
-# AIES v0.6 当前状态
+# AIES v0.6 当前状态（2026-11-19，真机证据归档后）
 
-> **当前版本：v0.6.0-beta（`main`）。2026-11-19 真机确认了 Siri 请求钩子命中，但解析失败；原生 UI、DeepSeek API 与响应替换尚未验证。**
+> **真实功能状态：实验性 Beta、尚未通过 Siri 原生端到端验收。** 60 模块的 Siri 请求解析在真机曾成功，DeepSeek API 曾至少一次进入有效响应的脚本处理路径，61 模块已两次观测真实 Qwen SSE，其中一次满足 60 严格预检。**最新 60 的完整字段 SSE 改写尚未在 Siri 原生 UI 验证**。不要将离线 CI 或“Qwen 卡片出现”误写成完整成功。
 
-本次修订保留 `REQUEST_DIAG_*` 固定诊断码和受限纯文本包装兼容，并将一次性本地组名探针升级为 **v2（600 秒、状态检查不取消、单键存储、独立 STOP）**，保留 WritingTools 旁路。已在真实 iPad 日志观察到两次 Siri 和一次 WritingTools 的 `GROUP_UNSUPPORTED`，且通过新版探针取得真实 Siri 组名 `siri.multimodal.noRTI`；已添加精确的 Siri-only 纯文本兼容分支，但**真机请求解析及原生回答仍需验收，不能宣称已经修好 Siri**。不收集任何原始报文、私有令牌或真实问题；复测见[调试手册](DEBUGGING_ZH.md)。
+## 一张表看清进展
 
-| 环节 | 现状 |
-|---|---|
-| 唯一 Shadowrocket 60 模块与双钩子 JS | 已编码 |
-| 文本识别、会话关联、SSE 重建 | 离线模拟通过；真实请求解析遇到 `ERROR_UNSUPPORTED_SIRI_REQUEST` |
-| DeepSeek API 对接 | 代码已存在；`deepseek-flash` 官方模型名已核对，但真实 Key / 账户调用尚未实测 |
-| 请求/响应钩子在真实 Siri 上是否触发 | 2026-11-19 已观察 Request hook 命中；Response hook 尚未确认 |
-| Siri 原生界面是否接受重建 SSE | 未验证 |
-| 分块、压缩、超时、并发和快速连续提问 | 需真机验证 |
-| DeepSeek 失败时是否完全没有千问回退 | 脚本内部尝试阻止，系统级未证明 |
-| 本地短期问题正文存储与彻底清理 | 待安全改善 |
-| 稳定版 Release | **未发布** |
+| 层级 | 最新证据与结果 | 当前结论 |
+|---|---|---|
+| 模块分工 | 60 DeepSeek 改写、61 Qwen 原生只读诊断；设备必须互斥启用 | 两套模式已存在，不能同时启用 |
+| Siri 组名 | `siri.multimodal.noRTI`，本机组名探针已验证 | 已知主要支持场景；其他 Siri 组未知 |
+| Siri 请求格式 | 11:54、12:07 字段摘要和 12:26 一次性脱敏请求体 | 文本包络及主要元数据类型已掌握 |
+| 请求解析 | 12:25 `REQUEST_CAPTURED ×4`、12:40 `REQUEST_CAPTURED ×2` | **至少六次成功解析**，不代表随后回答成功 |
+| 请求—响应关联 | 12:40 一次 `RESPONSE_TAG_MISSING`、一次成功从 store 恢复 | **间歇性不可靠；未证实修复**，缺少可验证事务标识时仍失败关闭 |
+| DeepSeek API | 12:25 一次 `DEEPSEEK_STARTED` + `DEEPSEEK_RESPONSE_ATTEMPTED` | 有一次脚本层有效模型输出处理证据；UI 未验证 |
+| Qwen 原生响应 | 13:50 与 14:49 两次 HTTP 200、13 个 SSE JSON 事件、两次文本 delta | 真实主要 SSE 事件序列及字段类型已掌握 |
+| 60 的 SSE 前置校验 | 14:49 `strict60Preflight=MATCHES_60_PREFLIGHT` | 对**该次**原生 Qwen 响应通过全部当前已知前置条件 |
+| 合成 DeepSeek SSE | 本轮按真实字段类型补齐 Session/Response/Choice/Item/Content/Done，离线测试 | 代码和 mock 通过；真实 Siri 是否接受 **待测** |
+| Siri UI 标识 | 用户曾报告一次 Qwen 标签、数次“无法获得回答” | 不能推断哪些回答由哪个模型生成 |
+| 安全限制 | 非纯文本、工具、审核分支拒绝；61 一律 `$done({})` | 保持失败关闭；系统级旁路仍可能显示 Qwen |
+| 稳定版 | 无充分真机成功率和回滚验证 | **未发布** |
 
-产品支持范围：特定 Siri 文本问答，不支持写作工具、视觉智能、音频文件、多模型或本地离线模型。用户接受原始请求可能由千问处理，DeepSeek 也会收到问题。
+## 最新代码实际做了什么
 
-**2026-11-19 12:07 新证据：** 真实 Siri 的顶层还可能有 `input_hint:string`，已将该字段按类型严格允许，但不发送其值。另新增[主动开启的单次请求正文（脱敏）采样](SIRI_QWEN_BODY_CAPTURE_ZH.md)，目的是直接定位 `input` 中的文本元素，而不是继续猜 JSON 字段；用户需主动用 Siri 发一次非隐私问题。**尚无请求捕获/模型成功的真机验证。**
+1. 60 **不再只生成字段极简的 12/13 SSE 事件**，而是按已经从真机观察到的对象键名和数组结构构造所有回答承载事件；只复用上游有界 ID/时间及经限制的 Qwen 同域 continuation 元数据，所有回答文本由经过校验的 DeepSeek 输出生成。
+2. 对 `notices`、`moderation`、工具调用、媒体内容的多处后期 SSE 位置增加了拒绝条件，防止错误的强制回答或 Qwen 数据泄漏。
+3. 原有的不可混淆请求关联保护未被弱化：必须有有效 Header+本地 store，或同一响应 Hook 内完整且受支持的 Request body；同时有两者时必须一致。缺失两者则 **502，不猜“最后一条问题”**。
+4. 61 被动诊断代码仍然不改写请求/响应，不调用 DeepSeek，不将问答正文写入仓库或额外服务器；它仍是独立的、手动授权才采样的实验工具。
 
-**真机新证据（2026-11-19 11:54）**：在明确手动授权的本机字段探针中，确认 `input:array`；顶层额外字段为 `client_tools:array`、`response_format:object`、`server_tools:array`、`stream:boolean`；`input` 包装层有 `type:string`；`message` 内部有 `content:array`、`role:string`。同期 PacketTunnel 的固定码证明两处原严格校验确实拦截了请求。现在仅精确允许这些**已证实的字段和类型**，要求消息 wrapper 的 `type` 若存在则必须为 `message`，未知实际值、媒体和工具调用仍拒绝。**真机完整解析、DeepSeek API、SSE 与 Siri UI 都未验证。**
+## 建议查阅顺序
 
-**真机前次定位（2026-11-19 11:14）**：新版结构诊断明确报告 `NORTI_SHAPE_ROOT_FIELDS` + `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`。本次增加单独的 [本机字段名/类型探针](SIRI_SCHEMA_PROBE_ZH.md)，只在明确手动授权时保存筛选过的字段键名/类型，不保存值。**不能仅据此认为输入已兼容**。
+- [一日全部调试时间线与 PR #17–25](DEBUG_HISTORY_2026-11-19_ZH.md)
+- [真实 Siri → Qwen 请求 JSON 结构](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)
+- [真实 Qwen 13 事件 SSE 响应结构](OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)
+- [根因、信任边界与遗留 P0](ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)
+- [真机验收矩阵和回滚](VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)
+- [安装 60](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) / [被动 61 指南](QWEN_PASSIVE_DIAG_ZH.md)
 
-**真机前次阻塞（2026-11-19 11:06）**：noRTI 组名已被接受，但真实 Siri 在 11:06:40 和 11:06:46 两次出现 `REQUEST_DIAG_INPUT_UNSUPPORTED`；未到 DeepSeek。本次新增 `NORTI_SHAPE_*` 固定码细分顶层字段、input 类型和消息包装，不存储或输出实际 JSON。**修复尚未完成，需一次非隐私真机复测确认形状差异。**
-
-当前下一步：刷新 60 模块，下载**新的** `siri_schema_probe_ONCE.js` 并遵循 [本地结构诊断流程](SIRI_SCHEMA_PROBE_ZH.md)。此脚本与此前组名探针不同，需要第一次手动开启、问 Siri、第二次手动读出经过筛选的键名与类型。使用非隐私 Siri 问题检查是否出现 `REQUEST_CAPTURED`，若看到 `REQUEST_DIAG_INPUT_UNSUPPORTED`、`CONTENT_UNSUPPORTED` 或 `MEDIA_UNSUPPORTED` 则说明真实结构仍超出安全白名单，停止该分支的测试并仅反馈固定错误码。之后再分别验证上游 SSE、DeepSeek 和 Siri 原生 UI；详见[调试说明](DEBUGGING_ZH.md)。达到 [发布清单](RELEASE_CHECKLIST_ZH.md) 的门槛后再决定是否发布稳定版。
-
-仓库只保留当前 v0.6 的运行文件、测试与文档，不再维护不相关的旧实验代码。删除仓库中的旧文件**不等于清除设备上此前导入的模块**，实际设备仍需停用冲突配置。
-
-## 真机 UI 品牌与响应阶段（2026-11-19）
-
-用户反馈大约三次“无法获得回答”，一次出现 Qwen UI 标识，未见明确 DeepSeek 字样。不能将 Qwen UI 卡片标志直接等同于回答来源，也不能把 `DEEPSEEK_RESPONSE_ATTEMPTED` 判定为原生 Siri 展示成功。最新脚本仅在已验证的 DeepSeek 响应完成 SSE 重写后，在回答正文直接添加 `【DeepSeek · AIES】`；同时增加 Response Hook 中关联标记、关联存储与请求正文恢复来源的**固定状态日志**。不存在成功的 DeepSeek 调用时绝不加此标签。**SSE 和 Siri UI 最终成功率仍未验收，未宣布可用。**
-
-## 2026-11-19：Qwen 原生对照与独立 SSE 被动诊断
-
-在生产 60 模块上真机多次观察到请求—响应关联丢失、原始 SSE 不满足严格模拟解析器。现在另有**临时 61 原生通行模块**：必须先停用 60 与旧 REJECT 并验证 Qwen 原生基线，再启用 61；它只以 `$done({})` 结束、无需 DeepSeek API Key；本地 Script Test 手动开启十分钟后，才保留一次请求和一次响应的*结构摘要*（SSE 事件名/顺序/嵌套键名及数据类型、部分 OS 元数据），不保留任何回答/问题原文。该模块不提供请求与响应会话 ID 关联保证；真机有效性待验收。详见 [诊断指南](QWEN_PASSIVE_DIAG_ZH.md)。
-
-## 13:50 真机原生 Qwen SSE 结构已确认
-
-61 临时被动诊断真实返回 HTTP 200、13 个 SSE JSON 事件、2 个文本增量事件、14 个 split 帧（含末尾空帧），无解析失败，且其事件名/顺序与当前 60 的严格预期一致。附带 PacketTunnel 也确认请求/响应钩子均成功捕获结构。**但不能从字段类型判断当前 60 的 ID 字符格式、Session ID 等值级检查，也不能证明其合成的 SSE 会被原生 Siri 接受。** 61 现新增本地 `strict60Preflight` 固定结果码，用来在正常 Qwen 交互时检查这一环节。详见[独立 61 使用指南](QWEN_PASSIVE_DIAG_ZH.md)。
+**补充边界**：无法证明 Shadowrocket 在所有连接阶段都把临时请求 Header 原样带入 Response Hook；这依赖真实设备而非 Node mock。若要继续验证来源和显示效果，使用少量不涉及个人信息的 Siri 测试即可；不需要重复向仓库提交 PacketTunnel、代理数据库或私密请求值。

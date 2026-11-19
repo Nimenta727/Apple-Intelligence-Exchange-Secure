@@ -1,67 +1,39 @@
-# AIES v0.6 安全与隐私边界
+# AIES v0.6 安全与隐私边界（2026-11-19）
 
-> 当前是**实验性 Beta**，未通过独立安全审计与 Siri 真机验收。以下描述代码设计，不能保证操作系统或代理失效时的行为。
+> 这是**实验性 Beta**。已对代码和 Node mock 做安全检查，但**未完成独立第三方安全审计、Shadowrocket 所有流转分支的验证或 Siri 原生端到端验收**。本页描述代码能控制的路径，并不承诺系统级的“只显示 DeepSeek”。
 
-## 数据可能发往哪里
+## 数据边界
 
-用户明确允许 Siri 原始文本请求到千问。响应脚本同时会把提取的问题发到用户授权的 DeepSeek API。因此**千问和 DeepSeek 都可能处理同一问题**。该工具不提供“千问零出站”或完全离线运行。
+1. **用户问题可能同时经过 Qwen 和 DeepSeek**：60 不会阻止已交给 Qwen 的原始 Siri 请求；在响应钩子验证成功后，只有提取出的明确纯文本部分会作为 `messages[].content` 发送到用户授权的 DeepSeek API。
+2. **DeepSeek API Key**：只存放在设备 `$persistentStore` 的 `SAIRS_DEEPSEEK_API_KEY`；传给官方 DeepSeek HTTPS 端点的 Authorization Header。运行时的 AIES 固定日志不打印这个值；不要把它写到模块、URL、GitHub、截图或聊天里。
+3. **原生 Qwen 回答**：60 对已识别 SSE 只使用通过格式约束的会话元数据（有界 ID、时间戳、部分被限制为同域的 continuation URL）。所有可显示答案的 `delta`、`done`、`output` 和最终响应文本由 DeepSeek 成功完成的回答重新构建；原生 Qwen 的答案文本不得混进改写结果。
+4. **Shadowrocket PacketTunnel**：系统原始日志可能包含 Header、私有访问令牌、代理路由、设备信息或正文。**禁止将整份 PacketTunnel、proxy 数据库、CA 私钥公开提交或分享**，即使本项目自己的 `[AIES_V06]` 只打印固定阶段码。
+5. **用户主动测试**：本地一次性组名、键/类型、脱敏正文探针均需用户手动开启 600 秒窗口；一般诊断只保留结构类型，不会主动上传 Qwen 或 DeepSeek 的文本值。带测试文本的专用探针仅适用于用户自己选择的**非隐私**问句，脱敏不是绝对保障。
+6. **逻辑清除不能保证物理擦除**：本机 Session 关联存储有 TTL 并在成功消费后写空；网络丢失或没有匹配 Response 时，状态仍可能残留直到宿主机制清理。时间到期检查并不自动把所有持久化文件从闪存物理擦掉。
 
-## 代码层设计
+## 支持范围与失败关闭
 
-- 只匹配固定 HTTPS Host/Path 和受支持的 Siri 文本输入。
-- 只将 Key 加到对 DeepSeek 官方 API 的 Authorization 头，Key 不通过模块 URL、源代码或日志发送。
-- 对已识别 SSE 结构重建答案，不在脚本能控制的成功路径中保留千问 AI 文本；未知 SSE 拒绝重写。
-- 对无 Key、网络/模型超时、SSE 错误等情况尝试用 502 代替上游回复。
-- 两个脚本钩子固定到同一不可变 Git commit，避免追踪开发分支更新。
-- 2026-11-19 新增请求解析固定原因码：代码只打印静态分类，不打印请求 body、header、Authorization、Private-Access-Token、Key 或真实问题。**Shadowrocket 自带的 PacketTunnel 日志可能显示敏感请求头，不能将整个日志发送给他人。**
+- 60 主要兼容设备已证实的 `siri.multimodal.noRTI` 和历史的 `siri.tqa` / `siri_tqa` 文本包络。**当前支持范围仅是已证实的文本变体，不是通用多模态 Siri 转发器**。WritingTools 按 User-Agent 旁路，无法保证未识别客户端在一切环境中都可分类。
+- 用户角色不是 `user`、未知外层类型、明显媒体内容、工具调用与非空审核输出应被拒绝，不发送给模型；新代码已对多个 SSE 结束事件中的工具和审核位置做检查。
+- 如果 Qwen 上游不返回 HTTP 200、SSE 帧或事件类型未知、ID 不一致、DeepSeek 网络失败、模型并未正常结束，60 应返回固定错误，避免主动把 Qwen 原文当成 DeepSeek。
+- 只有模型 API HTTP 200、`finish_reason=stop`、非空回答、重建 SSE 成功后才添加 `【DeepSeek · AIES】`，同时带 `X-AIES-Answer-Source: deepseek` 响应头。**不能凭卡片的 Qwen 品牌或 AIES 提交日志推断 Siri 真实显示。**
 
-## 2026-11-19 本地一次性组名诊断
+## P0：请求/响应关联的安全边界
 
-真实日志发现 Siri 和 WritingTools 共享目标接口；随后本机探针确认 Siri 的场景组名为 `siri.multimodal.noRTI`。本次改动：
+- 请求 Hook 为每条有效 Siri 请求生成独立的随机 `X-AIES-Request-ID` 并将问题暂存到单独的短期本机键。响应 Hook 只在相同标记匹配，或其**自身已持有并能严格解析同一事务请求体**时恢复问题；两种来源冲突时立即拒绝。
+- 真机已经出现 `RESPONSE_TAG_MISSING` + `RESPONSE_PROMPT_BODY_UNAVAILABLE`。如果这两个关联渠道都没有，**不能正确知道是哪一个问题产生当前响应**，因此返回 502。
+- **绝不能**将“最近一次 Siri 请求”“唯一一个 Pending 请求”“最接近的时间戳”作为安全关联策略；多请求、重试和异步转发会造成把 A 的答案发给 B 的风险。
+- 当前代码未证明 Shadowrocket 存在稳定的公开事务 ID API；后续只能在受控设备上验证宿主提供的同事务机制，不能臆测私有 `$request.id`。
 
-- WritingTools 的请求/响应识别为非 Siri 作用域时直接跳过，不调用 DeepSeek，主脚本只输出固定 `WRITINGTOOLS_SKIPPED`。
-- **默认不采集**未知组名。必须在本机通过手动运行最新版 `siri_group_probe_ONCE.js` 主动开启 600 秒窗口，且请求阶段确实为 Siri User-Agent 的 POST，才可能暂存一个被长度和字符集限制的组名。
-- 主脚本不记录组名；新版采用单个本地状态键保存固定解析原因、最多 9 次的小型计数及至多一个格式受限组名；重复手动查看状态不会取消采样。捕获后只在设备本机手动 Script Test 中显示一次 `GROUP_ID`，随后逻辑清空；独立 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js) 可以明确停止。**本机存储的逻辑 TTL 和清空不保证物理删除**，不证明执行环境共享状态或协议可信性。
-- 如果标识像随机令牌/凭据或不符合保守格式，直接拒绝采样；不要分享该值。**不得提交**原始 PacketTunnel 日志，它可能包含 Authorization、私有访问令牌和其他数据。
-- 新增组名仅精确允许 `siri.multimodal.noRTI`，同时要求 Siri User-Agent、POST 和严格文本容器。多模态附件、未知嵌套字段、非用户角色、未知根级属性将失败并只输出固定 `REQUEST_DIAG_*`；不能仅凭 User-Agent 放行。实际真机结构与端到端安全仍未验证。
+## 61 被动诊断风险与互斥
 
-详见 [Siri 组名安全诊断](SIRI_GROUP_PROBE_ZH.md)。
+- 61 两个 HTTP Hook 始终 `$done({})`，不改 Header、请求或响应 body/status，也不调用 DeepSeek 或其它第三方端点。
+- 61 的本地摘要只在手动启动 600 秒后保存有限 JSON 键名/类型、白名单系统版本、SSE 事件序列/数量/结构；不保存原始 SSE、User-Agent 完整内容、认证 Header、Qwen 问答正文或 session ID 实值。固定 `strict60Preflight` 是**内存**里的值级判断，只有一个枚举结果持久化。
+- 由于没有注入关联标记，61 单次 Request 摘要与 Response 摘要**不一定属于同一事务**，尤其存在并发时。测试期间一次只提一个问题。
+- `$done({})` 不能消除 HTTPS MITM 和响应缓冲自身的时序影响。**60 和 61 必须互斥**；用户需要纯原生 Qwen 时应同时停用两个模块和所有旧同域 REJECT/Rewrite。
 
-## 尚未解决的重要风险
+## 错误报告与回滚
 
-1. **系统绕过**：VPN 关闭、MITM 不生效、脚本加载失败、Siri 缓存或备用通路可能使用户看到千问回复，脚本无法无条件阻止。
-2. **本机留存**：问题正文写入 `$persistentStore`，45 秒仅是逻辑 TTL，不能保证物理删除或存储加密；Token 使用 `Math.random`，不应视为密码学强凭据。
-3. **MITM 根证书**：本机受信任 CA 扩大证书信任边界；仅对目标域名启用解密，测试后关闭并按需撤销信任。不分享 CA 私钥。
-4. **协议兼容**：真实 SSE 的分块、压缩、未知事件与跨阶段可见性未经真机验证。
-5. **API 模型与费用**：官方文档列出 `deepseek-flash`，但脚本尚未用真实账户 API 联调；调用会使用用户自己的 DeepSeek 额度。
-6. **上游元数据**：新增关联请求头可能被千问观察，虽然它不直接包含问题明文，但会增加可关联信息。
+只分享经过本人检查的 `[AIES_V06]` 或 `[AIES_QWEN_PASSIVE]` 固定日志类别、模块固定 SHA 和 Siri 显示结果。停止实验时依次停用 60、61 和旧 REJECT，并按原备份决定是否关闭不再需要的目标域 MITM。所需的本地辅助采样可通过对应 `*_STOP_ONCE.js` 手动清理，不会误清 DeepSeek API Key。若需主动删除 Key，请使用单独的 [clear_key_ONCE.js](../scripts/clear_key_ONCE.js)。
 
-## 停止条件与敏感数据规范
-
-任何显示千问答案、混合答案、串话、密钥泄露、流式错误或不明绕过都应记录为失败，停止测试并按[安装指南](INSTALL_SIRI_DEEPSEEK_V06_ZH.md)回滚。只记录阶段码和版本，**不提交**真实问题、API Key、Authorization、Cookie、完整 HTTP/SSE 或网络抓包。
-
-只有 [发布验收清单](RELEASE_CHECKLIST_ZH.md) 所列设备与安全门槛达成，才考虑 Stable。
-
-## noRTI 真机输入结构诊断补充
-
-已观察到 noRTI 首次兼容后仍出现 `REQUEST_DIAG_INPUT_UNSUPPORTED`。新增 `NORTI_SHAPE_*` 仅输出固定的字段层级/类型异常分类，最多两项；**不会因为发现结构差异而自动放开原本拒绝的媒体和未知字段**。获取具体完整 JSON 仍须另行安全评估，禁止上传带认证信息的原始日志。
-
-## 2026-11-19：请求字段结构最小采样
-
-为避免直接放宽 noRTI 未知字段，增加一个与原本组名探针完全独立的**本机 opt-in 结构摘要**：默认关闭，必须通过手动 Script Test 开启 600 秒。仅在精确 noRTI、Siri UA、POST、请求阶段和严格解析失败时，暂存一次经过长度和疑似敏感内容过滤的有限字段**名称/类型**。普通主脚本日志只显示固定成功或失败码；字段名只会在用户再次手动 Script Test 时本地展示一次并清除。**字段值从不被保存为探针结果**，包括真实问题、Authorization、Cookie、令牌、Key 或请求正文。字段名仍可能敏感，分享前必须人工检查；逻辑清空不能保证物理擦除。STOP 只清理诊断状态，不影响 API Key。详见[本地结构探针](SIRI_SCHEMA_PROBE_ZH.md)。
-
-## 真实 noRTI 字段结构精确兼容（2026-11-19 11:54）
-
-来自 iPad 本地探针的字段**名称和 JSON 类型**经人工提供，包含工具列表和响应格式配置；这些非提问元数据只做严格类型检查并忽略，**不会转发到 DeepSeek**。仅允许精确 Siri noRTI 组名和现有 Siri User-Agent，且保留 POST、纯文本、角色、媒体/工具调用、上游 SSE 失败关闭校验。外层 `type` 的值未知，不会因类型是 string 就放行任何值；只允许已知文本消息判别符 `message`。新的 `NORTI_CONTENT_*` 日志只报告固定的无值结构分类。真机完整输入仍未验证。
-
-## 2026-11-19：用户主动要求的本地请求正文捕获
-
-新增完全默认关闭的**一次性、10 分钟窗口**的 Siri → Qwen 请求体采集，只匹配已限定目标 URL、Siri User-Agent、HTTP POST。用户手动运行本地辅助脚本后，运行 Hook 才会把有限的 JSON **脱敏副本**写入本机；不读取 HTTP 请求头、Cookie、Authorization、Token、Key，不向其他服务额外发送结果。工具定义、响应格式配置、`input_hint` 和未知顶层值被省略/遮挡；保留 `input` 正常文本供用户手动审阅（因此可能含个人信息，必须用无隐私测试问题）。捕获结果在用户第二次手动测试时逻辑清除，随后通过分段日志本地显示；物理擦除与通用敏感信息去除无法保证。绝不启用辅助脚本自动事件或上传原始抓包。详见[使用指南](SIRI_QWEN_BODY_CAPTURE_ZH.md)。
-
-## DeepSeek 回答可见来源标记（2026-11-19）
-
-在满足已验证的 DeepSeek HTTP 200 正常完成、回答文本合法且 SSE 原始结构可识别的条件后，脚本才将 `【DeepSeek · AIES】` 作为正文前缀插入要提交给 Siri 的重写 SSE，且保留 `X-AIES-Answer-Source: deepseek` 响应头。提示词的身份描述不能替代这一代码级保证，也无法控制 Siri 的固定 Qwen UI 品牌。错误、Qwen 原文、未知 SSE、DeepSeek 失败均不标成 DeepSeek。新增的响应阶段关联诊断只打印常量，不输出临时 ID、认证头或请求正文。系统级旁路仍可能展示原生 Qwen 内容，非端到端来源保护承诺。
-
-## 独立 61 原生 Qwen 被动协议诊断
-
-临时实验模块只对目标 `prod-yabuli.qianwen.com/v1/sessions/responses` 的 Siri POST 与对应 Response Hook 做采样，默认关闭，用户手动开启 600 秒。一份请求字段**类型/受限键名**、少量白名单系统版本，以及一份 SSE **事件名/事件顺序/数量/嵌套键类型**在本地保存并于手动读取前逻辑清除。不会保存问题或回答文字、HTTP Header/Token/Cookie/Key、原始 SSE 或请求体，不调用模型或任何网络上传。所有 HTTP 钩子始终 `$done({})` 不改写流量。该模块应仅在停用生产 60 和任何同域旧 REJECT 后启用；响应缓冲和 HTTPS MITM 本身仍有风险，对原生连接的影响需基线对照，采样后的逻辑清空不保证物理擦除。详细流程：[独立诊断指南](QWEN_PASSIVE_DIAG_ZH.md)。
+详细源证据：[调试记录](DEBUG_HISTORY_2026-11-19_ZH.md)、[请求 JSON](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)、[原生 SSE](OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)、[根因与决策](ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)。

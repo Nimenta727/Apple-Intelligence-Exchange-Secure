@@ -1,5 +1,7 @@
 # 一次性提取 Siri → Qwen 请求正文（本地脱敏版）
 
+> **历史诊断用途（2026-11-19 14:56）**：已获得一次有效的真实 Siri 文本结构，不需要重复采集；优先阅读[已观测请求 JSON 归档](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)。本探针因可能显示本次无隐私测试问题的文本，仅在用户明确授权时使用。
+
 > 只用于你**主动发起的一次非隐私 Siri 测试**，不是长期监听。它采集的是 Siri **尝试发送到** `prod-yabuli.qianwen.com/v1/sessions/responses` 的 HTTP **POST JSON body**；不保证请求已经到达 Qwen。**不是直接抓取 Qwen App 或 Qwen 网页的全部聊天**。
 
 ## 能得到什么？

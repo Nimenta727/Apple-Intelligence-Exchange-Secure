@@ -1,81 +1,60 @@
-# AIES v0.6 安装与回滚指南
+# AIES v0.6 Shadowrocket 安装、模式切换与回滚
 
-> 版本：**v0.6.0-beta**。仅供受控真机验证，尚未证明 Siri 原生回答和 DeepSeek API 的完整兼容性。**原始问题可能发送千问与 DeepSeek**；不保证脚本未运行时的答案来源。
+> **实验 Beta，未通过原生 Siri UI 验收。** 只有 60 是 DeepSeek 改写模式；61 是只读 Qwen 诊断模式，**两者不能同时启用**。用户问题可能先到 Qwen，再由 60 转交给 DeepSeek，无法提供系统级“零 Qwen 流量”保证。
 
-## DeepSeek 改写的当前 60 模块（与 61 被动诊断互斥）
+## 1. 当前两个模块
 
-- [Shadowrocket 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)
-- [实际运行的脚本](../scripts/aies_siri_deepseek_v06.js)
-- 模块 Raw URL：
+| 模式 | 模块 | Runtime 固定 SHA |
+|---|---|---|
+| **60 Siri → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `087211c1858eb77d90fd6583de46a2b4f6bcb77a` |
+| **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `56755369499c85b3bf1594627ec2556633c8cf5b` |
+
+**60 的 Shadowrocket 模块 Raw URL：**
 
 ```text
 https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule
 ```
 
-模块的 HTTP Request 和 Response 两条规则均使用同一个经过固定 Git SHA 引用的脚本。**不要把 GitHub 页面链接当作模块导入 URL**。
+**61 的 Shadowrocket 模块 Raw URL：**
 
-**2026-11-19 诊断版升级：** 旧版在真实 Siri 请求捕获阶段返回 `ERROR_UNSUPPORTED_SIRI_REQUEST`。新模块已 pin 到修订脚本。已安装旧 60 的用户请**更新/重新导入模块并让 Shadowrocket 下载新的脚本**；无需重设本地 API Key 或 MITM CA。之后只记录 `REQUEST_DIAG_*` 和 `ERROR_*` 固定码；诊断版未证明 Siri 已修复。
+```text
+https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule
+```
 
-## 安装前的安全准备
+这些 Raw 地址是模块安装入口。**检查模块中的 Request 与 Response Hook 都固定到上表同一完整提交 SHA**；不要仅检查模块名字或脚本更新时间。GitHub 网页的 `blob/main` 链接不是 Shadowrocket 模块导入 URL。
 
-1. 备份当前 Shadowrocket 配置。设备上如存在**之前导入的同域 REJECT、旧接管脚本或其他冲突模块**，测试新模式时必须先停用。这些文件虽然已从仓库移除，但不会从设备上自动消失。
-2. Shadowrocket VPN 连接正常。本机生成并按当前 iOS 正规流程信任 Shadowrocket CA，MITM 只对 `prod-yabuli.qianwen.com` 生效。信任根 CA 有安全风险，测试结束后视需要撤销。
-3. 使用自己的 DeepSeek API Key。仅在设备本地支持执行脚本的情况下，复制 [provision_key_ONCE.js](../scripts/provision_key_ONCE.js) 到设备临时位置，将占位符替换为真实 Key，并在本地运行；Key 写入 `$persistentStore` 的 `SAIRS_DEEPSEEK_API_KEY`。执行后删除临时脚本。**绝不在 GitHub、聊天、URL、截图或日志中提交 Key**。
-4. **API 联调状态**：脚本固定 `model: "deepseek-flash"`，此模型名已由 [DeepSeek 官方 API 文档](https://api-docs.deepseek.com/api/create-chat-completion/) 确认支持；但设备上的真实 API Key 调用、账户额度和响应验证仍未完成，不能把未联调误认为安装错误。
-5. 若 Shadowrocket 不提供经确认的本地脚本执行入口，**暂停配置 Key**，不要把它放入远程模块或其他不安全渠道。
+## 2. 测试前准备
 
-## 诊断版更新（2026-11-19）
+1. 备份当前 Shadowrocket 配置。手动检查设备上**旧的 `00 REJECT`、历史脚本、同域 URL Rewrite 或另一个模式的模块**，先全部停用；GitHub 删除旧代码不会帮设备自动删除配置。
+2. 确认 VPN 连接正常。对**目标主机** `prod-yabuli.qianwen.com` 启用必要的 HTTPS MITM，并通过设备支持的系统证书信任流程完成验证。信任 CA 有安全风险，诊断结束应按需要关闭；不要把 MITM 范围扩大到其他域名。
+3. 若要启用 60，必须有本人授权使用的 DeepSeek API Key。使用仓库的 [provision_key_ONCE.js](../scripts/provision_key_ONCE.js) **仅在设备本地**填入并手动执行，使它写入 `$persistentStore` 的 `SAIRS_DEEPSEEK_API_KEY`。执行后删除含真实 Key 的本地临时脚本。绝不能在 GitHub、模块 URL、聊天、截图、PacketTunnel 日志里传播 Key。
+4. DeepSeek Chat Completions 的当前官方接口为 `POST https://api.deepseek.com/chat/completions`；本项目默认 `deepseek-flash`，并使用官方支持的 `thinking: {"type":"disabled"}` 非思考模式缩短等待时间。具体参见[官方 API 文档](https://api-docs.deepseek.com/api/create-chat-completion/)。**只有成功 HTTP/脚本日志和真机显示才算实际验收，不能仅因模型名称存在而宣布功能成功。**
 
-如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `187d755bf0f76032df162f4a9f25855b4f2a594f`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
+## 3. 先做原生 Qwen 基线
 
-额外的 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) **仅供手动 Script Test**，不是模块自动安装的第三条钩子。**必须在 iPad 本地把旧版同名 JS 覆盖为最新版**；仅刷新远程 60 模块不够。手动运行一次开启 **600 秒**，问一次非隐私 Siri 问题，再运行同一个脚本查看结果、剩余时间和命中次数；重复检查**不自动取消**。需要停止时专门手动运行 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js)。不要把任何辅助脚本放入启用的 `event`、`cron` 或 HTTP 自动规则。详见[完整步骤](SIRI_GROUP_PROBE_ZH.md)。
+先把 60 和 61 都关掉，问 Siri 一次无隐私的纯文本问题。如果这时就不能正常使用 Qwen，优先排查网络、Siri 集成、VPN/代理配置，而不是误判 DeepSeek 重建代码。
 
-**更新说明：** 真机已确认组名 `siri.multimodal.noRTI`，此版本仅对 Siri UA 且文本结构受限的这一精确组名开放解析；其他未知组名、多模态输入或含意外字段的请求仍拒绝。**只需刷新 60 模块，之前已更新的 v2 本地辅助 JS 不需要重装；DeepSeek Key、MITM CA 不需要重设。** DeepSeek、真实 SSE 和 Siri UI 仍未验收。
+需要研究原始 SSE 时，再启用 61（**60 保持关闭**）；按 [61 被动诊断指南](QWEN_PASSIVE_DIAG_ZH.md)使用本地 `qwen_passive_probe_ONCE.js`。61 默认不采集，手动开启 600 秒窗口才暂存有限字段类型，两个 Hook 都 `$done({})` 不修改请求或响应。即便如此，MITM 缓冲也可能影响流式时序。
 
-## 第一次集中安装
+## 4. 60 DeepSeek 实验模式
 
-1. 导入上方 Raw URL 的 60 模块并启用。
-2. 确认存在一个 `http-request` 和一个 `http-response` 规则，两者匹配相同 HTTPS 目标路径；不要叠加其它同域脚本。
-3. 确认 Shadowrocket VPN、CA 信任、目标域名 MITM 都已生效。
-4. 用不包含私人信息的一条 Siri 文本问题测试。**必须看 Siri 原生界面是否真正显示 DeepSeek 对应回答**，不能只看脚本记录“尝试替换”。
-5. 对照 [调试手册](DEBUGGING_ZH.md) 查看 `[AIES_V06]` 固定日志标记；如果响应失败、展示千问内容或超时，记录失败并停止测试。
+1. 关闭 61 和其它同域冲突模块，再导入并启用 60。确认两条脚本固定 SHA 为 `087211c1858eb77d90fd6583de46a2b4f6bcb77a`。
+2. 在 Siri 问一个非私密且答案容易核对的**纯文本问题**；音频、图像、工具调用、WritingTools、未知 SSE 事件都不应被当作正常文本转给 DeepSeek。
+3. **只查看固定 `[AIES_V06]` 状态码**：`REQUEST_CAPTURED`、`RESPONSE_TAG_*`、`SSE_PREFLIGHT_PASSED`、`DEEPSEEK_STARTED`、`DEEPSEEK_LABEL_APPLIED`、`DEEPSEEK_RESPONSE_ATTEMPTED` 或 `ERROR_*`；不要上传原始请求日志。
+4. 看 Siri **真正显示的内容**。只有用户肉眼看到 `【DeepSeek · AIES】` 的正文、且固定日志链与同一测试一致，才算至少一次 DeepSeek Siri 显示闭环。Qwen 服务卡片可能仍然显示原品牌。
+5. 遇到 `RESPONSE_TAG_MISSING` + `RESPONSE_PROMPT_BODY_UNAVAILABLE` 时会失败关闭，避免把错误问题配给另一个答案。这是**仍待真机解决**的跨 Hook 关联问题；不要打开“全局最新请求”之类不安全修复。其他错误按[调试表](DEBUGGING_ZH.md)判断。
 
-## 如何安全回滚
+## 5. 2026-11-19 新 SSE 重建的意义与限制
 
-1. 在设备上停用 60 模块和它的双阶段钩子。
-2. 恢复安装前备份的 Shadowrocket 配置；如原配置包含阻断规则，恢复后应按自己的网络要求复核其生效情况。
-3. 如不再使用 Key，可在本地执行 [clear_key_ONCE.js](../scripts/clear_key_ONCE.js)，它将对应 store 键清空。**清空操作不构成物理安全删除证明**。
-4. 测试结束后关闭不需要的 MITM 主机规则，按需移除 CA 信任，保留脱敏错误码和设备/软件版本即可。
+- 真机 61 已验证 Qwen 原生有 13 个 SSE 事件、两个文本增量，14:49 的一次响应满足 `MATCHES_60_PREFLIGHT`。旧版 60 只构建极简的 Choice/Item/Session 事件字段。
+- 最新 60 的脚本改为按[真实响应协议](OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)重新生成包含完整可见字段结构的所有回答事件，仅从 Qwen 取有界的非模型会话元数据，所有答案文本都来自通过验证的 DeepSeek 回包；工具/媒体/审核路径拒绝。
+- 这一改动仍只通过 Node 离线模拟和静态审查，**不能保证 Siri 真机接收**，也**没有解决 Header 丢失**。
 
-## 结果判定
+## 6. 停止和清理
 
-- “模块导入成功”不是“DeepSeek API 成功”。
-- “脚本调用了 `$done`”不是“Siri 接受响应”。
-- “单次 DeepSeek 显示成功”不是“脚本没运行时不会展示千问”。
-- 只有 [发布验收清单](RELEASE_CHECKLIST_ZH.md) 所列条件才决定是否可以标为稳定版本。
+- 不稳定时：**先停用 60，再停用 61**；确认旧的 REJECT 和其它同域脚本也停用，恢复原生 Qwen。
+- 完成调试后：如不需要长期使用目标域 MITM，按原备份关闭或撤销相应配置。停止任何还在运行的本地采样，请手动执行对应的 `*_STOP_ONCE.js`；这不会清除 Key。
+- 若想清除 DeepSeek Key，按需手动运行 [clear_key_ONCE.js](../scripts/clear_key_ONCE.js)，但这一步与普通更新模块无关。
+- 只分享固定错误码、脚本 SHA 和 Siri 显示结果；**不要上传完整 PacketTunnel、代理 DB、CA 私钥、真实问题或认证信息**。
 
-其他材料：[使用手册](USER_GUIDE_ZH.md) · [当前架构](ARCHITECTURE_CURRENT_ZH.md) · [安全说明](SECURITY_CURRENT_ZH.md)。
-
-### 真实 Siri 输入结构诊断更新（2026-11-19）
-
-如已看到 `REQUEST_DIAG_INPUT_UNSUPPORTED`，新 60 模块仅在 noRTI 严格输入校验失败时输出附加的 `NORTI_SHAPE_*` 安全分类。**继续保留严格拒绝，不代表已修好 Siri。** 设备只需刷新 60 模块，**不需要重装本地组名探针、DeepSeek API Key 或 CA**。问一次非隐私问题后，分享固定 AIES 错误码即可，不能发送原始 PacketTunnel 日志。
-
-### 11:14 新增：本地 noRTI 结构探针
-
-现在真实 Siri 已命中严格 noRTI 分支，但因根级和消息包装的额外字段被拒绝；不能仅靠原 PacketTunnel 日志判断这些字段是否安全。新模块添加了仅**手动授权**时记录结构键名和类型的能力。需要**刷新 60 模块，同时单独下载新的** [`siri_schema_probe_ONCE.js`](../scripts/siri_schema_probe_ONCE.js) 并在 Script Test 手动运行（无需替换已经正确的组名探针）。完整流程见[结构探针指南](SIRI_SCHEMA_PROBE_ZH.md)。不需要重设 Key 或 CA。此版本**还不能保证 Siri 正常回答**。
-
-### 已确认的 noRTI 外层结构兼容更新（2026-11-19）
-
-本机手动探针已确认 Siri 的根级工具/格式字段名称及 JSON 类型、输入包装 `type:string`、内部 `message` 的 `content:array`、`role:string`。新脚本在 Siri UA + 精确 noRTI 组名下**只放行这些键与类型**，不会将工具配置或格式元数据转发到 DeepSeek。若真实包装 `type` 不是文本消息的 `message` 或内容元素不是纯文本，仍可能被拒绝并输出固定的 `NORTI_SHAPE_*` 或 `NORTI_CONTENT_*`。**只需刷新 60 模块，无需更新已成功的本地探针或重设 API Key/证书。**
-
-## 12:07 已确认的字段与单次请求正文采样
-
-本地结构诊断再次确认了顶层 `input_hint:string`，本版严格允许其字段名与类型但**不使用其值**。为了直接核对用户希望发给 Qwen 的文本片段，另增加 [一次性本地脱敏请求正文采集工具](SIRI_QWEN_BODY_CAPTURE_ZH.md)：更新 60 模块，并在本地 Shadowrocket Script Test 手动运行 `siri_qwen_body_probe_ONCE.js`，问一次非隐私 Siri 问题，再手动读取。捕获体不读取请求头、Token 或 API Key；**不能将辅助脚本启用为自动钩子**，不需要重设 CA 或 Key。这仍不等于 DeepSeek 或 Siri UI 工作正常。
-
-## 来源标签与失败阶段诊断（2026-11-19）
-
-本版本加入仅在 DeepSeek 验证成功时生成的正文前缀 `【DeepSeek · AIES】`，及响应阶段缺失关联标记/存储关联/请求正文恢复情况的**固定码**。更新设备上已经安装的 60 模块，让两条 HTTP Hook 都引用 `187d755bf0f76032df162f4a9f25855b4f2a594f`；本次不需要重装本地探针、API Key 或 CA。问一次非隐私问题后核对 Siri **实际显示的正文**与 `[AIES_V06]` 日志。Qwen 的系统品牌卡片可能保持不变；若只出现卡片但没有 DeepSeek 前缀，来源仍无法确认。不要上传完整 PacketTunnel 或凭据。
-
-## 仅观测 Qwen 原生协议时的临时 61 模式
-
-若要正常使用 Qwen，同时分析上游 SSE 结构，请**先停用此文档的 60 改写模块**、旧同域 REJECT，再验证原生 Qwen 是否回答正常。随后启用独立 [61 Qwen 被动诊断模块](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) 并按[手动一次性诊断指南](QWEN_PASSIVE_DIAG_ZH.md)操作。**不要同时启用 60 和 61**。61 只返回 `$done({})`，不调用 DeepSeek，不更改请求或响应正文、Headers、Status；但 MITM/响应缓冲本身仍需真机验证。完成后关闭 61 再恢复原配置。
+完整资料：[请求 JSON](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)、[调试历史](DEBUG_HISTORY_2026-11-19_ZH.md)、[根因与未修项](ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)、[验收矩阵](VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)。
