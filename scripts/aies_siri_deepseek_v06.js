@@ -77,7 +77,8 @@ function safeGroupIdentifier(v){
    !/^(?:bearer|token|secret|sk-)/i.test(v);
 }
 function captureUnknownSiriGroup(g){
- if(!isSiriForProbe())return;
+ // Capture only in the request hook for an explicit Siri POST; never in response.
+ if(res||!isSiriForProbe()||String(req.method||req.httpMethod||"").toUpperCase()!=="POST")return;
  var arm=storeRead(GROUP_PROBE_ARM),exp=0;
  try{exp=JSON.parse(arm).expiresAt;}catch(e){return;}
  if(typeof exp!=="number"||!isFinite(exp)||exp<=Date.now()||exp>Date.now()+180000)return;
