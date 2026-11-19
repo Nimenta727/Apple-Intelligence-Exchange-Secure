@@ -19,7 +19,7 @@ npm test
 npm run docs:check
 ```
 
-Node.js >=20；没有旧式 bundle 构建步骤。CI 检查 JS 语法、60 双钩子模拟、61 只读行为、失败/隐私/并发/SSE 场景、文档链接、模块固定 Git SHA 和文件清单。**全部通过后才能合并**，但仍须按[验收矩阵](VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)另做真机检查。
+Node.js >=20；没有旧式 bundle 构建步骤。CI 检查 JS 语法、60 主双钩子模拟及第三条 Guard 的静态一致性、61 只读行为、失败/隐私/并发/SSE 场景、文档链接、模块固定 Git SHA 和文件清单。**全部通过后才能合并**，但仍须按[验收矩阵](VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)另做真机检查。
 
 ## 代码修改原则
 
@@ -31,6 +31,10 @@ Node.js >=20；没有旧式 bundle 构建步骤。CI 检查 JS 语法、60 双�
 6. 修改 61 时同理同步两个 61 Hook；运行脚本任何异常必须 `$done({})`，不得主动上传、记录用户正文或调用 DeepSeek。
 7. 各个 `*_ONCE.js` 和 `*_STOP_ONCE.js` 只能在 Shadowrocket **手动 Script Test** 使用，不能注册为 HTTP/event/cron 自动采样；首次开启、状态复查、过期、清理与存储失败都要覆盖测试。
 8. 代码在 PR 分支完成、CI 成功后合并。**GitHub 主分支 CI 通过也不能代表真机 UI 兼容**；发布必须明确证据和未完成事项。
+
+## 60 的第三条规则（2026-11-19 15:51）
+
+60 现在不是只有两条脚本规则，而是两条主接口 Request/Response 改写钩子，加一条只处理 Siri `/v1/sessions/{opaque-id}/responses` 的 SSE 响应 Guard。三条规则必须使用同一个完整不可变 SHA；61 的两个只读 Hook 保持不变。Guard 可能增加 Siri 失败率，因此严格禁止升级为全域 `REJECT` 或把会话级请求直接猜测关联到主请求。
 
 ## 真实调试记录格式与隐私
 
