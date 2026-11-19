@@ -387,6 +387,12 @@ function parseRequest(raw){
   var parts=[];
   for(var i=0;i<o.input.length;i++){
    var it=o.input[i],m=it&&it.message&&typeof it.message==="object"?it.message:it;
+   if(m&&typeof m==="object"&&Object.prototype.hasOwnProperty.call(m,"role")&&m.role!=="user"){
+    requestDiagnostic="INPUT_UNSUPPORTED";return null;
+   }
+   if(it&&typeof it==="object"&&Object.prototype.hasOwnProperty.call(it,"type")&&it.type!=="message"){
+    requestDiagnostic="INPUT_UNSUPPORTED";return null;
+   }
    var content=m&&m.content;
    var list=Array.isArray(content)?content:[content];
    if(list.length<1||list.length>64){requestDiagnostic="CONTENT_UNSUPPORTED";return null;}
@@ -663,7 +669,7 @@ try{
   url:C.endpoint,method:"POST",timeout:10,"auto-redirect":false,
   headers:{"Content-Type":"application/json","Accept":"application/json","Authorization":"Bearer "+key},
   body:safeJson({
-   model:C.model,stream:false,max_tokens:500,
+   model:C.model,stream:false,thinking:{type:"disabled"},max_tokens:500,
    messages:[
     {role:"system",content:"你是通过 AIES 提供回答的 DeepSeek 中文问答助手。回答应简短准确，不要自称千问或 Qwen；用户询问回答来源时，如实说明答案由 DeepSeek API 生成、经 AIES 转发。不要自行在答案里重复添加固定来源标签，代理脚本会统一添加。"},
     {role:"user",content:prompt2}
