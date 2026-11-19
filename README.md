@@ -9,7 +9,7 @@
 
 > **2026-11-19 真机进展**：已观察 Siri POST 被 Request hook 拦截，但脚本返回 `ERROR_UNSUPPORTED_SIRI_REQUEST`，未到 DeepSeek 阶段。本次添加不记录敏感数据的 `REQUEST_DIAG_*` 分类、少量严格纯文本包装兼容和离线回归测试。**现已确认组名，但真实输入 JSON 和响应 SSE 结构仍需复测，不能认定问题已解决。** 重新导入/刷新 60 模块才能使用新固定脚本，详见[调试文档](docs/DEBUGGING_ZH.md)。
 
-## 2026-11-19：Siri 组名已确认，严格纯文本适配待真机验证
+## 2026-11-19：Siri 组名已确认，真实文本结构仍待适配
 
 最新日志确认 Siri 与 WritingTools 共享同一个接口，并且二者均可能触发 `REQUEST_DIAG_GROUP_UNSUPPORTED`。已在 iPad 实际捕获 Siri `response_configuration_group_id=siri.multimodal.noRTI`。现仅为**匹配 Siri User-Agent、受限纯文本输入形状**的这一精确组名加入离线验证过的支持；媒体和未知字段仍被拒绝。WritingTools 继续跳过，**端到端 Siri/DeepSeek 功能尚未验证**。
 
@@ -86,3 +86,5 @@ npm run check
 - [发布验收门槛](docs/RELEASE_CHECKLIST_ZH.md)
 
 **当前结论**：代码和模拟验证不等于可用性验证；真实 Siri、DeepSeek 模型、协议兼容性、异常回退及本地存储生命周期仍须测试。本项目遵循 [MIT License](LICENSE)，参考 [boitar/sair](https://github.com/boitar/sair) 的公开协议研究并保留出处。
+
+> **最新真机诊断（11:06）**：`siri.multimodal.noRTI` 已经通过组名检查，但后续两次均出现 `REQUEST_DIAG_INPUT_UNSUPPORTED`，尚未调用 DeepSeek。为了避免盲目放宽多模态请求，本次进一步增加 `NORTI_SHAPE_*` 固定分类码。刷新 60 模块后问 Siri 一次，仅反馈固定错误码；详见[调试指南](docs/DEBUGGING_ZH.md)。
