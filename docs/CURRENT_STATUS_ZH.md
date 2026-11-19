@@ -83,3 +83,9 @@
 ## 2026-11-20 最新：PR #33 已合并，106/106 tests 通过，真实多轮 UI 仍待验收
 
 [PR #33](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/33) 已合并（`345ec50c45c8966ed3ad5ec005148ba3203318cc`），[CI](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44567918717) 通过 106/106。60 四条 Request/Response Hook 统一固定 `7a698fbaadeb37431d9bd1d43df359292ee78ba0`；61 四条保持 `506e51ad1ad549722242611f174b527cc12c4d21`。最新 60 会尝试将同一 Siri session、可信 choice / tag 的后续纯文本请求重写为 DeepSeek 回答并保留最多三轮短期本地对话上下文；不具备可靠关联时仍失败关闭。用户当前仅完成 61 的真实 followup 结构诊断，**尚未安装并验收此新版 60 的第二问/第三问实际显示**。这不是稳定版，短期本地历史的逻辑 TTL 也不等于物理清除。详见 [维护记录](routine/2026-11-20-00-25-Siri-verified-followup-DeepSeek-beta.md)。
+
+## 2026-11-20 00:47：用户真机 60 发生远程脚本更新 CFNetwork 310，Qwen 原生透传
+
+用户提供四张截图显示 60 对 `raw.githubusercontent.com` 固定脚本 `7a698fba...` 反复下载失败（`kCFErrorDomainCFNetwork Code=310`，即 HTTPS 代理连接失败）、`script exception`，随后请求与响应发出。在截图范围内没有 `[AIES_V06] REQUEST_CAPTURED` 或 `DEEPSEEK_STARTED`；因此当次 Qwen 穿透首先是**脚本未正常加载**，尚不能判断新四 Hook 多轮解析代码能否成功。
+
+[PR #34](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/34) 已合并（`909f2169ed404b1bd9e74156af8959e85f798fe9`），[CI](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44571160641) **107/107 pass**。新增与 60 互斥的 [62 LOCAL 模块](../shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule)：使用四条相同 HTTP Hook，但从设备本地 `Script/aies_siri_deepseek_v06.js` 加载固定 `7a698fba...` 版本，以避免 GitHub Raw 在运行时失败。**本地路径仍待用户 iPad 验证**，不能宣称修复或系统级零 Qwen。步骤及边界见[安装说明](INSTALL_SIRI_DEEPSEEK_V06_ZH.md)和[维护记录](routine/2026-11-20-00-47-Shadowrocket-runtime-CFNetwork-310-local-fallback.md)。
