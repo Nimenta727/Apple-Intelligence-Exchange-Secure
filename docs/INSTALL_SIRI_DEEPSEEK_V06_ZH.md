@@ -7,7 +7,7 @@
 | 模式 | 模块 | Runtime 固定 SHA |
 |---|---|---|
 | **60 Siri / 写作工具 → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `975599163bafeb8c6ba8aa60624577e2a861d9f0` |
-| **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `955fe4f7cec2471042469cdb7de740015db850bf` |
+| **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `506e51ad1ad549722242611f174b527cc12c4d21` |
 
 **60 的 Shadowrocket 模块 Raw URL：**
 
@@ -71,7 +71,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 同题 A/B 实验（2026-11-19 16:15 后）
 
-为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `975599163bafeb8c6ba8aa60624577e2a861d9f0`；61 的四条原样放行规则均固定到 `955fe4f7cec2471042469cdb7de740015db850bf`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
+为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `975599163bafeb8c6ba8aa60624577e2a861d9f0`；61 的四条原样放行规则均固定到 `506e51ad1ad549722242611f174b527cc12c4d21`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
 
 ## 写作工具 Compose Beta（2026-11-19 浏览器协议研究后新增）
 
@@ -88,3 +88,9 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 ## 响应阶段 User-Agent 丢失的受限场景恢复（2026-11-19）
 
 新版 60 若响应阶段缺少 `User-Agent`，只允许凭**该事务请求阶段生成、仍在 45 秒有效期内、并在本地 store 验证成功的 `X-AIES-Request-ID`**恢复 WritingTools/Siri 场景；若响应阶段有明确但冲突的 UA，仍返回 `CORRELATION_MISMATCH`。缺少可靠 token 时，不能按最近一次请求猜测 WritingTools 场景。`WRITINGTOOLS_COMPOSE_SCOPED` 现在只在写作请求完成支持组名及纯文本校验后输出；`WRITINGTOOLS_SCENE_RECOVERED_FROM_TAG` 是受限恢复路径的诊断码，**仅表明代码命中，不等于 iPad 真机已经正常展示**。
+
+## Siri 只能第一问显示 DeepSeek：先做 61 followup 诊断（2026-11-19）
+
+2026-11-19 两份真机日志显示，多次 `DEEPSEEK_RESPONSE_ATTEMPTED` 已发生，而 60 的第三条规则累计 7 次 `QWEN_SESSION_FOLLOWUP_SSE_BLOCKED`（给会话级路径返回 502），并且每份日志各出现一次请求关联缺失。**这不能证明 DeepSeek API 只支持第一问**，也不能仅凭日志断定第二问 UI 失败完全由 Guard 引起。
+
+在改动 60 的会话逻辑之前，先按 [61 被动诊断指南](QWEN_PASSIVE_DIAG_ZH.md)第五节运行一次 Siri followup *仅结构*探针：保持 60 关闭、61 独占，手动开启 `siri_followup_schema_probe_ONCE.js`，连续问两条非隐私文本问题，然后手动读取结构并清除。**不要把禁用 Guard 后偶然出现的原生 Qwen 回答误判为 DeepSeek。**
