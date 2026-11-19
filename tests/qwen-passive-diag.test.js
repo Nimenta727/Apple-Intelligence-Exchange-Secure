@@ -118,6 +118,7 @@ test("captures only SSE event name/order/count plus JSON key/type schema, no Qwe
  const st=snap(e);
  assert.equal(st.response.status,200);
  assert.equal(st.response.format,"SSE");
+ assert.equal(st.response.strict60Preflight,"MATCHES_60_PREFLIGHT");
  assert.equal(st.response.eventCounts.length,12);
  assert.equal(st.response.orderFirst.length,12);
  assert.equal(st.response.orderFirst[0],"session.created");
@@ -152,6 +153,66 @@ test("passive summarizer preserves unknown SSE event shape safely without accept
  assert.ok(!value(resp).includes("PRIVATE_ID"));
  assert.ok(!value(resp).includes("surprise_PRIVATE_TOKEN"));
 });
+function makeFixture(){return Sse.candidateSse("QWEN_PRIVATE_ANSWER",SECRET,"siri");}
+function changePayload(raw,eventName,edit){
+ const frames=raw.trim().split("\n\n");
+ const idx=frames.findIndex(x=>x.startsWith("event: "+eventName+"\n"));
+ assert.ok(idx>=0,"fixture event exists");
+ const lines=frames[idx].split("\n"),wrapper=JSON.parse(lines[1].slice(6));
+ edit(wrapper[eventName],wrapper);
+ lines[1]="data: "+JSON.stringify(wrapper);
+ frames[idx]=lines.join("\n");
+ return frames.join("\n\n")+"\n\n";
+}
+function observedPreflight(raw){
+ const e=env();e.arm();
+ const result=e.invoke(e.request(),{status:200,body:raw});
+ assert.equal(value(result.returned[0]),"{}");
+ assert.equal(e.sent.length,0);
+ const summary=snap(e).response;
+ assert.ok(!value(summary).includes("QWEN_PRIVATE_ANSWER"));
+ assert.ok(!value(summary).includes(SECRET));
+ return summary.strict60Preflight;
+}
+test("passive 61 strict60 preflight classifier matches current rewriteSse branch checks",()=>{
+ const stream=makeFixture();
+ assert.equal(observedPreflight(stream),"MATCHES_60_PREFLIGHT");
+ const first=stream.split("\n\n")[0];
+ assert.equal(observedPreflight(first+"\n\n"),"EVENT_COUNT_UNSUPPORTED");
+ const addedId=stream.replace("event: session.created\n","id: PRIVATE_ID\nevent: session.created\n");
+ assert.equal(observedPreflight(addedId),"FRAME_LAYOUT_UNSUPPORTED");
+ const unknown=stream.replace("event: session.created","event: unknown");
+ assert.equal(observedPreflight(unknown),"EVENT_UNKNOWN");
+ const malformed=stream.replace(/data: \{[^\n]+/,"data: {");
+ assert.equal(observedPreflight(malformed),"EVENT_JSON_INVALID");
+ const envelope=changePayload(stream,"session.created",(payload,wrapper)=>{
+  delete wrapper.type;
+ });
+ assert.equal(observedPreflight(envelope),"EVENT_ENVELOPE_INVALID");
+ const frames=stream.trim().split("\n\n");
+ const order=[frames[1],frames[0],...frames.slice(2)].join("\n\n")+"\n\n";
+ assert.equal(observedPreflight(order),"EVENT_ORDER_UNSUPPORTED");
+ const invalidId=changePayload(stream,"session.created",payload=>{payload.id="session/PRIVATE";});
+ assert.equal(observedPreflight(invalidId),"SESSION_OR_RESPONSE_ID_INVALID");
+ const link=changePayload(stream,"session.response.created",payload=>{payload.session_id="WRONG_LINK_PRIVATE";});
+ assert.equal(observedPreflight(link),"SESSION_LINK_MISMATCH");
+ const expires=changePayload(stream,"session.created",payload=>{payload.expires_at="PRIVATE_EXPIRY";});
+ assert.equal(observedPreflight(expires),"SESSION_EXPIRY_INVALID");
+});
+test("preflight classifier never leaks prompt or response content and does not modify HTTP response",()=>{
+ const raw=makeFixture(),e=env();e.arm();
+ e.invoke(e.request());
+ const returned=e.invoke(e.request(),{status:200,body:raw,headers:{"Set-Cookie":SECRET}});
+ assert.equal(value(returned.returned[0]),"{}");
+ const stored=value(snap(e));
+ assert.ok(stored.includes("strict60Preflight"));
+ assert.ok(stored.includes("MATCHES_60_PREFLIGHT"));
+ assert.ok(!stored.includes(SECRET));
+ assert.ok(!stored.includes("QWEN_PRIVATE_ANSWER"));
+ assert.ok(!stored.includes("Set-Cookie"));
+ assert.equal(e.sent.length,0);
+});
+
 test("one request and response each only; never overwrites after repeated Siri activity",()=>{
  const e=env();e.arm();
  e.invoke(e.request());
