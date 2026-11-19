@@ -11,7 +11,9 @@
 
 ## 2026-11-19：Siri 组名已确认，真实文本结构仍待适配
 
-**11:14 真机进展：** 新日志确认 `NORTI_SHAPE_ROOT_FIELDS` 与 `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`。原始 PacketTunnel 不包含安全可用的字段名称；因此新增**完全本地、手动开启、只采集字段名及数据类型**的 [noRTI 结构探针](docs/SIRI_SCHEMA_PROBE_ZH.md)。此工具不采集字段值、问题正文或认证信息；实际解析仍失败，DeepSeek/Siri 端到端尚未修复。需要先刷新 60 模块，再下载 [本地新脚本](scripts/siri_schema_probe_ONCE.js) 手动运行。
+**11:54 真机进展：** 本地结构探针已经采到顶层 `client_tools:array`、`response_format:object`、`server_tools:array`、`stream:boolean` 和输入包装 `type:string`、内部 `content:array` 与 `role:string`。已依据这一证据增加严格范围内的类型兼容，不转发工具元数据；但未知 `type` 值和内容项格式仍待真机验证。**新版本只需刷新 60 模块，当前不必重复结构采样。**
+
+**11:14 前次进展：** 新日志确认 `NORTI_SHAPE_ROOT_FIELDS` 与 `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`。原始 PacketTunnel 不包含安全可用的字段名称；因此新增**完全本地、手动开启、只采集字段名及数据类型**的 [noRTI 结构探针](docs/SIRI_SCHEMA_PROBE_ZH.md)。此工具不采集字段值、问题正文或认证信息；实际解析仍失败，DeepSeek/Siri 端到端尚未修复。需要先刷新 60 模块，再下载 [本地新脚本](scripts/siri_schema_probe_ONCE.js) 手动运行。
 
 最新日志确认 Siri 与 WritingTools 共享同一个接口，并且二者均可能触发 `REQUEST_DIAG_GROUP_UNSUPPORTED`。已在 iPad 实际捕获 Siri `response_configuration_group_id=siri.multimodal.noRTI`。现仅为**匹配 Siri User-Agent、受限纯文本输入形状**的这一精确组名加入离线验证过的支持；媒体和未知字段仍被拒绝。WritingTools 继续跳过，**端到端 Siri/DeepSeek 功能尚未验证**。
 
