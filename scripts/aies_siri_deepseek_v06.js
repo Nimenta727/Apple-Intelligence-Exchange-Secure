@@ -306,7 +306,19 @@ function parseRequest(raw){
    if(list.length<1||list.length>64){requestDiagnostic="CONTENT_UNSUPPORTED";return null;}
    for(var j=0;j<list.length;j++){
     var str=textAtom(list[j]);
-    if(typeof str!=="string"){requestDiagnostic="CONTENT_UNSUPPORTED";return null;}
+    if(typeof str!=="string"){
+     // Never echo unknown content values or type discriminators to logs.
+     // The observed group contains a content array, but element kinds are
+     // not yet known; classify only the *structural* mismatch.
+     if(observedGroup){
+      var atom=list[j];
+      var kind=!atom||typeof atom!=="object"?"PRIMITIVE_UNSUPPORTED":
+       Array.isArray(atom)?"NESTED_ARRAY_UNSUPPORTED":
+       "TEXT_OBJECT_UNSUPPORTED";
+      log("NORTI_CONTENT_"+kind);
+     }
+     requestDiagnostic="CONTENT_UNSUPPORTED";return null;
+    }
     if(/data:(image|audio|video)\//i.test(str)){requestDiagnostic="MEDIA_UNSUPPORTED";return null;}
     if(str.trim())parts.push(str.trim());
    }
