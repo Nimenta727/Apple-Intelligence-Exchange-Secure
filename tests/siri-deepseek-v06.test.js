@@ -7,6 +7,7 @@ const path=require("node:path");
 const Sse=require("./fixtures/siri-sse");
 const script=fs.readFileSync(path.join(__dirname,"../scripts/aies_siri_deepseek_v06.js"),"utf8");
 const moduleText=fs.readFileSync(path.join(__dirname,"../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");
+const localProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_group_probe_ONCE.js"),"utf8");
 const URL="https://prod-yabuli.qianwen.com/v1/sessions/responses";
 const fixture=Sse.candidateSse("QWEN_ORIGINAL_ANSWER_TEST","Sample","siri",{now:()=>1730000000000,id:()=>"beta-test"});
 const promptBody=JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:[{content:"Explain why the sky is blue"}]});
@@ -141,6 +142,96 @@ test("oversized body rejection is bounded and does not echo input",()=>{
  assert.ok(e.logs.every(x=>x.length<100));
 });
 
+
+function runLocalProbe(e){
+ const output=[],logs=[];
+ const store={
+  read:k=>e.data[k]||null,
+  write:(v,k)=>{e.data[k]=v;return true;}
+ };
+ vm.runInNewContext(localProbe,{$persistentStore:store,Date,
+  console:{log:v=>logs.push(v)},$done:()=>output.push(true)},{timeout:1000});
+ return {logs,output};
+}
+test("WritingTools is bypassed on request and response without model calls",()=>{
+ const e=env();
+ const req={...e.request,headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)"}};
+ const first=e.invoke(req);
+ const second=e.invoke(req,{status:200,body:fixture});
+ assert.equal(JSON.stringify(first.returned),JSON.stringify([{}]));
+ assert.equal(JSON.stringify(second.returned),JSON.stringify([{}]));
+ assert.equal(e.requests.length,0);
+ assert.ok(e.logs.every(x=>x==="[AIES_V06] WRITINGTOOLS_SKIPPED"));
+});
+test("unarmed unknown Siri group stays denied and is never stored",()=>{
+ const e=env(),id="siri.actual_variant";
+ const body=JSON.stringify({configuration:{response_configuration_group_id:id},input:[{content:"NONPRIVATE_QUESTION"}]});
+ const result=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body});
+ assert.equal(result.returned[0].response.status,502);
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,undefined);
+ assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_GROUP_UNSUPPORTED"));
+ assert.equal(e.requests.length,0);
+ assert.ok(!e.logs.some(x=>x.includes(id)||x.includes("NONPRIVATE_QUESTION")));
+});
+test("manual probe arm, single Siri sample, deliberate local read, and clear",()=>{
+ const e=env();
+ const armed=runLocalProbe(e);
+ assert.ok(armed.logs.includes("[AIES_SIRI_GROUP_LOCAL] ARMED_180_SECONDS"));
+ assert.ok(e.data.AIES_SIRI_GROUP_PROBE_ARM);
+ const id="siri.sample_group";
+ const body=JSON.stringify({configuration:{response_configuration_group_id:id},input:[{content:"VERY_PRIVATE_PROMPT"}]});
+ const request={...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)",Authorization:"Bearer PRIVATE_AUTH"},body};
+ const r=e.invoke(request);
+ assert.equal(r.returned[0].response.status,502);
+ assert.equal(e.requests.length,0);
+ assert.ok(e.logs.includes("[AIES_V06] SIRI_GROUP_CAPTURED_LOCAL"));
+ assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_GROUP_UNSUPPORTED"));
+ assert.ok(!e.logs.some(x=>x.includes(id)||x.includes("VERY_PRIVATE_PROMPT")||x.includes("PRIVATE_AUTH")));
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_ARM,"");
+ assert.equal(JSON.parse(e.data.AIES_SIRI_GROUP_PROBE_RESULT).id,id);
+ const consumed=runLocalProbe(e);
+ assert.deepEqual(consumed.logs,["[AIES_SIRI_GROUP_LOCAL] GROUP_ID="+id]);
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_ARM,"");
+});
+test("armed probe never captures WritingTools or suspicious identifiers",()=>{
+ const e=env();
+ runLocalProbe(e);
+ const body=JSON.stringify({configuration:{response_configuration_group_id:"writingtools.generic"},input:[{content:"PRIVATE"}]});
+ e.invoke({...e.request,headers:{"User-Agent":"WritingTools (iPad - Version 27.3.0)"},body});
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
+ assert.ok(e.data.AIES_SIRI_GROUP_PROBE_ARM);
+ const badId="PRIVATEACCESS"+("A".repeat(50));
+ const siriBody=JSON.stringify({configuration:{response_configuration_group_id:badId},input:[{content:"SAFE_TEST"}]});
+ e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body:siriBody});
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_ARM,"");
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
+ assert.ok(e.logs.includes("[AIES_V06] SIRI_GROUP_PROBE_UNSAFE_ID"));
+ assert.ok(!e.logs.some(x=>x.includes(badId)));
+ assert.deepEqual(runLocalProbe(e).logs,["[AIES_SIRI_GROUP_LOCAL] ARMED_180_SECONDS"]);
+});
+test("response hook cannot consume local probe opt-in",()=>{
+ const e=env();
+ runLocalProbe(e);
+ const body=JSON.stringify({configuration:{response_configuration_group_id:"siri.unrecognized"},input:[{content:"SAFE"}]});
+ const result=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body},{status:200,body:fixture});
+ assert.equal(result.returned[0].status,502);
+ assert.ok(e.data.AIES_SIRI_GROUP_PROBE_ARM);
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
+});
+
+test("expired and malformed opt-in state never stores Siri group",()=>{
+ const e=env();
+ for(const value of ['not-json',JSON.stringify({expiresAt:Date.now()-1000}),JSON.stringify({expiresAt:Date.now()+900000})]){
+  e.data.AIES_SIRI_GROUP_PROBE_ARM=value;
+  e.data.AIES_SIRI_GROUP_PROBE_RESULT="";
+  const body=JSON.stringify({configuration:{response_configuration_group_id:"siri.unrecognized"},input:[{content:"SAFE"}]});
+  e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body});
+  assert.equal(e.data.AIES_SIRI_GROUP_PROBE_RESULT,"");
+ }
+ assert.equal(e.requests.length,0);
+});
+
 test("out-of-scope URL is untouched",()=>{
  const e=env();
  const r=e.invoke({url:"https://unrelated.example/test",method:"GET",headers:{}},undefined);
@@ -184,7 +275,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/c1eb3bcb908311bc16790e73ca7da7194f3f97e8/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/ca1842345ea90ce9b2d97e69675852614275404f/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{

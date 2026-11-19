@@ -56,6 +56,14 @@ Siri 文本请求
 
 **复测流程：** 备份配置，刷新或重新导入 60 模块使双钩子引用新固定 SHA，使用一个非隐私问题测试；只反馈 `REQUEST_DIAG_*`、`ERROR_*` 和 Siri 最终显示类型。没有新诊断码就先检查是否仍在运行旧版脚本。不要再发送完整 PacketTunnel 日志——真实日志可能含 Authorization 和私有访问令牌。若看到千问输出，视为来源验收失败并回滚。
 
+## 2026-11-19 新增：Siri 与 WritingTools 的组名区分
+
+真实日志出现三个 `REQUEST_DIAG_GROUP_UNSUPPORTED`：一次 WritingTools、两次 Siri。因为二者共享同一个 URL，**仅匹配域名并不能区分**；当前脚本会对识别为 WritingTools 的请求和响应执行 `WRITINGTOOLS_SKIPPED`，不会向 DeepSeek 转发其内容。主程序仍严格拒绝未知 Siri 组名。
+
+为了在不提交私密请求的前提下查明 Siri 组名，新增一个需要主动手动运行两次的 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js)。请严格按照 [本地探针完整步骤](SIRI_GROUP_PROBE_ZH.md) 操作，只有你手动检查结果时才会在本地脚本测试日志出现 `GROUP_ID=...`；普通主程序日志只会出现固定的 `SIRI_GROUP_CAPTURED_LOCAL`，绝不输出实际值。若采样超时或格式不安全，不放宽校验。
+
+**提示：** `SIRI_GROUP_CAPTURED_LOCAL` 不代表请求已捕获并可送 DeepSeek，只代表曾临时保存一个组名；在真实组名审查后仍须验证解析、SSE 和 Siri UI。禁止发完整 PacketTunnel 日志。
+
 ## 后续验证
 
 只有正常显示可确认时，才使用非隐私文本检查失败路径、重复请求、网络切换和脚本缺席时是否发生千问回退。脚本错误处理不等于系统级控制能力。

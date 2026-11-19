@@ -18,6 +18,12 @@
 4. 查看 **Siri 原生界面**实际显示的文字。若为空、报错、千问回答或与当前问题不对应，记为未通过。
 5. 遇到错误按照 [调试手册](DEBUGGING_ZH.md) 分类，暂停测试；不需要重复无关的网络探针。
 
+## 请求仍报 GROUP_UNSUPPORTED 时怎么做？
+
+新版已确认 Siri 和 WritingTools 都可能使用 `/v1/sessions/responses`。当前明确跳过 WritingTools，但仍不自动放行未知 Siri 组名。
+
+如需继续验证：按照 [Siri 场景标识本地诊断步骤](SIRI_GROUP_PROBE_ZH.md) 将 `siri_group_probe_ONCE.js` 保存到本机，使用你已经找到的 **Script Test** 手动运行一次启用、一次检查/清理，中间只发一次非隐私 Siri 文本问题。不要将它添加到 event/cron/HTTP 自动触发规则，不需要重新写入 DeepSeek Key。主程序固定日志 `SIRI_GROUP_CAPTURED_LOCAL` 并不代表 DeepSeek 已调用。
+
 ## 目前的能力边界
 
 - 只接受已知的 Siri 文本 POST 与 SSE 事件顺序；未知协议结构会导致失败。

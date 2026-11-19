@@ -8,6 +8,12 @@
 
 > **2026-11-19 device observation:** The target Siri POST reached the HTTP request hook, but parsing failed with `ERROR_UNSUPPORTED_SIRI_REQUEST`. This update adds privacy-safe fixed `REQUEST_DIAG_*` codes and limited strict text-only envelope support. The real request JSON schema is still unknown; this does **not** establish working Siri responses. Refresh the 60 module to load the new pinned script.
 
+## 2026-11-19 device-only group discovery
+
+Real device logs show that both Siri and WritingTools use the same endpoint and can trigger `REQUEST_DIAG_GROUP_UNSUPPORTED`. The actual Siri group identifier is not known. This update bypasses WritingTools and adds an **explicitly armed, one-shot 180-second on-device probe**. It does not add unknown groups to the allowlist, and native Siri output is **still unverified**.
+
+To run the probe, use the [Chinese local group diagnosis guide](docs/SIRI_GROUP_PROBE_ZH.md) and [manual `siri_group_probe_ONCE.js`](scripts/siri_group_probe_ONCE.js) via Shadowrocket Script Test, **not** as an HTTP/event/cron hook. The helper is run twice, before and after one nonsensitive Siri question. Never upload raw PacketTunnel logs.
+
 ## Purpose
 
 The module targets one Siri **text question-answering** network endpoint. The original request **may reach Qwen**, while the response hook attempts to obtain text from DeepSeek and rebuild the recognized answer events. Errors handled within the script do not intentionally fall back to Qwen.

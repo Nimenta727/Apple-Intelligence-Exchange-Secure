@@ -9,6 +9,12 @@
 
 > **2026-11-19 真机进展**：已观察 Siri POST 被 Request hook 拦截，但脚本返回 `ERROR_UNSUPPORTED_SIRI_REQUEST`，未到 DeepSeek 阶段。本次添加不记录敏感数据的 `REQUEST_DIAG_*` 分类、少量严格纯文本包装兼容和离线回归测试。**真实请求 JSON 格式仍未知，不能认定问题已解决。** 重新导入/刷新 60 模块才能使用新固定脚本，详见[调试文档](docs/DEBUGGING_ZH.md)。
 
+## 2026-11-19 下一阶段：真机 Siri 组名采样
+
+最新日志确认 Siri 与 WritingTools 共享同一个接口，并且二者均可能触发 `REQUEST_DIAG_GROUP_UNSUPPORTED`。真实 Siri `response_configuration_group_id` 尚未确定。本次加入**需要手动开启的单次本地诊断**和 WritingTools 跳过逻辑，但**尚未把未知组名加入白名单，不能宣称 Siri 已修复**。
+
+按照 [Siri 场景标识本地诊断指南](docs/SIRI_GROUP_PROBE_ZH.md) 使用新增的 [`siri_group_probe_ONCE.js`](scripts/siri_group_probe_ONCE.js)：本机 Script Test 先运行一次以启用 180 秒窗口，发出一个非隐私 Siri 文本问题，然后再手动运行一次读取并清理结果。不要使用 event/cron，也不要发送原始 PacketTunnel 日志。已有 DeepSeek API Key 不需要重设。
+
 ## 项目目标
 
 - **界面**：保留 Siri 原生界面，只面向特定 Siri 文本问答场景。

@@ -24,6 +24,14 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 4. **API 联调状态**：脚本固定 `model: "deepseek-flash"`，此模型名已由 [DeepSeek 官方 API 文档](https://api-docs.deepseek.com/api/create-chat-completion/) 确认支持；但设备上的真实 API Key 调用、账户额度和响应验证仍未完成，不能把未联调误认为安装错误。
 5. 若 Shadowrocket 不提供经确认的本地脚本执行入口，**暂停配置 Key**，不要把它放入远程模块或其他不安全渠道。
 
+## 诊断版更新（2026-11-19）
+
+如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `ca1842345ea90ce9b2d97e69675852614275404f`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
+
+额外的 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) **仅供手动 Script Test**，不是模块自动安装的第三条钩子。先运行一次启用 180 秒窗口，再用非隐私 Siri 问题触发，最后再运行一次读取/清空结果。不要把辅助脚本放入 `event`、`cron` 或 HTTP 自动规则。详见[完整步骤](SIRI_GROUP_PROBE_ZH.md)。
+
+**注意：** 这不是已经确定真实 Siri 组名的修复版；未知组名仍会拒绝，DeepSeek 与 SSE 仍有后续验收环节。
+
 ## 第一次集中安装
 
 1. 导入上方 Raw URL 的 60 模块并启用。

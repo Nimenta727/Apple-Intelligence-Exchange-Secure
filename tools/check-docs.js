@@ -34,11 +34,11 @@ const activeNames=[
  "README.md","README_EN.md","CHANGELOG.md","CONTRIBUTING.md",
  "docs/README.md","docs/CURRENT_STATUS_ZH.md","docs/ISSUES_AND_DECISIONS_ZH.md",
  "docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md","docs/USER_GUIDE_ZH.md",
- "docs/DEBUGGING_ZH.md","docs/ARCHITECTURE_CURRENT_ZH.md",
+ "docs/DEBUGGING_ZH.md","docs/SIRI_GROUP_PROBE_ZH.md","docs/ARCHITECTURE_CURRENT_ZH.md",
  "docs/OPERATIONS_ZH.md","docs/SECURITY_CURRENT_ZH.md",
  "docs/RELEASE_CHECKLIST_ZH.md",
  "scripts/aies_siri_deepseek_v06.js","scripts/provision_key_ONCE.js",
- "scripts/clear_key_ONCE.js","shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule",
+ "scripts/clear_key_ONCE.js","scripts/siri_group_probe_ONCE.js","shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule",
  "tests/siri-deepseek-v06.test.js","tests/fixtures/siri-sse.js"
 ];
 for(const item of activeNames)if(!fs.existsSync(path.join(root,item)))fail("missing active file: "+item);
@@ -51,7 +51,7 @@ const modules=all.filter(x=>x.endsWith(".sgmodule")).map(relative);
 if(modules.length!==1||modules[0]!=="shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule")
  fail("expected exactly one current .sgmodule, got "+modules.join(","));
 const scripts=all.filter(x=>relative(x).startsWith("scripts/")&&x.endsWith(".js")).map(relative);
-if(scripts.length!==3)fail("expected runtime and two local Key scripts only: "+scripts.join(","));
+if(scripts.length!==4)fail("expected runtime, two local Key scripts and one manual Siri group probe: "+scripts.join(","));
 const tests=all.filter(x=>relative(x).startsWith("tests/")&&x.endsWith(".test.js")).map(relative);
 if(tests.length!==1||tests[0]!=="tests/siri-deepseek-v06.test.js")fail("obsolete unit tests present: "+tests.join(","));
 const moduleText=fs.readFileSync(path.join(root,"shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");

@@ -10,5 +10,5 @@
 hostname = %APPEND% prod-yabuli.qianwen.com
 
 [Script]
-AIES60 Capture = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/c1eb3bcb908311bc16790e73ca7da7194f3f97e8/scripts/aies_siri_deepseek_v06.js
-AIES60 Rewrite = type=http-response,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=921600,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/c1eb3bcb908311bc16790e73ca7da7194f3f97e8/scripts/aies_siri_deepseek_v06.js
+AIES60 Capture = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/ca1842345ea90ce9b2d97e69675852614275404f/scripts/aies_siri_deepseek_v06.js
+AIES60 Rewrite = type=http-response,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=921600,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/ca1842345ea90ce9b2d97e69675852614275404f/scripts/aies_siri_deepseek_v06.js

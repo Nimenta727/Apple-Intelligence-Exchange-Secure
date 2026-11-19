@@ -2,6 +2,13 @@
 
 > `main` 仅维护当前 v0.6 Beta 实验路线；未完成的 Siri 真机验收与来源保证不得因合并代码而标记通过。
 
+## 真机组名诊断维护要求（2026-11-19）
+
+- Siri 与 WritingTools 共用目标路径，不能仅凭 URL 放宽 Siri 组白名单，也不能把 WritingTools 当成 Siri。
+- `scripts/siri_group_probe_ONCE.js` 仅供设备本地 Script Test 两次手动运行，不是 Shadowrocket 自动 Hook；正式模块仍只有两条相同固定提交的 Hook。
+- 组名仅在人工明确授权时暂存，主运行日志不包含组名、请求正文和认证凭据；原生 PacketTunnel 日志仍可能显示私有令牌。
+- 获得不敏感的真实场景标识后，应先添加明确的 Siri-only 兼容测试，再决定是否调整白名单；SSE / DeepSeek / 原生 UI 仍各自需要验收。
+
 ## 日常开发
 
 ```bash
