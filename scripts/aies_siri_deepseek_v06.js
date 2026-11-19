@@ -18,7 +18,7 @@ var C={
   model:"deepseek-flash",
   keyName:"SAIRS_DEEPSEEK_API_KEY",
   maxRequest:300000,maxPrompt:14000,maxSse:900000,maxAnswer:12000,
-  timeoutMs:15000,sessionTtlMs:45000
+  timeoutMs:15000,sessionTtlMs:45000,followupContextTtlMs:300000
 };
 // Only add this human-visible source label to successfully validated DeepSeek
 // replies. Siri/Qwen service branding is controlled upstream and may not change.
@@ -295,12 +295,14 @@ function captureQwenRequestBodyOnce(){
   log("QWEN_BODY_CAPTURED_LOCAL");
  else log("QWEN_BODY_CAPTURE_STORE_FAILED");
 }
-function observedSiriTextEnvelopeReasons(o){
+function observedSiriTextEnvelopeReasons(o,isFollowupRoute){
  // Exact field names and field TYPES confirmed by the local iPad schema probe.
  // Root metadata is not forwarded to DeepSeek. Unknown keys, tool calls, media
  // and unsupported message types remain blocked by this and textAtom().
  var reasons=[],top=Object.keys(o);
  var allowedRoot=["configuration","input","client_tools","input_hint","response_format","server_tools","stream"];
+ if(isFollowupRoute)allowedRoot.push("previous_choice_id");
+ if(isFollowupRoute&&!validId(o.previous_choice_id))reasons.push("PREVIOUS_CHOICE_INVALID");
  if(top.some(function(k){return allowedRoot.indexOf(k)<0;})||
     top.indexOf("configuration")<0||top.indexOf("input")<0)
   reasons.push("ROOT_FIELDS");
@@ -356,7 +358,7 @@ function observedSiriTextEnvelopeReasons(o){
  }
  return reasons;
 }
-function parseRequest(raw){
+function parseRequest(raw,allowRecoveredSiri,followupMode){
  if(!raw){if(requestDiagnostic==="UNSET")requestDiagnostic="BODY_EMPTY";return null;}
  if(raw.length>C.maxRequest){requestDiagnostic="BODY_OVERSIZE";return null;}
  var o;
@@ -367,16 +369,17 @@ function parseRequest(raw){
   if(typeof g!=="string"){requestDiagnostic="GROUP_MISSING";return null;}
   requestGroup=g;
   var observedGroup=g==="siri.multimodal.noRTI";
+   if(followupMode&&!observedGroup){requestDiagnostic="FOLLOWUP_GROUP_UNVERIFIED";return null;}
   if(!/^(siri\.tqa|siri_tqa)$/i.test(g)&&!observedGroup){
    requestDiagnostic="GROUP_UNSUPPORTED";return null;
   }
   // The newly observed multimodal group is never accepted for WritingTools,
   // unknown clients or unverified non-text JSON envelopes.
-  if(observedGroup&&!isSiriForProbe()){
+  if(observedGroup&&!isSiriForProbe()&&!allowRecoveredSiri){
    requestDiagnostic="GROUP_UNSUPPORTED";return null;
   }
   if(observedGroup){
-   var shapeReasons=observedSiriTextEnvelopeReasons(o);
+   var shapeReasons=observedSiriTextEnvelopeReasons(o,!!followupMode);
    if(shapeReasons.length){
     captureNortiSchemaLocally(o);
     shapeReasons.forEach(function(code){log("NORTI_SHAPE_"+code);});
@@ -474,9 +477,10 @@ function parseWritingToolsRequest(raw,allowRecoveredScene){
  }
  requestDiagnostic="OK";return prompt;
 }
-function parseApplePrompt(raw,allowRecoveredScene){
- return isWritingTools()||allowRecoveredScene?
-  parseWritingToolsRequest(raw,!!allowRecoveredScene):parseRequest(raw);
+function parseApplePrompt(raw,recoveredScene,followupMode){
+ return isWritingTools()||recoveredScene==="writing"?
+  parseWritingToolsRequest(raw,recoveredScene==="writing"):
+  parseRequest(raw,recoveredScene==="siri",!!followupMode);
 }
 
 function validKey(k){return typeof k==="string"&&/^[A-Za-z0-9_-]{12,256}$/.test(k)&&!/REPLACE_WITH|PLACEHOLDER/i.test(k);}
