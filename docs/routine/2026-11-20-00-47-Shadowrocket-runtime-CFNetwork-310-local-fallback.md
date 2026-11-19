@@ -27,3 +27,10 @@
 3. 如果 GitHub Raw 的代理连通性长期失败，用户从受信任渠道在 iPad Shadowrocket 本地 Script 目录保存固定版本源码，并仅启用 62 LOCAL；真实日志确认无 GitHub Raw runtime 下载且有 `[AIES_V06] REQUEST_CAPTURED`。
 4. 只有请求与响应双方脚本真实执行后再验收 Siri 第一问/第二问/第三问。每轮正文必须带 `【DeepSeek · AIES】`；无前缀即视为未证实 DeepSeek。
 5. 若本地路径无效，依据脚本 URL 页面、版本、错误分类决定适配 Shadowrocket 本机 file URL 或明确受支持的本地配置；**不直接推断本地模式已部署成功**。
+
+## PR #34 合并及 CI 补记
+
+- [PR #34](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/34) 已合并到 `main`，merge commit `909f2169ed404b1bd9e74156af8959e85f798fe9`。
+- [GitHub Actions](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44571160641) 结果 **107 tests / 107 pass / 0 failed**。已在仓库验证 60 Remote 与 62 Local 的四条 Hook 规则参数相同，区别只有 runtime 的下载 URL / 本地文件名。
+- 下一步保持：优先修复 GitHub Raw 的 HTTPS 代理下载链路；若不可修复，用户亲自保存固定提交 JS 至 Shadowrocket Script 文件夹、且仅启动 62 LOCAL。真正的验收依据是脚本 HTTP Hook 日志出现 `[AIES_V06] REQUEST_CAPTURED` 及 Siri UI 实际 DeepSeek 来源前缀，而非仅成功运行本地 Script Test。
+- **仍未验证用户 iPad 的本地 module `script-path` 解析行为**；不声称此 PR 已在用户设备解决全部 Qwen 穿透。
