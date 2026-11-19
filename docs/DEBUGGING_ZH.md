@@ -121,3 +121,20 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 因已确认根级 `input_hint:string`，但 `message.content[]` 的实际元素形状和字段值未知，提供[单次本地脱敏请求正文探针](SIRI_QWEN_BODY_CAPTURE_ZH.md)，能够在**Siri POST 请求进入严格解析器之前**一次性保存有限的、经脱敏的 JSON 正文，并通过手动 Script Test 查看 `BODY_PART_*`。普通 AIES 日志只记录 `QWEN_BODY_CAPTURED_LOCAL`，不输出原文。
 
 **请不要再发完整 PacketTunnel 日志**。只从设备本地手动测试日志中，检查后摘取不敏感的 `BODY_PART_*`，不要包括请求头、凭据、私人问题或未经筛查的原始 JSON。采样不改变拒绝或放行行为，不能推断请求已经由 Qwen 处理。
+
+## 2026-11-19：DeepSeek 来源可视标签和响应关联诊断
+
+真机反馈：大约三次 Siri 无法获得回答，另一次 Siri UI 出现 Qwen 标识，但**无法仅凭固定界面品牌判断正文实际来源**。本次仅在 DeepSeek API HTTP 200、`finish_reason=stop`、回答正文有效、原始 SSE 结构可验证且重写成功时，脚本在生成的回答文本前写入固定 **`【DeepSeek · AIES】`**，不依赖模型是否遵循提示词；系统提示词同时要求如实说明 DeepSeek 经 AIES 转发。错误码或原始 Qwen 回复绝不加此标记。**不能更改 Siri 系统控件自带的“Qwen”服务标识，也不能保证原生 Siri 会显示本次生成的文本**。
+
+附加固定诊断码（不包含请求 ID、Header、问题文本或令牌）：
+
+| 日志码 | 含义 |
+|---|---|
+| `RESPONSE_TAG_PRESENT` / `RESPONSE_TAG_MISSING` / `RESPONSE_TAG_INVALID` | Response Hook 中是否见到可识别的请求关联标记（仅输出状态，不显示值） |
+| `RESPONSE_PROMPT_FROM_STORE` / `RESPONSE_PROMPT_STORE_MISSING` | 请求阶段本地问题记录是否成功关联 |
+| `RESPONSE_PROMPT_FROM_BODY` / `RESPONSE_PROMPT_BODY_UNAVAILABLE` | 当关联不可用时，响应阶段能否从同一请求正文安全恢复文本 |
+| `SSE_PREFLIGHT_PASSED` | 原始 SSE 结构预检通过，但不代表 Siri UI 支持替换结果 |
+| `DEEPSEEK_LABEL_APPLIED` | DeepSeek 返回满足条件，并成功构建带来源前缀的 SSE，仍非 Siri 展示成功的证明 |
+| `DEEPSEEK_RESPONSE_ATTEMPTED` | Script 向 Shadowrocket 提交替换内容，系统最终是否显示尚不可由此推断 |
+
+如果 UI 仍出现 Qwen 标签：**先核对回答正文中是否含 `【DeepSeek · AIES】`，再看上述固定阶段码**。若卡片中只有 Qwen 标签而无正文前缀，不可推断来源；若出现 Qwen 原本的模型答案，应停止测试、禁用模块并恢复原配置。不要上传包含令牌的 PacketTunnel 全文，只分享 `[AIES_V06]` 固定日志码和不敏感的显示结果。
