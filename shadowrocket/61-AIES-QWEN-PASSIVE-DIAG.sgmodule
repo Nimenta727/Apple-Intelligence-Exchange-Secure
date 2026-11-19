@@ -10,5 +10,5 @@
 hostname = %APPEND% prod-yabuli.qianwen.com
 
 [Script]
-AIES61 Passive Request = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/eded04f046b8bd1a53af7de2258eda265969442c/scripts/aies_qwen_passive_diag.js
-AIES61 Passive Response = type=http-response,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=921600,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/eded04f046b8bd1a53af7de2258eda265969442c/scripts/aies_qwen_passive_diag.js
+AIES61 Passive Request = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/56755369499c85b3bf1594627ec2556633c8cf5b/scripts/aies_qwen_passive_diag.js
+AIES61 Passive Response = type=http-response,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=921600,timeout=20,script-path=https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/56755369499c85b3bf1594627ec2556633c8cf5b/scripts/aies_qwen_passive_diag.js

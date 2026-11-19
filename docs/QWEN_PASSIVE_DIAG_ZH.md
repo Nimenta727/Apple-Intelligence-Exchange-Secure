@@ -10,7 +10,7 @@
    
    `https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule`
 
-   模块中的两条脚本路径都应固定到 `eded04f046b8bd1a53af7de2258eda265969442c`。
+   模块中的两条脚本路径都应固定到 `56755369499c85b3bf1594627ec2556633c8cf5b`。
 
 4. 61 模块只对 `https://prod-yabuli.qianwen.com/v1/sessions/responses` 的 HTTP POST 启用 Request 和 Response 诊断钩子，仅允许 User-Agent 以 `Siri (` 开头。仍需在用户设备上对目标主机启用 HTTPS MITM，**不要将 MITM 扩展到更多域名**。HTTP 脚本可能影响流式响应缓冲与时间，故“代码不改写”**不等于**与完全关闭 MITM 的连接行为完全相同。首次测试后如 Qwen 失败，停用 61 并恢复基线。
 
@@ -68,3 +68,20 @@
 - 测试完成，停用 61、关闭不再需要的 MITM 规则并恢复自己原来的 Shadowrocket 配置；若之后要继续测试 DeepSeek 才重新启用 60，但**61 和 60 永远不要同时启用**。
 
 **现阶段这只是被动观测的离线设计，仍需要真机确认 Shadowrocket 是否真的将完整 SSE 响应交给脚本。**
+
+## 基于真实 Qwen SSE 的 60 模块预检兼容诊断（增量更新）
+
+真实 61 捕获证实 Qwen HTTP 200、13 个可解析 SSE 数据帧（其中 2 个文本 `delta`），事件顺序与 60 当前预期一致；但是仅靠字段名称与**类型**不足以判断 60 对 ID 格式、`session_id` 一致性、`expires_at` 整数性等**值级**校验是否通过。为避免获取任何 ID 的实际值，最新版 61 在响应内存中直接运行一遍当前 60 的**严格预检**，只向本地报告固定枚举：
+
+| `strict60Preflight` | 含义 |
+|---|---|
+| `MATCHES_60_PREFLIGHT` | **当前这份**响应通过 60 的 SSE 前置结构检查，不意味着改写内容一定会被 Siri UI 接受 |
+| `FRAME_LAYOUT_UNSUPPORTED` | 帧格式、额外行、多行 data 等超出 60 的两行要求 |
+| `EVENT_UNKNOWN` / `EVENT_ORDER_UNSUPPORTED` / `EVENT_COUNT_UNSUPPORTED` | 事件名称、次序或计数不匹配 |
+| `EVENT_JSON_INVALID` / `EVENT_ENVELOPE_INVALID` | 事件 JSON 无法解析或事件包装不匹配 |
+| `SESSION_OR_RESPONSE_ID_INVALID` | ID 不符合 60 的受限字符格式（不保存 ID 值） |
+| `SESSION_LINK_MISMATCH` | Response 关联的 session ID 与 Session 不一致（不保存双方 ID） |
+| `SESSION_EXPIRY_INVALID` | Session 过期字段类型/范围不符合 60 代码要求 |
+| `STREAM_UNAVAILABLE` | 非有效长度的原始响应文本 |
+
+此字段出现在手动读取的 `RESPONSE_SSE_PART_*` 拼接 JSON 里；正常 Hook 日志仍只出现 `RESPONSE_SSE_SCHEMA_CAPTURED_LOCAL`。只需刷新 **61 模块到固定提交 `56755369499c85b3bf1594627ec2556633c8cf5b`**，再次手动启动十分钟窗口、用 Siri 问一个非隐私问题、手动读取；**保持 60 停用**。没有泄露问题、回答、ID 或 Headers。一次采集满足当前检查，不代表其他 Siri 问答同样兼容；如果预检通过但 DeepSeek 改写后原生 Siri 仍显示失败，则主要需审查**合成 SSE 内部字段结构与真实 Qwen Schema 的差异**。

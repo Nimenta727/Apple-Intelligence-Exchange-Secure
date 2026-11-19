@@ -96,6 +96,54 @@ function eventName(raw){
    /^(?:session|response|message|content|completion|error|ping|done)(?:\.|\[|$)/i.test(raw))return raw;
  return "UNSAFE_EVENT_NAME";
 }
+// Match the CURRENT v0.6 60 rewriteSse() preflight decisions, but output
+// only a fixed enum. No SSE payload, IDs, timestamps or text ever persisted.
+// Diagnostic parity must be updated if 60's validation logic is revised.
+function strict60Preflight(raw){
+ if(typeof raw!=="string"||!raw.length||raw.length>900000)return "STREAM_UNAVAILABLE";
+ var events=[
+  "session.created","session.response.created",
+  "session.response.choices[].added",
+  "session.response.choices[].items[].added",
+  "session.response.choices[].items[].message.content[].added",
+  "session.response.choices[].items[].message.content[].text.value.delta",
+  "session.response.choices[].items[].message.content[].text.value.done",
+  "session.response.choices[].items[].message.content[].done",
+  "session.response.choices[].items[].done",
+  "session.response.choices[].completed",
+  "session.response.choices[].done","session.response.done"
+ ];
+ var frames=raw.replace(/\r\n/g,"\n").split("\n\n"),rows=[],i;
+ for(i=0;i<frames.length;i++){
+  var trimmed=frames[i].trim();
+  if(!trimmed)continue;
+  var lines=trimmed.split("\n");
+  if(lines.length!==2||lines[0].slice(0,7)!=="event: "||
+     lines[1].slice(0,6)!=="data: ")return "FRAME_LAYOUT_UNSUPPORTED";
+  var name=lines[0].slice(7);
+  if(events.indexOf(name)<0)return "EVENT_UNKNOWN";
+  var obj;
+  try{obj=JSON.parse(lines[1].slice(6));}catch(e){return "EVENT_JSON_INVALID";}
+  if(!obj||obj.type!==name||!Object.prototype.hasOwnProperty.call(obj,name))
+   return "EVENT_ENVELOPE_INVALID";
+  rows.push({name:name,payload:obj[name]});
+ }
+ if(rows.length<12||rows.length>256)return "EVENT_COUNT_UNSUPPORTED";
+ for(i=0;i<5;i++)if(rows[i].name!==events[i])return "EVENT_ORDER_UNSUPPORTED";
+ for(i=0;i<6;i++)if(rows[rows.length-6+i].name!==events[6+i])
+  return "EVENT_ORDER_UNSUPPORTED";
+ for(i=5;i<rows.length-6;i++)if(rows[i].name!==events[5])
+  return "EVENT_ORDER_UNSUPPORTED";
+ var session=rows[0].payload,response=rows[1].payload;
+ var validId=function(v){return typeof v==="string"&&/^[A-Za-z0-9_-]{1,160}$/.test(v);};
+ if(!session||!response||!validId(session.id)||!validId(response.id))
+  return "SESSION_OR_RESPONSE_ID_INVALID";
+ if(response.session_id!==session.id)return "SESSION_LINK_MISMATCH";
+ var expiry=session.expires_at;
+ if(typeof expiry!=="number"||!isFinite(expiry)||expiry<0||
+    Math.floor(expiry)!==expiry)return "SESSION_EXPIRY_INVALID";
+ return "MATCHES_60_PREFLIGHT";
+}
 function responseSummary(){
  var status=res&&(res.statusCode||res.status);
  var code=typeof status==="number"?status:Number(status||0);
@@ -114,6 +162,7 @@ function responseSummary(){
   return out;
  }
  out.format="SSE";
+ out.strict60Preflight=strict60Preflight(raw);
  var chunks=raw.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n\n");
  var seq=[],counts=[],examples=[],names=[],last=[],ok=0,bad=0,framing={id:false,comments:false,retry:false,multiData:false,missingEvent:false},done=false;
  for(var i=0;i<chunks.length&&i<500;i++){

@@ -142,3 +142,7 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 ## 实际 Qwen SSE 结构诊断（独立 61 临时模式）
 
 遇到 `SSE_REWRITE_UNSUPPORTED` 不应直接放开未知 SSE 事件白名单或导出完整响应。先停用 60/旧 REJECT，确认 Siri 通过 Qwen 原生回答正常，再使用[61 被动协议诊断指南](QWEN_PASSIVE_DIAG_ZH.md)。独立模块只采集字段/类型、SSE 事件名称、顺序、数量、分帧标志和白名单 OS 信息；读取脚本手动打印 `[AIES_QWEN_PASSIVE_LOCAL]` 的分段摘要并清理，不显示真实问答或认证值。响应未捕获不代表原生 Qwen 一定失败：可能是 MITM、脚本响应缓冲上限或用户代理上下文不满足。
+
+## 13:50 原生 Qwen 成功后对比 60 的严格 SSE 检查
+
+真实 61 摘要显示 13 个完全可解析 SSE JSON 数据事件，其名称和顺序与当前 `rewriteSse` 预期相符。因此原先 `ERROR_SSE_REWRITE_UNSUPPORTED` **并不能仅归因于某个未知事件或错误顺序**：60 代码还强制 Session/Response ID 格式、关联字符串一致和 Session 过期时间为非负整数。最新 61 会在原始响应**内存中**重新执行这部分判断，只输出 `strict60Preflight` 固定分类码，不记录实际值。若结果是 `MATCHES_60_PREFLIGHT`，说明该条原生 SSE 理论上通过当前 60 的预检，**下一处应审查 60 合成事件缺少真实响应中的 `choices`、`created_at`、`index`、`annotations`、`session_id` 等结构字段**，以及请求关联缺失问题。详见[61 临时诊断](QWEN_PASSIVE_DIAG_ZH.md)。
