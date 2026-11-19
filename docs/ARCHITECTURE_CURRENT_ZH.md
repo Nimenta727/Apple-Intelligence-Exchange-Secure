@@ -93,3 +93,7 @@ v2 的 `probeObserveRequest`、`probeObserveWritingTools` **不会改变解析�
 ## noRTI 字段结构探针（手动授权）
 
 `captureNortiSchemaLocally` 只在 noRTI 严格文本检查失败且本机用户明确打开 600 秒窗口时运行。它仅将最多 8 项/层级、已过滤敏感样式的字段名称和**数据类型标签**写入独立本地状态键；不将任何字段值、正文、HTTP Header、Cookie、Authorization 或 Key 写入诊断状态或 HTTP 日志。`siri_schema_probe_ONCE.js` 手动测试将读取并逻辑清除；独立 STOP 允许明确取消。原解析限制完全不变，真实字段名仍待设备确认；参考[结构探针指南](SIRI_SCHEMA_PROBE_ZH.md)。
+
+## 11:54 真机 schema 探针反馈后的受限允许规则
+
+仅在精确 noRTI + Siri UA 分支允许已证实的根级字段及类型：`client_tools:array`、`server_tools:array`、`response_format:object`、`stream:boolean`；它们只参与类型检查，**不发送到 DeepSeek**。输入外层只允许 `message` 和可选 `type`，后者若存在必须为文本消息类型 `message`；内部只允许 `content`、`role=user`、可选 `type=message`。实际 `type` **值**和内容数组元素的结构尚未知，不允许自动扩展媒体/工具调用。内容解析仍采用严格 `textAtom`。若拒绝未知元素，只记录固定 `NORTI_CONTENT_*` 分类。

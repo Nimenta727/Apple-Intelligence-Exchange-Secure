@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 2026-11-19 — 真机 noRTI 字段结构精确兼容
+
+- 11:54 本机结构探针确认 `client_tools:array`、`response_format:object`、`server_tools:array`、`stream:boolean`，输入外层 `type:string`，内部 `content:array`、`role:string`。PacketTunnel 固定诊断码也印证了这两处原有阻塞。
+- 只允许已确认的额外根级键和 JSON 类型，且不向 DeepSeek 传输工具/格式元数据；消息包装 `type` 值只有精确 `message` 才允许；未知媒体、工具调用和额外字段仍拒绝。
+- 新增 `NORTI_CONTENT_*` 固定内容结构诊断码及离线正/负回归测试；模块双钩子更新为相同的不可变提交。**真实的 `type` 值和 content 元素仍需设备确认，未宣称端到端成功。**
+
+
 ## 2026-11-19 — 真机 noRTI 结构键名本地探针
 
 - 新日志显示 `NORTI_SHAPE_ROOT_FIELDS` 和 `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`，既有安全诊断码无法判断具体键名，不能安全放宽原始 JSON 白名单。

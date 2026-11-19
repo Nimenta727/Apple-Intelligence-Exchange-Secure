@@ -18,7 +18,9 @@
 
 产品支持范围：特定 Siri 文本问答，不支持写作工具、视觉智能、音频文件、多模型或本地离线模型。用户接受原始请求可能由千问处理，DeepSeek 也会收到问题。
 
-**真机最新定位（2026-11-19 11:14）**：新版结构诊断明确报告 `NORTI_SHAPE_ROOT_FIELDS` + `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`。本次增加单独的 [本机字段名/类型探针](SIRI_SCHEMA_PROBE_ZH.md)，只在明确手动授权时保存筛选过的字段键名/类型，不保存值。**不能仅据此认为输入已兼容**。
+**真机新证据（2026-11-19 11:54）**：在明确手动授权的本机字段探针中，确认 `input:array`；顶层额外字段为 `client_tools:array`、`response_format:object`、`server_tools:array`、`stream:boolean`；`input` 包装层有 `type:string`；`message` 内部有 `content:array`、`role:string`。同期 PacketTunnel 的固定码证明两处原严格校验确实拦截了请求。现在仅精确允许这些**已证实的字段和类型**，要求消息 wrapper 的 `type` 若存在则必须为 `message`，未知实际值、媒体和工具调用仍拒绝。**真机完整解析、DeepSeek API、SSE 与 Siri UI 都未验证。**
+
+**真机前次定位（2026-11-19 11:14）**：新版结构诊断明确报告 `NORTI_SHAPE_ROOT_FIELDS` + `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`。本次增加单独的 [本机字段名/类型探针](SIRI_SCHEMA_PROBE_ZH.md)，只在明确手动授权时保存筛选过的字段键名/类型，不保存值。**不能仅据此认为输入已兼容**。
 
 **真机前次阻塞（2026-11-19 11:06）**：noRTI 组名已被接受，但真实 Siri 在 11:06:40 和 11:06:46 两次出现 `REQUEST_DIAG_INPUT_UNSUPPORTED`；未到 DeepSeek。本次新增 `NORTI_SHAPE_*` 固定码细分顶层字段、input 类型和消息包装，不存储或输出实际 JSON。**修复尚未完成，需一次非隐私真机复测确认形状差异。**
 
