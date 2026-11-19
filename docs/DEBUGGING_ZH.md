@@ -61,6 +61,10 @@ Siri 文本请求
 
 ## 2026-11-19 新增：Siri 与 WritingTools 的组名区分
 
+> **历史与现状区分**：下面引用的 `WRITINGTOOLS_SKIPPED` 是 **旧版 60** 当时的真实行为。新版 60 已新增 SAIR 逆向 `compose_selectedAndAllText` 组的严格纯文本 WritingTools Compose **Beta**，使用与 Siri 不同的 `body/refinements` 响应结构。未知 WritingTools 组/媒体/工具内容不进入模型，可能产生 `REQUEST_DIAG_WRITING_*` 和 `ERROR_UNSUPPORTED_WRITING_REQUEST`，不能继续按永久旁路排障。来源与限度见 [跨站协议研究](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。
+
+
+
 真实日志出现三个 `REQUEST_DIAG_GROUP_UNSUPPORTED`：一次 WritingTools、两次 Siri。因为二者共享同一个 URL，**仅匹配域名并不能区分**；当前脚本会对识别为 WritingTools 的请求和响应执行 `WRITINGTOOLS_SKIPPED`，不会向 DeepSeek 转发其内容。主程序仍严格拒绝未知 Siri 组名；**已确认的 `siri.multimodal.noRTI` 仅在 Siri UA 和严格纯文本 JSON 结构满足条件时允许通过第一道解析门槛**。
 
 为避免旧版 180 秒采样过期和重复测试误取消，现用 **v2 600 秒状态检查工具**：先同步更新远程 60 模块和 iPad **本地同名 JS 文件**，使用 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) 手动开启、询问 Siri、反复查询剩余时间与分类计数，查询**不会取消**；捕获时仅在本机测试日志显示一次 `GROUP_ID=...`，其他日志仍只有固定码。确需取消，手动运行独立的 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js)。完整方法及 `ACTIVE_REMAINING_SECONDS` / `SIRI_REQUESTS_SEEN` / `LAST_STAGE` 解释见[本地探针指南](SIRI_GROUP_PROBE_ZH.md)。若窗口过期、网络通路未命中或格式不安全，不放宽白名单。
