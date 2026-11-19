@@ -929,7 +929,14 @@ if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
  if(prompt2)log("RESPONSE_PROMPT_FROM_STORE");
  else log("RESPONSE_PROMPT_STORE_MISSING");
 }
-var fromReq=parseApplePrompt(rawRequest(),!responseUA&&activeScene==="writing"&&!!prompt2);
+var responseBody=rawRequest();
+var fromReq=parseApplePrompt(responseBody,!responseUA&&activeScene==="writing"&&!!prompt2);
+// When recovering scene without a response UA, a *present* request body must
+// still be parseable as that same scene. Otherwise a Siri body carrying a
+// WritingTools token could bypass the usual cross-scene comparison.
+if(prompt2&&!responseUA&&req&&typeof req.body==="string"&&req.body.length&&!fromReq){
+ error("CORRELATION_MISMATCH");return;
+}
 if(prompt2&&fromReq&&prompt2!==fromReq){error("CORRELATION_MISMATCH");return;}
 if(!prompt2){
  if(fromReq){prompt2=fromReq;log("RESPONSE_PROMPT_FROM_BODY");}
