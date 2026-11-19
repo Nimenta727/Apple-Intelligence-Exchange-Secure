@@ -510,7 +510,9 @@ function rewriteSse(original,answer){
  );
  for(i=0;i<names.length;i++)out.push(event(names[i],n[i]));
  var joined=out.join("");
- if(joined.length>C.maxSse||joined.indexOf(answer)<0)return null;
+ // The answer may contain newlines: compare JSON-escaped serialized content,
+ // not the raw plaintext, which is absent verbatim from SSE JSON frames.
+ if(joined.length>C.maxSse||joined.indexOf(safeJson(body))<0)return null;
  return joined;
 }
 function randomToken(){
