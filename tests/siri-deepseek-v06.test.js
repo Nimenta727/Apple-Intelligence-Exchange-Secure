@@ -159,6 +159,42 @@ function sirireq(e,group,ua="Siri (iPad - Version 27.3.0)",content="SAFE_QUESTIO
  const body=JSON.stringify({configuration:{response_configuration_group_id:group},input:[{content}]});
  return e.invoke({...e.request,headers:{"User-Agent":ua,Authorization:"Bearer PRIVATE_SECRET"},body});
 }
+test("noRTI input failures report bounded fixed shape categories without exposing field names or values",()=>{
+ const g="siri.multimodal.noRTI";
+ const base={configuration:{response_configuration_group_id:g},input:[{content:"SAFE_TEXT"}]};
+ const cases=[
+  {value:{...base,privateSecret:"TOP_PRIVATE"},codes:["ROOT_FIELDS"]},
+  {value:{configuration:base.configuration},codes:["ROOT_FIELDS","INPUT_MISSING"]},
+  {value:{configuration:base.configuration,input:{content:"PRIVATE"}},codes:["INPUT_NOT_ARRAY"]},
+  {value:{configuration:base.configuration,input:[]},codes:["INPUT_COUNT"]},
+  {value:{configuration:base.configuration,input:["PRIVATE_STRING"]},codes:["ITEM_NOT_OBJECT"]},
+  {value:{configuration:base.configuration,input:[{message:{content:"SAFE"},secret:"PRIVATE"}]},codes:["ITEM_WRAPPER_FIELDS"]},
+  {value:{configuration:base.configuration,input:[{message:"PRIVATE"}]},codes:["MESSAGE_NOT_OBJECT"]},
+  {value:{configuration:base.configuration,input:[{content:"SAFE",secret:"PRIVATE"}]},codes:["ITEM_FIELDS"]},
+  {value:{configuration:base.configuration,input:[{role:"user"}]},codes:["CONTENT_MISSING"]},
+  {value:{configuration:base.configuration,input:[{role:"assistant",content:"SAFE"}]},codes:["ROLE_UNSUPPORTED"]},
+  {value:{configuration:base.configuration,input:[{type:"audio",content:"SAFE"}]},codes:["ITEM_TYPE_UNSUPPORTED"]},
+  {value:{...base,privateSecret:"PRIVATE",input:{content:"SAFE"}},codes:["ROOT_FIELDS","INPUT_NOT_ARRAY"]}
+ ];
+ for(const c of cases){
+  const e=env();
+  const request={...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)",Authorization:"Bearer PRIVATE_ACCESS"},body:JSON.stringify(c.value)};
+  const out=e.invoke(request);
+  assert.equal(out.returned[0].response.status,502);
+  assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_INPUT_UNSUPPORTED"));
+  for(const code of c.codes)assert.ok(e.logs.includes("[AIES_V06] NORTI_SHAPE_"+code),code);
+  assert.equal(e.requests.length,0);
+  assert.ok(e.logs.every(x=>x.length<100&&!x.includes("PRIVATE")&&!x.includes("secret")&&!x.includes("SAFE_TEXT")));
+ }
+});
+test("valid noRTI text envelopes do not emit structure diagnostic lines",()=>{
+ const e=env();
+ const body=JSON.stringify({configuration:{response_configuration_group_id:"siri.multimodal.noRTI"},input:[{message:{content:{type:"text",text:"SAFE"}}}]});
+ const response=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body});
+ assert.ok(response.returned[0].headers["X-AIES-Request-ID"]);
+ assert.ok(!e.logs.some(x=>x.includes("NORTI_SHAPE_")));
+});
+
 test("observed iPadOS noRTI Siri group supports strict text through both hooks in offline mock",()=>{
  const e=env();
  const body=JSON.stringify({
@@ -442,7 +478,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/e79d05c3b8ef788abc92d3f1626426914c9dc7ce/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/bc726e60bdbf810d1edf1dbb62d8e6dc79b69d2d/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
