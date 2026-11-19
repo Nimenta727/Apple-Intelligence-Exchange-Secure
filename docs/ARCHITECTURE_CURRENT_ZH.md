@@ -103,3 +103,7 @@ v2 的 `probeObserveRequest`、`probeObserveWritingTools` **不会改变解析�
 ## 12:07 输入提示字段与用户授权的单次请求体诊断
 
 已观察到额外根级 `input_hint:string`，精确支持字符串型但不将其值用于模型。`captureQwenRequestBodyOnce` 在**目标 Siri POST Request Hook** 与主解析器运行之前，以单独的本机状态键保存一份**脱敏后的**请求 JSON（保留受限 `input` 纯文本，省略工具定义、格式配置及未知根级的值）。该功能必须通过本地 `siri_qwen_body_probe_ONCE.js` 手动开启，默认不采集，成功后仅保存一次，不在 HTTP 日志输出正文，不影响原请求的失败关闭路径。用户手动读取先清理存储再分段显示。**不等于原始网络抓包或 Qwen 已接收证明。**
+
+## 可选 61 被动协议诊断（非生产模式）
+
+新增 `shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule`，与 60 改写模块**互斥**，只有同一固定脚本 `scripts/aies_qwen_passive_diag.js` 的 Request/Response 两个钩子，始终 `$done({})`。手动脚本 `qwen_passive_probe_ONCE.js`、`qwen_passive_probe_STOP_ONCE.js` 在独立持久化键中管理 600 秒窗口。默认无采样、无模型调用；采集结构类型与事件顺序，不记录正文/响应 ID 或 Header。该模块不能提供跨连接同会话关联保证，遇到并发须停止复测。详见[指南](QWEN_PASSIVE_DIAG_ZH.md)。

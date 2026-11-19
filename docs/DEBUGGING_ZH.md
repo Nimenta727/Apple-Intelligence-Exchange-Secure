@@ -138,3 +138,7 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 | `DEEPSEEK_RESPONSE_ATTEMPTED` | Script 向 Shadowrocket 提交替换内容，系统最终是否显示尚不可由此推断 |
 
 如果 UI 仍出现 Qwen 标签：**先核对回答正文中是否含 `【DeepSeek · AIES】`，再看上述固定阶段码**。若卡片中只有 Qwen 标签而无正文前缀，不可推断来源；若出现 Qwen 原本的模型答案，应停止测试、禁用模块并恢复原配置。不要上传包含令牌的 PacketTunnel 全文，只分享 `[AIES_V06]` 固定日志码和不敏感的显示结果。
+
+## 实际 Qwen SSE 结构诊断（独立 61 临时模式）
+
+遇到 `SSE_REWRITE_UNSUPPORTED` 不应直接放开未知 SSE 事件白名单或导出完整响应。先停用 60/旧 REJECT，确认 Siri 通过 Qwen 原生回答正常，再使用[61 被动协议诊断指南](QWEN_PASSIVE_DIAG_ZH.md)。独立模块只采集字段/类型、SSE 事件名称、顺序、数量、分帧标志和白名单 OS 信息；读取脚本手动打印 `[AIES_QWEN_PASSIVE_LOCAL]` 的分段摘要并清理，不显示真实问答或认证值。响应未捕获不代表原生 Qwen 一定失败：可能是 MITM、脚本响应缓冲上限或用户代理上下文不满足。

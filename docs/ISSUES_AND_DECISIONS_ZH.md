@@ -26,3 +26,7 @@
 | I7 | WritingTools 与 Siri 使用同一目标 URL，容易被错误接管 | 新版识别 WritingTools 后跳过请求和响应；兼容性仍需真机确认 |
 
 任何修复应加回归测试，按 [调试说明](DEBUGGING_ZH.md) 定位并经 [维护流程](OPERATIONS_ZH.md) 审查。当前风险与发布状态以 [当前状态](CURRENT_STATUS_ZH.md) 和 [发布清单](RELEASE_CHECKLIST_ZH.md) 为准。
+
+## 61 临时本地被动观测决策（2026-11-19）
+
+真实 Siri 测试呈现 `RESPONSE_TAG_MISSING`、`ERROR_PROMPT_UNAVAILABLE` 和 `ERROR_SSE_REWRITE_UNSUPPORTED`，无法仅凭现有固定错误码推断完整 Qwen SSE 流。采用与生产 60 互斥的 61 模块、只读 `$done({})` 双钩子，手动开启 600 秒后保存一份请求类型结构和一份响应 SSE 事件结构摘要。禁止记录用户/模型文本、认证字段或完整响应；不得随意将真实 SSE 的未知事件全部加入生产版允许列表。需拿到用户实际的安全摘要后再审查兼容性。
