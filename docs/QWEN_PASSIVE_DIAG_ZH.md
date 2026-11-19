@@ -13,7 +13,7 @@
    
    `https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule`
 
-   模块中的两条脚本路径都应固定到 `52ae2a07d68b38a34c102969b32805159270e717`。
+   模块中的两条脚本路径都应固定到 `9ea939df59a95b471b7034f5b1bf71a755d8bf88`。
 
 4. 61 模块只对 `https://prod-yabuli.qianwen.com/v1/sessions/responses` 的 HTTP POST 启用 Request 和 Response 诊断钩子，仅允许 User-Agent 以 `Siri (` 开头。仍需在用户设备上对目标主机启用 HTTPS MITM，**不要将 MITM 扩展到更多域名**。HTTP 脚本可能影响流式响应缓冲与时间，故“代码不改写”**不等于**与完全关闭 MITM 的连接行为完全相同。首次测试后如 Qwen 失败，停用 61 并恢复基线。
 
@@ -87,4 +87,4 @@
 | `SESSION_EXPIRY_INVALID` | Session 过期字段类型/范围不符合 60 代码要求 |
 | `STREAM_UNAVAILABLE` | 非有效长度的原始响应文本 |
 
-此字段出现在手动读取的 `RESPONSE_SSE_PART_*` 拼接 JSON 里；正常 Hook 日志仍只出现 `RESPONSE_SSE_SCHEMA_CAPTURED_LOCAL`。只需刷新 **61 模块到固定提交 `52ae2a07d68b38a34c102969b32805159270e717`**，再次手动启动十分钟窗口、用 Siri 问一个非隐私问题、手动读取；**保持 60 停用**。没有泄露问题、回答、ID 或 Headers。一次采集满足当前检查，不代表其他 Siri 问答同样兼容；如果预检通过但 DeepSeek 改写后原生 Siri 仍显示失败，则主要需审查**合成 SSE 内部字段结构与真实 Qwen Schema 的差异**。
+此字段出现在手动读取的 `RESPONSE_SSE_PART_*` 拼接 JSON 里；正常 Hook 日志仍只出现 `RESPONSE_SSE_SCHEMA_CAPTURED_LOCAL`。只需刷新 **61 模块到固定提交 `9ea939df59a95b471b7034f5b1bf71a755d8bf88`**，再次手动启动十分钟窗口、用 Siri 问一个非隐私问题、手动读取；**保持 60 停用**。没有泄露问题、回答、ID 或 Headers。一次采集满足当前检查，不代表其他 Siri 问答同样兼容；如果预检通过但 DeepSeek 改写后原生 Siri 仍显示失败，则主要需审查**合成 SSE 内部字段结构与真实 Qwen Schema 的差异**。

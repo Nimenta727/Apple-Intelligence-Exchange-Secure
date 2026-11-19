@@ -1,5 +1,14 @@
 # Changelog / 更新日志
 
+## 2026-11-19 17:12 — 复杂问题 text.annotations SSE 支持与 A/B 实验诊断
+
+- 17:04 本地 DeepSeek 采样三次主请求均未调用模型；其中两次 Qwen SSE 因新增的 `text.annotations[].added` 等严格事件约束被拒绝，一次因为跨 Hook 关联丢失；旧短问答 13 事件和新复杂 24/26 事件不是相同协议实例。
+- 60 仅允许新增注释事件出现在 `text.value.done` 与 `content.done` 之间，完全丢弃上游注释文本、引用网址，再从 DeepSeek 重建回答。并允许最终纯文本项中的有界注释数组，不复制它们。
+- 61 `strict60Preflight` 与新 60 统一，新增复杂 SSE 安全通过与位置不合法时仍拒绝的离线测试；原生 pass-through 功能不变。
+- 三份实验日志显示：A 组无 AIES 执行，第二份加载的是 61，第三份运行的是 60（却手动开启了 61 原生诊断），不能把这轮数据当成完整 A/B 模型文本对比。
+- [本次 routine 记录与后续计划](docs/routine/2026-11-19-17-12-Siri-complex-annotations-ab-diagnosis.md)。**请求关联 P0 与完整真机兼容性仍未解决**。
+
+
 ## 2026-11-19 — 同题 A/B：原生 Qwen 与 DeepSeek 输出和 SSE 结构对照
 
 - 16:15 最新真实 60 日志证实 4 次主请求、2 次 DeepSeek 提交、1 次关联缺失、1 次 SSE 不兼容，并记录 4 次会话级 Qwen SSE 被 Guard 主动阻断。相关代理数据库 175 条记录中有 4 条主接口与 4 条会话级 Siri 请求。

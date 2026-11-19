@@ -462,6 +462,8 @@ var E={
  added:"session.response.choices[].items[].message.content[].added",
  delta:"session.response.choices[].items[].message.content[].text.value.delta",
  textDone:"session.response.choices[].items[].message.content[].text.value.done",
+ // Complex Siri/Qwen text can have citation annotations AFTER text.value.done.
+ annotation:"session.response.choices[].items[].message.content[].text.annotations[].added",
  contentDone:"session.response.choices[].items[].message.content[].done",
  itemDone:"session.response.choices[].items[].done",
  completed:"session.response.choices[].completed",
@@ -511,6 +513,29 @@ function rewriteSse(original,answer){
   if(!obj||obj.type!==name||!Object.prototype.hasOwnProperty.call(obj,name))return null;
   entries.push({name:name,payload:obj[name]});
  }
+ // Citation annotations are observed only between text.value.done and
+ // content.done. Never copy their source URLs, IDs, snippets or other Qwen
+ // content into a synthetic DeepSeek reply. Preserve only the text event
+ // skeleton, and fail closed for annotations outside this verified interval.
+ if(entries.length<12||entries.length>256)return null;
+ var clean=[],seenTextDone=false,seenContentDone=false,annotationCount=0;
+ for(i=0;i<entries.length;i++){
+  var row=entries[i];
+  if(row.name===E.annotation){
+   if(!seenTextDone||seenContentDone||++annotationCount>64||
+      !row.payload||typeof row.payload!=="object"||
+      Array.isArray(row.payload))return null;
+   // Annotation data is explicitly discarded: not copied, sent or logged.
+   continue;
+  }
+  if(row.name===E.textDone){
+   if(seenTextDone)return null;
+   seenTextDone=true;
+  }
+  if(row.name===E.contentDone)seenContentDone=true;
+  clean.push(row);
+ }
+ entries=clean;
  if(entries.length<12||entries.length>256)return null;
  var names=entries.map(function(x){return x.name;});
  var prefix=[E.session,E.created,E.choice,E.item,E.added];
@@ -544,7 +569,11 @@ function rewriteSse(original,answer){
     var entry=contents[j];
     if(!entry||typeof entry!=="object"||Array.isArray(entry)||
        entry.type&&entry.type!=="text"||
-       entry.text&&entry.text.annotations&&!emptyOrMissing(entry.text.annotations))
+       // Upstream citation arrays may be present in completed text; none of
+       // their contents are forwarded, and their length is bounded.
+       entry.text&&typeof entry.text==="object"&&
+       Object.prototype.hasOwnProperty.call(entry.text,"annotations")&&
+       (!Array.isArray(entry.text.annotations)||entry.text.annotations.length>64))
      return true;
    }
   }

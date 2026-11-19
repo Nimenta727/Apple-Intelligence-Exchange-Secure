@@ -118,6 +118,37 @@ test("native AB capture is fully disabled unless explicitly armed; standalone ST
  assert.equal(e.data.SAIRS_DEEPSEEK_API_KEY,"PRIVATE_DEEPSEEK_API_KEY");
 });
 
+test("61 strict60 parity accepts annotated complex Qwen SSE without collecting citation contents",()=>{
+ const e=env();e.arm();
+ const req=e.request(),name="session.response.choices[].items[].message.content[].text.annotations[].added";
+ const a={type:name};
+ a[name]={choice_index:0,item_index:0,content_index:0,index:0,
+  annotation:{url:"https://PRIVATE_QWEN_CITATION.example",title:SECRET}};
+ const prefix="event: "+name+"\ndata: "+JSON.stringify(a)+"\n\n";
+ const orig=Sse.candidateSse("PUBLIC_ANSWER_TEST","Sample","siri");
+ const place="event: session.response.choices[].items[].message.content[].done\n";
+ assert.ok(orig.includes(place));
+ const withCitation=orig.replace(place,prefix+place);
+ const r=e.invoke(req,{status:200,body:withCitation});
+ assert.equal(value(r.returned[0]),"{}");
+ const st=snap(e);
+ assert.equal(st.response.strict60Preflight,"MATCHES_60_PREFLIGHT");
+ assert.ok(st.response.eventCounts.some(x=>x.event===name&&x.count===1));
+ assert.ok(!value(st).includes("PRIVATE_QWEN_CITATION.example"));
+ assert.ok(!value(st).includes(SECRET));
+});
+test("61 strict60 parity rejects annotations before final answer text",()=>{
+ const e=env();e.arm();
+ const req=e.request(),name="session.response.choices[].items[].message.content[].text.annotations[].added";
+ const a={type:name};a[name]={index:0,annotation:{title:SECRET}};
+ const prefix="event: "+name+"\ndata: "+JSON.stringify(a)+"\n\n";
+ const orig=Sse.candidateSse("PUBLIC_ANSWER_TEST","Sample","siri");
+ const misplaced=orig.replace("event: session.response.choices[].items[].message.content[].text.value.done\n",
+  prefix+"event: session.response.choices[].items[].message.content[].text.value.done\n");
+ e.invoke(req,{status:200,body:misplaced});
+ assert.equal(snap(e).response.strict60Preflight,"ANNOTATION_POSITION_OR_TYPE_UNSUPPORTED");
+});
+
 test("default unarmed mode always passes original Qwen traffic without observing body",()=>{
  const e=env();
  const request=e.request();
@@ -239,7 +270,9 @@ test("passive 61 strict60 preflight classifier matches current rewriteSse branch
  const first=stream.split("\n\n")[0];
  assert.equal(observedPreflight(first+"\n\n"),"EVENT_COUNT_UNSUPPORTED");
  const addedId=stream.replace("event: session.created\n","id: PRIVATE_ID\nevent: session.created\n");
- assert.equal(observedPreflight(addedId),"FRAME_LAYOUT_UNSUPPORTED");
+ assert.equal(observedPreflight(addedId),"MATCHES_60_PREFLIGHT"); // 60 already allows standard SSE id fields
+ const unknownFrame=stream.replace("event: session.created\n","private-field: data\nevent: session.created\n");
+ assert.equal(observedPreflight(unknownFrame),"FRAME_LAYOUT_UNSUPPORTED");
  const unknown=stream.replace("event: session.created","event: unknown");
  assert.equal(observedPreflight(unknown),"EVENT_UNKNOWN");
  const malformed=stream.replace(/data: \{[^\n]+/,"data: {");

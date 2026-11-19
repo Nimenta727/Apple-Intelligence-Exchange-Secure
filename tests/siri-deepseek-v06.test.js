@@ -129,6 +129,66 @@ test("AB trace identifies failed session follow-up SSE without collecting Qwen t
  assert.equal(JSON.stringify(r2.returned[0]),"{}");
 });
 
+function annotatedQwenSse(raw,annotationCount=5,position="after_text_done"){
+ const eventName="session.response.choices[].items[].message.content[].text.annotations[].added";
+ let out=raw;
+ for(let i=0;i<annotationCount;i++){
+  const a={type:eventName};
+  a[eventName]={choice_index:0,item_index:0,content_index:0,index:i,
+   annotation:{type:"url_citation",url:"https://PRIVATE_QWEN_SOURCE_INVALID.example/citation",
+    title:"QWEN_ANNOTATION_PRIVATE_ANSWER"}};
+  const evt="event: "+eventName+"\ndata: "+JSON.stringify(a)+"\n\n";
+  const before=position==="before_text_done"?
+   "event: session.response.choices[].items[].message.content[].text.value.done\n":
+   position==="after_content_done"?
+   "event: session.response.choices[].items[].done\n":
+   "event: session.response.choices[].items[].message.content[].done\n";
+  assert.ok(out.includes(before));
+  out=out.replace(before,evt+before);
+ }
+ return out;
+}
+test("Siri 24/26-event annotated Qwen SSE allows DeepSeek rewriting without leaking citation text or links",()=>{
+ for(const n of [5,6]){
+  let raw=annotatedQwenSse(fixture,n);
+  raw=changeNativeEvent(raw,"session.response.choices[].items[].done",v=>{
+   v.item.message.content[0].text.annotations=[{title:"QWEN_ANNOTATION_PRIVATE_ANSWER"}];
+  });
+  raw=changeNativeEvent(raw,"session.response.choices[].completed",v=>{
+   v.choice.output[0].message.content[0].text.annotations=[{url:"https://PRIVATE_QWEN_SOURCE_INVALID.example/citation"}];
+  });
+  raw=changeNativeEvent(raw,"session.response.choices[].done",v=>{
+   v.choice.output[0].message.content[0].text.annotations=[{title:"QWEN_ANNOTATION_PRIVATE_ANSWER"}];
+  });
+  raw=changeNativeEvent(raw,"session.response.done",v=>{
+   v.choices[0].output[0].message.content[0].text.annotations=[{title:"QWEN_ANNOTATION_PRIVATE_ANSWER"}];
+  });
+  const e=env(),a=e.invoke(e.request);
+  const b=e.invoke({...e.request,headers:a.returned[0].headers},
+   {status:200,headers:{"Content-Type":"text/event-stream"},body:raw});
+  assert.equal(b.returned[0].status,200);
+  assert.equal(e.requests.length,1);
+  assert.ok(b.returned[0].body.includes("DEEPSEEK_EXCLUSIVE_REPLY"));
+  assert.equal(Sse.validateCandidateSse(b.returned[0].body,"siri").ok,true);
+  assert.ok(!b.returned[0].body.includes("QWEN_ANNOTATION_PRIVATE_ANSWER"));
+  assert.ok(!b.returned[0].body.includes("PRIVATE_QWEN_SOURCE_INVALID"));
+  assert.ok(!b.returned[0].body.includes("QWEN_ORIGINAL_ANSWER_TEST"));
+  assert.ok(!b.returned[0].body.includes("text.annotations[].added"));
+ }
+});
+test("Qwen citation frames in unobserved positions still fail closed before DeepSeek billing",()=>{
+ for(const position of ["before_text_done","after_content_done"]){
+  const raw=annotatedQwenSse(fixture,2,position);
+  const e=env(),a=e.invoke(e.request);
+  const b=e.invoke({...e.request,headers:a.returned[0].headers},
+   {status:200,body:raw});
+  assert.equal(b.returned[0].status,502);
+  assert.equal(e.requests.length,0);
+  assert.ok(e.logs.includes("[AIES_V06] ERROR_SSE_REWRITE_UNSUPPORTED"));
+  assert.ok(!JSON.stringify(b.returned[0]).includes("QWEN_ANNOTATION_PRIVATE_ANSWER"));
+ }
+});
+
 test("verified DeepSeek answer is visibly labeled once in the rewritten Siri SSE and provider identity prompt",()=>{
  const e=env();
  const req=e.invoke(e.request);
@@ -1098,7 +1158,7 @@ test("DeepSeek Flash is requested in documented disabled-thinking mode for short
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,3);
- assert.ok(scripts.every(x=>x.includes("/b2c2ff84443fa046c70f89823808fc74d04924c3/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/454556947d1a9a9615f587b5a1b4847e3fb5308a/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
