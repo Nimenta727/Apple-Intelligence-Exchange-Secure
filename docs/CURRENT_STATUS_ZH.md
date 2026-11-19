@@ -2,7 +2,7 @@
 
 > **当前版本：v0.6.0-beta（`main`）。2026-11-19 真机确认了 Siri 请求钩子命中，但解析失败；原生 UI、DeepSeek API 与响应替换尚未验证。**
 
-本次修订保留 `REQUEST_DIAG_*` 固定诊断码和受限纯文本包装兼容，并将一次性本地组名探针升级为 **v2（600 秒、状态检查不取消、单键存储、独立 STOP）**，保留 WritingTools 旁路。已在真实 iPad 日志观察到两次 Siri 和一次 WritingTools 的 `GROUP_UNSUPPORTED`，但尚未取得 Siri 实际组名；**不能宣称已经修好 Siri**。不收集任何原始报文、私有令牌或真实问题；复测见[调试手册](DEBUGGING_ZH.md)。
+本次修订保留 `REQUEST_DIAG_*` 固定诊断码和受限纯文本包装兼容，并将一次性本地组名探针升级为 **v2（600 秒、状态检查不取消、单键存储、独立 STOP）**，保留 WritingTools 旁路。已在真实 iPad 日志观察到两次 Siri 和一次 WritingTools 的 `GROUP_UNSUPPORTED`，且通过新版探针取得真实 Siri 组名 `siri.multimodal.noRTI`；已添加精确的 Siri-only 纯文本兼容分支，但**真机请求解析及原生回答仍需验收，不能宣称已经修好 Siri**。不收集任何原始报文、私有令牌或真实问题；复测见[调试手册](DEBUGGING_ZH.md)。
 
 | 环节 | 现状 |
 |---|---|
@@ -18,6 +18,6 @@
 
 产品支持范围：特定 Siri 文本问答，不支持写作工具、视觉智能、音频文件、多模型或本地离线模型。用户接受原始请求可能由千问处理，DeepSeek 也会收到问题。
 
-当前下一步：先刷新 60 模块且**同步替换 iPad 本地探针脚本文件**，按照 [Siri 组名本地诊断 v2](SIRI_GROUP_PROBE_ZH.md) 手动开启、提问、反复检查状态（不会取消）并按需单独停止，以非隐私问题确认真实 Siri 场景标识；随后按 [安装指南](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) 做一次集中真机验收，按 [调试说明](DEBUGGING_ZH.md) 判断是宿主钩子、SSE、DeepSeek 还是原生 Siri UI 环节失败。达到 [发布清单](RELEASE_CHECKLIST_ZH.md) 的门槛后再决定是否发布稳定版。
+当前下一步：刷新 60 模块以启用新增的 `siri.multimodal.noRTI` 严格纯文本分支；**本地探针 JS 不必再次更新**。使用非隐私 Siri 问题检查是否出现 `REQUEST_CAPTURED`，若看到 `REQUEST_DIAG_INPUT_UNSUPPORTED`、`CONTENT_UNSUPPORTED` 或 `MEDIA_UNSUPPORTED` 则说明真实结构仍超出安全白名单，停止该分支的测试并仅反馈固定错误码。之后再分别验证上游 SSE、DeepSeek 和 Siri 原生 UI；详见[调试说明](DEBUGGING_ZH.md)。达到 [发布清单](RELEASE_CHECKLIST_ZH.md) 的门槛后再决定是否发布稳定版。
 
 仓库只保留当前 v0.6 的运行文件、测试与文档，不再维护不相关的旧实验代码。删除仓库中的旧文件**不等于清除设备上此前导入的模块**，实际设备仍需停用冲突配置。

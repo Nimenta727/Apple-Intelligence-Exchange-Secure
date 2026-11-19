@@ -30,7 +30,7 @@ docs/                                      当前使用/架构/调试/安全/发
 Siri 文本输入
   ↓
 Shadowrocket HTTP Request Hook
-  ├ 固定 host/path、POST、JSON 和 siri.tqa 文本范围校验
+  ├ 固定 host/path、POST、JSON，以及 legacy siri.tqa / 新增 Siri-only noRTI 严格文本范围校验
   ├ 读取问题正文、生成请求 token、写入短期存储
   └ 原请求继续按系统配置发送（可能由千问处理）
   ↓
@@ -61,13 +61,13 @@ Siri 原生 UI 是否接受：尚待真机验证
 | `done`、`error` | 一次性响应、超时与尝试 502 错误 |
 | `log` | 固定阶段日志，不主动输出问题和 Key |
 
-2026-11-19 真机实测只证明 HTTP Request hook 命中，随后 `ERROR_UNSUPPORTED_SIRI_REQUEST`；没有真实 JSON 结构证据。因此本次新增的 `textAtom` 只允许受限纯文本内容对象（含 `text.value`），不会放开 Siri 组名、媒体或任意嵌套结构。错误码不包含正文/请求头/Key。是否能适配真实 Siri 仍待下次脱敏复测。
+2026-11-19 真机通过本地只读探针确认了 `siri.multimodal.noRTI`。本次仅对这个精确标识且 User-Agent 符合 Siri 的请求增加受限纯文本适配；`observedSiriTextOnlyEnvelope` 只接受顶层 `configuration` + `input`，每项仅接受纯文本 `content` 或受限 `message` 包装，拒绝媒体附件、意外字段与非用户角色；随后继续复用 `textAtom` 和 SSE 的严格检查。**真实 noRTI 请求的完整 JSON 结构尚未验证，拒绝不代表系统有问题**。日志仍只输出固定码。
 
 ## 真机组名诊断（2026-11-19）
 
 用户日志确认 Siri 与 WritingTools 共用目标路径；请求钩子对两类请求都曾返回 `GROUP_UNSUPPORTED`。现在新增 `isWritingTools`，明确识别为 WritingTools 时无论 Request/Response 阶段均调用 `$done({})` 旁路，避免错误接管不支持的写作工具。
 
-v2 的 `probeObserveRequest`、`probeObserveWritingTools` **不会改变解析结果**；它们仅在本机手动开启后的 600 秒有效期、HTTP Request 阶段、指定目标路径执行。单个状态键保留固定阶段码与有上限的统计；只有 Siri User-Agent 的目标 POST、组名格式通过过滤时才暂存一个组名，供本机手动查看并清除。手动脚本重复执行仅查状态，独立 STOP 文件明确停止。主运行日志只打印固定码；本地 Script Test 与网络脚本能否共享 `$persistentStore` 尚待真实设备确认。
+v2 的 `probeObserveRequest`、`probeObserveWritingTools` **不会改变解析结果**；它们仅在本机手动开启后的 600 秒有效期、HTTP Request 阶段、指定目标路径执行。单个状态键保留固定阶段码与有上限的统计；只有 Siri User-Agent 的目标 POST、组名格式通过过滤时才暂存一个组名，供本机手动查看并清除。手动脚本重复执行仅查状态，独立 STOP 文件明确停止。主运行日志只打印固定码；真机已由 `SIRI_REQUESTS_SEEN=1`、`LAST_STAGE=GROUP_CAPTURED` 和一次本地 `GROUP_ID` 读取确认了当前设备上诊断状态的跨执行环境共享；不同设备版本仍需分别验证。
 
 新版模块仍只有两个 HTTP Hook 且 pin 到同一个不可变提交，辅助脚本单独放在 `scripts/` 中供 Script Test。详情见 [诊断指南](SIRI_GROUP_PROBE_ZH.md)。
 

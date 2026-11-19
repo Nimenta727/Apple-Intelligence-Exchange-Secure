@@ -6,11 +6,11 @@
 
 [中文](README.md) · [Install (Chinese)](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [Documentation](docs/README.md) · [Security](docs/SECURITY_CURRENT_ZH.md)
 
-> **2026-11-19 device observation:** The target Siri POST reached the HTTP request hook, but parsing failed with `ERROR_UNSUPPORTED_SIRI_REQUEST`. This update adds privacy-safe fixed `REQUEST_DIAG_*` codes and limited strict text-only envelope support. The real request JSON schema is still unknown; this does **not** establish working Siri responses. Refresh the 60 module to load the new pinned script.
+> **2026-11-19 device observation:** The target Siri POST reached the HTTP request hook, but parsing failed with `ERROR_UNSUPPORTED_SIRI_REQUEST`. This update adds privacy-safe fixed `REQUEST_DIAG_*` codes and limited strict text-only envelope support. The real group ID is known, but the complete request JSON schema remains unverified; this does **not** establish working Siri responses. Refresh the 60 module to load the new pinned script.
 
-## 2026-11-19 device-only group discovery
+## 2026-11-19 device-only group discovery and guarded compatibility
 
-Real device logs show that both Siri and WritingTools use the same endpoint and can trigger `REQUEST_DIAG_GROUP_UNSUPPORTED`. The actual Siri group identifier is not known. This update bypasses WritingTools and adds an **explicitly armed, one-shot 600-second (10-minute) on-device probe**. It does not add unknown groups to the allowlist, and native Siri output is **still unverified**.
+Real device logs show that both Siri and WritingTools use the same endpoint and can trigger `REQUEST_DIAG_GROUP_UNSUPPORTED`. The device-local probe has now identified the exact Siri group ID: `siri.multimodal.noRTI`. This update **accepts only that exact group with a Siri User-Agent and a conservative text-only envelope**, while rejecting media and unexpected fields; WritingTools is bypassed. The 600-second opt-in probe remains available for diagnostics. Real request JSON schema, SSE and native Siri output are **still unverified**.
 
 To run the probe, use the [Chinese local group diagnosis guide](docs/SIRI_GROUP_PROBE_ZH.md) and [manual `siri_group_probe_ONCE.js`](scripts/siri_group_probe_ONCE.js) via Shadowrocket Script Test, **not** as an HTTP/event/cron hook. The [local helper](scripts/siri_group_probe_ONCE.js) arms on first run; later runs report remaining seconds, Siri/WritingTools/other-client counts, and a fixed parser stage **without disarming**. Once an identifier is captured, a manual run shows it locally and clears it. Explicit cancellation uses [siri_group_probe_STOP_ONCE.js](scripts/siri_group_probe_STOP_ONCE.js). **Replace the old iPad-local helper file as well as refreshing the 60 module**. Never upload raw PacketTunnel logs.
 

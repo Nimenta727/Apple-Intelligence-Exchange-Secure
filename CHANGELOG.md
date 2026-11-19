@@ -1,5 +1,13 @@
 # Changelog / 更新日志
 
+## 2026-11-19 — 真机 Siri noRTI 标识确认与纯文本分支
+
+- 用户通过 v2 本地探针确认真机 Siri 的 `response_configuration_group_id=siri.multimodal.noRTI`；主脚本原本返回 `REQUEST_DIAG_GROUP_UNSUPPORTED`，这是已证实的第一道阻塞。
+- 仅对精确 `siri.multimodal.noRTI` 且 Siri User-Agent 的 POST 增加文本解析路径；对未知客户端、WritingTools、附件、媒体、未知输入字段和其他组名保持严格失败或旁路。
+- 增加离线模拟的双钩子成功路径及拒绝样例，更新模块 Request/Response 的同一不可变脚本提交。
+- 真实 noRTI 输入 JSON、上游 SSE、DeepSeek 账户 API 与 Siri 原生界面尚未实测成功；测试中仍只能反馈固定码，不可分享含凭据的完整抓包。
+
+
 ## 2026-11-19 — v0.6 Beta 组名诊断 v2（10 分钟，手动状态检查）
 
 - 旧 180 秒探针的第二次运行会误取消采样。新版改为 **600 秒**，重复检查仅报告状态和剩余时间，不自动停止。

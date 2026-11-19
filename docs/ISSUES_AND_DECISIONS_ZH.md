@@ -17,12 +17,12 @@
 
 | 编号 | 问题 | 处理办法 |
 |---|---|---|
-| I1 | 2026-11-19 已证实真实 Siri 请求命中钩子，但解析失败；响应关联尚未知 | 按 `REQUEST_DIAG_*` 分类定位，获取脱敏结构证据后修复 |
+| I1 | 2026-11-19 已证实真实 Siri 请求命中钩子，并确认其 `siri.multimodal.noRTI` 组名；其余文本结构和响应关联尚未知 | 按 `REQUEST_DIAG_*` 分类定位，获取脱敏结构证据后修复 |
 | I2 | 实际 SSE 结构是否兼容 | 未知格式拒绝，必要时仅分析脱敏结构 |
 | I3 | 官方 API 已列出 `deepseek-flash`，但用户账户实际调用尚未验证 | 先解决请求解析，再核对模型 HTTP 响应与额度 |
 | I4 | 脚本未执行时仍可能出现千问内容 | 需要明确系统级能力边界，不能宣称保证 |
 | I5 | `$persistentStore` 中的问题正文可能残留 | 在下一次安全重构中减少存储和完善清理 |
-| I6 | 真机 Siri 和 WritingTools 均出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，真实 Siri 组名仍未知 | v2 已提供 600 秒状态可重复查看、Siri/WritingTools 计数及独立 STOP；真机待读取单个受限组名，禁止盲目放宽白名单 |
+| I6 | 真机已确认 Siri 组名 `siri.multimodal.noRTI`，但具体 JSON 输入形状未知 | 新增 Siri-only 严格文本兼容分支；真机观察下一个 `REQUEST_DIAG_*`，禁止放宽附件与多模态结构 |
 | I7 | WritingTools 与 Siri 使用同一目标 URL，容易被错误接管 | 新版识别 WritingTools 后跳过请求和响应；兼容性仍需真机确认 |
 
 任何修复应加回归测试，按 [调试说明](DEBUGGING_ZH.md) 定位并经 [维护流程](OPERATIONS_ZH.md) 审查。当前风险与发布状态以 [当前状态](CURRENT_STATUS_ZH.md) 和 [发布清单](RELEASE_CHECKLIST_ZH.md) 为准。

@@ -48,7 +48,7 @@ Siri 文本请求
 |---|---|
 | `BODY_NOT_TEXT` / `BODY_EMPTY` / `BODY_OVERSIZE` | 请求正文不是可读字符串、为空或超限 |
 | `JSON_INVALID` / `ROOT_UNSUPPORTED` | JSON 无效或顶层不是对象 |
-| `GROUP_MISSING` / `GROUP_UNSUPPORTED` | 不存在或不属于允许的 `siri.tqa` / `siri_tqa` 组 |
+| `GROUP_MISSING` / `GROUP_UNSUPPORTED` | 不存在或不属于 `siri.tqa` / `siri_tqa`、或严格受限的 `siri.multimodal.noRTI`（Siri UA）组 |
 | `INPUT_UNSUPPORTED` | `input` 数组结构或数量不符合限制 |
 | `CONTENT_UNSUPPORTED` / `MEDIA_UNSUPPORTED` | 文本内容包装不支持或包含媒体 |
 | `PROMPT_EMPTY` / `PROMPT_OVERSIZE` | 提取后为空或超长 |
@@ -58,9 +58,11 @@ Siri 文本请求
 
 ## 2026-11-19 新增：Siri 与 WritingTools 的组名区分
 
-真实日志出现三个 `REQUEST_DIAG_GROUP_UNSUPPORTED`：一次 WritingTools、两次 Siri。因为二者共享同一个 URL，**仅匹配域名并不能区分**；当前脚本会对识别为 WritingTools 的请求和响应执行 `WRITINGTOOLS_SKIPPED`，不会向 DeepSeek 转发其内容。主程序仍严格拒绝未知 Siri 组名。
+真实日志出现三个 `REQUEST_DIAG_GROUP_UNSUPPORTED`：一次 WritingTools、两次 Siri。因为二者共享同一个 URL，**仅匹配域名并不能区分**；当前脚本会对识别为 WritingTools 的请求和响应执行 `WRITINGTOOLS_SKIPPED`，不会向 DeepSeek 转发其内容。主程序仍严格拒绝未知 Siri 组名；**已确认的 `siri.multimodal.noRTI` 仅在 Siri UA 和严格纯文本 JSON 结构满足条件时允许通过第一道解析门槛**。
 
 为避免旧版 180 秒采样过期和重复测试误取消，现用 **v2 600 秒状态检查工具**：先同步更新远程 60 模块和 iPad **本地同名 JS 文件**，使用 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) 手动开启、询问 Siri、反复查询剩余时间与分类计数，查询**不会取消**；捕获时仅在本机测试日志显示一次 `GROUP_ID=...`，其他日志仍只有固定码。确需取消，手动运行独立的 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js)。完整方法及 `ACTIVE_REMAINING_SECONDS` / `SIRI_REQUESTS_SEEN` / `LAST_STAGE` 解释见[本地探针指南](SIRI_GROUP_PROBE_ZH.md)。若窗口过期、网络通路未命中或格式不安全，不放宽白名单。
+
+**2026-11-19 新阶段：** 真机探针已读出 `siri.multimodal.noRTI`。更新模块后，无需再次开启采样，直接问一个非隐私文本问题。若继续收到 `REQUEST_DIAG_GROUP_UNSUPPORTED`，先确认模块更新和请求确实使用这个组名；若出现 `REQUEST_DIAG_INPUT_UNSUPPORTED` 或 `CONTENT_UNSUPPORTED`，意味着真正的 JSON 输入结构超出已知安全文本范围，**不要通过放宽多模态字段绕过**；若出现 `REQUEST_CAPTURED`，才进入 SSE/DeepSeek 下一步。上述均不代表 Siri 最终输出成功。
 
 **提示：** `SIRI_GROUP_CAPTURED_LOCAL` 不代表请求已捕获并可送 DeepSeek，只代表曾临时保存一个组名；在真实组名审查后仍须验证解析、SSE 和 Siri UI。禁止发完整 PacketTunnel 日志。
 

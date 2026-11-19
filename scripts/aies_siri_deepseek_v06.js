@@ -141,6 +141,32 @@ function probeObserveRequest(){
  else if(state.lastCode==="GROUP_ID_UNSAFE")log("SIRI_GROUP_PROBE_UNSAFE_ID");
  else log("SIRI_PROBE_SIRI_REQUEST_SEEN");
 }
+// The observed iPadOS 27.3 Siri group is named "multimodal". To prevent
+// accidentally routing images, audio, sidecar attachments or hidden context to
+// the text-only model, support only explicit text envelopes for this group.
+// The real Siri JSON envelope remains unverified: reject unknown structures.
+function observedSiriTextOnlyEnvelope(o){
+ if(!o||typeof o!=="object"||Array.isArray(o))return false;
+ var top=Object.keys(o);
+ if(top.length!==2||top.indexOf("configuration")<0||top.indexOf("input")<0)return false;
+ if(!Array.isArray(o.input)||o.input.length<1||o.input.length>12)return false;
+ for(var i=0;i<o.input.length;i++){
+  var it=o.input[i];
+  if(!it||typeof it!=="object"||Array.isArray(it))return false;
+  var keys=Object.keys(it),nested=Object.prototype.hasOwnProperty.call(it,"message");
+  if(nested){
+   if(keys.length!==1||keys[0]!=="message")return false;
+   it=it.message;
+   if(!it||typeof it!=="object"||Array.isArray(it))return false;
+   keys=Object.keys(it);
+  }
+  if(!keys.length||keys.some(function(k){return k!=="content"&&k!=="role"&&k!=="type";}))return false;
+  if(!Object.prototype.hasOwnProperty.call(it,"content"))return false;
+  if(Object.prototype.hasOwnProperty.call(it,"role")&&it.role!=="user")return false;
+  if(Object.prototype.hasOwnProperty.call(it,"type")&&it.type!=="message")return false;
+ }
+ return true;
+}
 function parseRequest(raw){
  if(!raw){if(requestDiagnostic==="UNSET")requestDiagnostic="BODY_EMPTY";return null;}
  if(raw.length>C.maxRequest){requestDiagnostic="BODY_OVERSIZE";return null;}
@@ -151,7 +177,18 @@ function parseRequest(raw){
   var g=o.configuration&&o.configuration.response_configuration_group_id;
   if(typeof g!=="string"){requestDiagnostic="GROUP_MISSING";return null;}
   requestGroup=g;
-  if(!/^(siri\.tqa|siri_tqa)$/i.test(g)){requestDiagnostic="GROUP_UNSUPPORTED";return null;}
+  var observedGroup=g==="siri.multimodal.noRTI";
+  if(!/^(siri\.tqa|siri_tqa)$/i.test(g)&&!observedGroup){
+   requestDiagnostic="GROUP_UNSUPPORTED";return null;
+  }
+  // The newly observed multimodal group is never accepted for WritingTools,
+  // unknown clients or unverified non-text JSON envelopes.
+  if(observedGroup&&!isSiriForProbe()){
+   requestDiagnostic="GROUP_UNSUPPORTED";return null;
+  }
+  if(observedGroup&&!observedSiriTextOnlyEnvelope(o)){
+   requestDiagnostic="INPUT_UNSUPPORTED";return null;
+  }
   if(!Array.isArray(o.input)||o.input.length<1||o.input.length>12){
    requestDiagnostic="INPUT_UNSUPPORTED";return null;
   }
