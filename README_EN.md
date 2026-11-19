@@ -1,69 +1,33 @@
 # Apple Intelligence Exchange Secure (AIES)
 
-**Experimental DeepSeek-sourced answers in the native Siri interface, via Shadowrocket.**
+**Experimental Shadowrocket Siri text → DeepSeek response rewriting.** Not affiliated with Apple, Qwen, Shadowrocket or DeepSeek.
 
-> **v0.6.0-beta — request hook observed, end-to-end validation pending.** Offline unit tests do not demonstrate real Siri compatibility, a successful live DeepSeek API call, or protection against operating-system fallback. Not affiliated with Apple, Shadowrocket, or DeepSeek.
+> **v0.6.0-beta (2026-11-19). Native Siri UI acceptance is NOT VERIFIED.** A real iPad has confirmed the `siri.multimodal.noRTI` request group, a text-only JSON input, and a 13-event Qwen SSE response. One native Qwen stream passed the existing strict preflight. A historical DeepSeek call reached the script's response-attempt stage, but successful native Siri rendering has not been observed.
 
-[中文](README.md) · [Install (Chinese)](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [Documentation](docs/README.md) · [Security](docs/SECURITY_CURRENT_ZH.md)
+[Chinese documentation hub](docs/README.md) · [Installation / rollback (ZH)](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [Device validation matrix (ZH)](docs/VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)
 
-> **2026-11-19 device observation:** The target Siri POST reached the HTTP request hook, but parsing failed with `ERROR_UNSUPPORTED_SIRI_REQUEST`. This update adds privacy-safe fixed `REQUEST_DIAG_*` codes and limited strict text-only envelope support. The real group ID is known, but the complete request JSON schema remains unverified; this does **not** establish working Siri responses. Refresh the 60 module to load the new pinned script.
+## Modules (mutually exclusive)
 
-## 2026-11-19 device-only group discovery and guarded compatibility
+- [**60 DeepSeek rewriting Beta**](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule): captures supported Siri text, uses per-request correlation, requests a DeepSeek completion, reconstructs Qwen-like SSE with the observed native event/field schema and a `【DeepSeek · AIES】` answer prefix. Unknown tools, audio/media, moderation, SSE shapes and uncorrelatable requests fail closed. **The intermittent loss of correlation metadata in Shadowrocket remains unresolved.**
+- [**61 native Qwen passive diagnostics**](shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule): unchanged `$done({})` request/response hooks. Only after manual opt-in, records bounded JSON key/type structure, SSE event counts/order and allowlisted OS metadata, not prompts, answers or credentials. **Disable 60 and older REJECT/rewrite hooks first.** MITM buffering may still affect streaming.
 
-Real device logs show that both Siri and WritingTools use the same endpoint and can trigger `REQUEST_DIAG_GROUP_UNSUPPORTED`. The device-local probe has now identified the exact Siri group ID: `siri.multimodal.noRTI`. This update **accepts only that exact group with a Siri User-Agent and a conservative text-only envelope**, while rejecting media and unexpected fields; WritingTools is bypassed. The 600-second opt-in probe remains available for diagnostics. Real request JSON schema, SSE and native Siri output are **still unverified**.
+## Verified protocol and development archive
 
-To run the probe, use the [Chinese local group diagnosis guide](docs/SIRI_GROUP_PROBE_ZH.md) and [manual `siri_group_probe_ONCE.js`](scripts/siri_group_probe_ONCE.js) via Shadowrocket Script Test, **not** as an HTTP/event/cron hook. The [local helper](scripts/siri_group_probe_ONCE.js) arms on first run; later runs report remaining seconds, Siri/WritingTools/other-client counts, and a fixed parser stage **without disarming**. Once an identifier is captured, a manual run shows it locally and clears it. Explicit cancellation uses [siri_group_probe_STOP_ONCE.js](scripts/siri_group_probe_STOP_ONCE.js). **Replace the old iPad-local helper file as well as refreshing the 60 module**. Never upload raw PacketTunnel logs.
+- [Siri → Qwen request JSON outline (ZH)](docs/OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)
+- [Qwen SSE 13-event schema (ZH)](docs/OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)
+- [Full November 19 device diagnostic chronology (ZH)](docs/DEBUG_HISTORY_2026-11-19_ZH.md)
+- [Root causes, design decisions, security constraints (ZH)](docs/ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)
+- [Acceptance tests, privacy, rollback (ZH)](docs/VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)
+- [Current evidence status (ZH)](docs/CURRENT_STATUS_ZH.md)
 
-## Purpose
-
-The module targets one Siri **text question-answering** network endpoint. The original request **may reach Qwen**, while the response hook attempts to obtain text from DeepSeek and rebuild the recognized answer events. Errors handled within the script do not intentionally fall back to Qwen.
-
-**This is not a system-level provenance guarantee.** Siri may display Qwen content when the VPN, MITM or script fails to run, or when the client uses a separate path or cached response.
-
-## Install
-
-The only current module is [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule):
-
-```text
-https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule
+```bash
+npm ci
+npm run check
+npm test
 ```
 
-Follow the [installation and rollback guide](docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md) before enabling it. Back up your config, disable any existing conflicting same-host REJECT rules, provide your own DeepSeek API key **only on the device**, and verify HTTPS MITM is limited to the intended host. Use only nonsensitive Siri questions in testing.
+`npm run check` includes syntax, mocked HTTP dual hooks, SSE schema fidelity, fail-closed safety, token privacy, no-model-call passive 61, documentation links and immutable script pin tests.
 
-The `deepseek-flash` model ID is documented by the [official DeepSeek Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/), but real calls with the user's account and end-to-end Siri behavior remain **unverified**.
+## Limitations
 
-## Code layout
-
-- `shadowrocket/`: the single installable module, with request and response hooks
-- `scripts/`: the runtime JS plus one-time on-device key provisioning and clearing templates
-- `tests/`: current beta unit tests and synthetic SSE fixtures
-- `tools/`: documentation and deployment integrity checks
-- `docs/`: current documentation only
-
-Run `npm run check` with Node.js >=20. See the [architecture](docs/ARCHITECTURE_CURRENT_ZH.md), [debugging runbook](docs/DEBUGGING_ZH.md), [operations](docs/OPERATIONS_ZH.md), [release gates](docs/RELEASE_CHECKLIST_ZH.md), and [verification status](docs/CURRENT_STATUS_ZH.md).
-
-API keys, CA private keys, real prompts, Authorization headers and traffic captures must not be submitted. AIES is MIT licensed and credits the published research in [boitar/sair](https://github.com/boitar/sair).
-
-## Latest noRTI on-device input diagnosis (2026-11-19)
-
-The observed Siri group is accepted, but two real requests still failed at `REQUEST_DIAG_INPUT_UNSUPPORTED`. The new runtime adds fixed `NORTI_SHAPE_*` categories for top-level fields, input containers and message wrappers, without recording actual field names or values or widening the allowed media payloads. Refresh the 60 module and share fixed AIES diagnostic codes only. DeepSeek/SSE/native Siri remain unverified.
-
-## Device-local schema-only probe (2026-11-19)
-
-The latest Siri failure yields `NORTI_SHAPE_ROOT_FIELDS` and `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`. To avoid loosening media handling without evidence, a new **explicitly armed, ten-minute on-device** [schema probe](docs/SIRI_SCHEMA_PROBE_ZH.md) stores only bounded, screened JSON field **names and types**, not values, prompts or headers. It is inspected once through [manual Script Test](scripts/siri_schema_probe_ONCE.js), then erased. Requires updated 60 module and local helper. This is a diagnostic aid, **not** an end-to-end Siri/DeepSeek fix.
-
-## Real iPad Siri field metadata (2026-11-19 11:54)
-
-Explicit local-only schema probe established root field names/types: `client_tools:array`, `response_format:object`, `server_tools:array`, `stream:boolean`; item wrapper `type:string`; nested message `content:array`, `role:string`. The runtime now accepts only the confirmed additional root fields with matching JSON types (never forwards tool metadata to DeepSeek), and an optional wrapper `type` only if it equals `message`. Unknown discriminators and content element types remain fail-closed. **Refresh the 60 module** for the next nonsensitive Siri test; no need to rerun the schema probe. Native DeepSeek/SSE/Siri output remains unverified.
-
-## Local one-shot sanitized Siri-to-Qwen request-body capture (2026-11-19)
-
-The iPad schema probe also observed an `input_hint:string` field; the parser now accepts that key only as a string and discards its value. A separate, manual, ten-minute, one-shot [request-body probe](docs/SIRI_QWEN_BODY_CAPTURE_ZH.md) captures a **sanitized copy** of the Siri-bound Qwen JSON POST body, preserving a bounded `input` text structure while masking credentials and unrelated metadata. The capture is not a header dump, nor a general Qwen app/web chat interceptor. It does not establish that Qwen actually received the request or that DeepSeek/native Siri answers work.
-
-## Device-visible DeepSeek source marker and response diagnostics (2026-11-19)
-
-The observed Siri UI sometimes displayed a Qwen service badge and often failed to show an answer. A service badge alone is not proof of which model authored the content. The runtime now **deterministically prefixes** a verified, successfully rewritten DeepSeek answer with `【DeepSeek · AIES】`; a system instruction also asks the provider to explain its role accurately. It never marks failed responses or original Qwen text as DeepSeek, and cannot change system-controlled Siri/Qwen UI branding. Additional fixed codes distinguish missing response correlation headers, unavailable local prompt storage, request-body fallback and successful SSE preflight without exposing secrets. Native Siri success is still unverified.
-
-## Temporary native Qwen pass-through and passive protocol observation
-
-To diagnose real Siri-to-Qwen SSE without altering Qwen responses, **first disable the experimental DeepSeek 60 module and all older same-domain REJECT/rewrite rules**. Verify the native Qwen baseline before optionally enabling the separate [61 passive diagnostic module](shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule). It always calls `$done({})`, never modifies headers, request/response bodies or status, and never calls DeepSeek. A manual, one-shot 600-second opt-in collects only bounded JSON field/type outlines, SSE event names/order/count and whitelisted OS metadata, not messages or credentials. **Never enable 60 and 61 together**. See the [Chinese guide](docs/QWEN_PASSIVE_DIAG_ZH.md). MITM/response buffering itself may affect streaming and still requires real-device verification.
+The original Siri query may reach Qwen before DeepSeek is invoked. The product does **not** guarantee Qwen bypass protection if the proxy or scripts do not run. A visible Qwen service badge cannot establish which model authored the text; nor does a log such as `DEEPSEEK_RESPONSE_ATTEMPTED` prove that Siri displayed it. A failed request/response correlation remains a known device-level blocker, and the client UI's acceptance of the newly schema-aligned synthetic SSE still needs live testing. Never upload raw PacketTunnel, proxy databases, private question text, API keys or certificates.
