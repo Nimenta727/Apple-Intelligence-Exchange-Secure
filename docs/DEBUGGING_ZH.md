@@ -157,3 +157,19 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 ## 16:15 同题实验：避免混淆“模型输出变了”与“Guard 主动阻断”
 
 最新 2,987 行 PacketTunnel 日志同时包含两次 DeepSeek SSE 成功提交、一次跨 Hook 请求关联缺失、一次 SSE 预检失败和四次 `QWEN_SESSION_FOLLOWUP_SSE_BLOCKED`。因此复杂 Siri 无回答不能直接归咎于 DeepSeek 模型输出。新增[三阶段同题 A/B 实验](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)，原生侧使用 61 的手动 Qwen 可见答案/SSE 探针，改写侧使用 60 的手动 DeepSeek HTTP `finish_reason`/usage/答案/SSE 探针。模型实际完成时看 `DEEPSEEK_API.finishReason`；如果只出现 `RESPONSE_TAG_MISSING` 或 `SESSION_FOLLOWUP_BLOCKED` 而没有 `DEEPSEEK_API`，**说明那次失败不是模型回复内容变了**。两个探针只适用于用户亲自选择的非隐私普通问题，读取后逻辑清理。
+
+## 23:42–23:47 两份新真机日志：第二轮 Siri 不稳定
+
+上传的两份 PacketTunnel 中，经**只提取固定状态码并脱敏聚合**，得到：
+
+| 时间窗口 | `REQUEST_CAPTURED` | `DEEPSEEK_RESPONSE_ATTEMPTED` | `ERROR_PROMPT_UNAVAILABLE` | `QWEN_SESSION_FOLLOWUP_SSE_BLOCKED` |
+|---|---:|---:|---:|---:|
+| 23:42–23:44 | 4 | 3 | 1 | 6 |
+| 23:45–23:47 | 6 | 5 | 1 | 1 |
+
+- 两份日志分别存在连续多个真实 DeepSeek 调用 / SSE 改写提交，故“API 只回答第一问”不符合脚本记录；用户观察到的 **Siri UI 第二问无法稳定展示**是真实、不同层级的问题。
+- 60 的第三条 Hook 对 `/v1/sessions/{id}/responses` 上符合条件的 Siri SSE **主动返回 502**，这可能阻断 Siri 后续会话。但成功提交 SSE 与 502 是否在同一 Siri UI 对话中相关，PacketTunnel 固定码无法确认，不可直接宣布唯一根因。
+- 两次 `RESPONSE_TAG_MISSING` 后 `RESPONSE_PROMPT_BODY_UNAVAILABLE`、`ERROR_PROMPT_UNAVAILABLE` 属另一独立 P0；响应无可信 token 和同事务请求正文时保持失败关闭。
+- 近期**不能**通过删除 Guard、直接 Qwen 透传或全局最近提问缓存来声称多轮均由 DeepSeek 生成。
+
+**下一步**：使用 61 的 [Siri 会话级 schema-only 手动诊断](QWEN_PASSIVE_DIAG_ZH.md)（`scripts/siri_followup_schema_probe_ONCE.js`）验证会话级 Request 类型 / 组名结构和 SSE 事件；全部捕获仅记录字段/类型与固定状态，不获取全文。待协议、同事务关联、Siri UI 结果均已证实后，另行设计 multi-turn 适配。原始 PacketTunnel 及 Key/Headers 不进入 GitHub。
