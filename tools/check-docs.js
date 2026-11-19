@@ -70,7 +70,7 @@ if(urls.some(x=>!/^https:\/\/raw\.githubusercontent\.com\/Nimenta727\/Apple-Inte
  fail("runtime URL must be pinned to a full immutable commit");
 const passiveModule=fs.readFileSync(path.join(root,"shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule"),"utf8");
 const passiveScript=fs.readFileSync(path.join(root,"scripts/aies_qwen_passive_diag.js"),"utf8");
-const passiveHooks=passiveModule.match(/^AIES61 Passive (?:Request|Response) = .+type=http-(?:request|response).+script-path=.+$/gm)||[];
+const passiveHooks=passiveModule.match(/^AIES61 Passive (?:Request|Response) = .*type=http-(?:request|response).*script-path=.+$/gm)||[];
 if(passiveHooks.length!==2||!passiveHooks.some(x=>x.includes("type=http-request"))||
  !passiveHooks.some(x=>x.includes("type=http-response")))
  fail("diagnostic module requires one passive request and one response hook");
