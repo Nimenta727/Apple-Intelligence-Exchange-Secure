@@ -426,8 +426,8 @@ function parseRequest(raw){
 }
 // Compose is documented by boitar/sair's iOS 27.3 Qwen reverse analysis.
 // Exact allowlist: other WritingTools modes and rich/media input are NOT proven.
-function parseWritingToolsRequest(raw){
- if(!isWritingTools()){requestDiagnostic="WRITING_CLIENT_UNSUPPORTED";return null;}
+function parseWritingToolsRequest(raw,allowRecoveredScene){
+ if(!isWritingTools()&&!allowRecoveredScene){requestDiagnostic="WRITING_CLIENT_UNSUPPORTED";return null;}
  if(!raw||raw.length>C.maxRequest){requestDiagnostic="WRITING_BODY_UNAVAILABLE";return null;}
  var o;
  try{o=JSON.parse(raw);}catch(e){requestDiagnostic="WRITING_JSON_INVALID";return null;}
@@ -474,8 +474,9 @@ function parseWritingToolsRequest(raw){
  }
  requestDiagnostic="OK";return prompt;
 }
-function parseApplePrompt(raw){
- return isWritingTools()?parseWritingToolsRequest(raw):parseRequest(raw);
+function parseApplePrompt(raw,allowRecoveredScene){
+ return isWritingTools()||allowRecoveredScene?
+  parseWritingToolsRequest(raw,!!allowRecoveredScene):parseRequest(raw);
 }
 
 function validKey(k){return typeof k==="string"&&/^[A-Za-z0-9_-]{12,256}$/.test(k)&&!/REPLACE_WITH|PLACEHOLDER/i.test(k);}
@@ -854,7 +855,7 @@ function isFollowupTextSse(){
 if(!isTarget()&&!isFollowup()){done({});return;}
 // Apple WritingTools Compose and Siri have distinct return schemas.
 // Only exact SAIR-observed Compose is opted into the experimental adapter.
-if(isWritingTools()){probeObserveWritingTools();log("WRITINGTOOLS_COMPOSE_SCOPED");}
+if(isWritingTools())probeObserveWritingTools();
 // Light native-Qwen leak guard: extra session-scoped URL observed in the user
 // device proxy DB. Unlike the base request, we cannot safely rewrite these
 // responses with DeepSeek without confirmed same-transaction correlation.
@@ -879,6 +880,7 @@ if(!res){
  abRequest(rawRequest(),prompt);
  probeObserveRequest();
  if(!prompt){log("REQUEST_DIAG_"+requestDiagnostic);error(isWritingTools()?"UNSUPPORTED_WRITING_REQUEST":"UNSUPPORTED_SIRI_REQUEST");return;}
+ if(isWritingTools())log("WRITINGTOOLS_COMPOSE_SCOPED");
  if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){error("INVALID_METHOD");return;}
  var token=randomToken();
  if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,scene:isWritingTools()?"writing":"siri",exp:Date.now()+C.sessionTtlMs}))){
@@ -897,6 +899,7 @@ abSse("MAIN_UPSTREAM",statusCode(res),res&&res.body);
 if(statusCode(res)!==200){error("ORIGINAL_RESPONSE_STATUS");return;}
 if(!res||typeof res.body!=="string"||res.body.length>C.maxSse){error("SSE_UNAVAILABLE");return;}
 var tag=header(req.headers,"X-AIES-Request-ID"),current=null,prompt2=null;
+var responseUA=header(req.headers,"User-Agent");
 var activeScene=isWritingTools()?"writing":"siri";
 if(!tag)log("RESPONSE_TAG_MISSING");
 else if(!/^aies_[a-z0-9_]{12,90}$/.test(tag))log("RESPONSE_TAG_INVALID");
@@ -904,6 +907,17 @@ else log("RESPONSE_TAG_PRESENT");
 if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
  var raw=storeRead("AIES_R1_"+tag);
  try{current=raw&&JSON.parse(raw);}catch(e){}
+ // Only a valid, unexpired transaction tag can recover WritingTools when
+ // Shadowrocket drops User-Agent in the response hook. An explicit Siri/other
+ // User-Agent is never overridden and still fails closed on scene mismatch.
+ var validStored=current&&current.exp>Date.now()&&
+  current.exp<=Date.now()+C.sessionTtlMs&&
+  (current.scene==="siri"||current.scene==="writing")&&
+  typeof current.p==="string"&&current.p.length>0&&current.p.length<=C.maxPrompt;
+ if(!responseUA&&validStored){
+  activeScene=current.scene;
+  if(activeScene==="writing")log("WRITINGTOOLS_SCENE_RECOVERED_FROM_TAG");
+ }
  // A mismatched transaction tag is never rescued by reading the current
  // request body: it may belong to an unrelated Siri/WritingTools operation.
  if(current&&typeof current.scene==="string"&&current.scene!==activeScene){
@@ -911,12 +925,18 @@ if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
   error("CORRELATION_MISMATCH");return;
  }
  storeWrite("AIES_R1_"+tag,""); // consume once, even if invalid
- if(current&&current.exp>Date.now()&&current.exp<=Date.now()+C.sessionTtlMs&&
-    current.scene===activeScene&&typeof current.p==="string"&&current.p.length<=C.maxPrompt)prompt2=current.p;
+ if(validStored&&current.scene===activeScene)prompt2=current.p;
  if(prompt2)log("RESPONSE_PROMPT_FROM_STORE");
  else log("RESPONSE_PROMPT_STORE_MISSING");
 }
-var fromReq=parseApplePrompt(rawRequest());
+var responseBody=rawRequest();
+var fromReq=parseApplePrompt(responseBody,!responseUA&&activeScene==="writing"&&!!prompt2);
+// When recovering scene without a response UA, a *present* request body must
+// still be parseable as that same scene. Otherwise a Siri body carrying a
+// WritingTools token could bypass the usual cross-scene comparison.
+if(prompt2&&!responseUA&&req&&typeof req.body==="string"&&req.body.length&&!fromReq){
+ error("CORRELATION_MISMATCH");return;
+}
 if(prompt2&&fromReq&&prompt2!==fromReq){error("CORRELATION_MISMATCH");return;}
 if(!prompt2){
  if(fromReq){prompt2=fromReq;log("RESPONSE_PROMPT_FROM_BODY");}
