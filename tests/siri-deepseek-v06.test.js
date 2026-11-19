@@ -243,6 +243,68 @@ test("WritingTools and unknown client followup routes remain pass-through and do
   headers:{"Content-Type":"text/event-stream"}}).returned[0]),"{}");
  assert.equal(e.requests.length,0);
 });
+
+test("observed 18-event followup: four deltas + four post-text-done annotations are stripped",()=>{
+ const e=env(),first=completeFirstSiriTurn(e),req=siriFollowupRequest(e,first.sid,first.prev);
+ const a=e.invoke(req),token=a.returned[0].headers;
+ let raw=siriFollowupFixture(first.sid,"annotated");
+ const delta="event: session.response.choices[].items[].message.content[].text.value.delta\n";
+ const frame=raw.split("\n\n").find(x=>x.startsWith(delta));
+ assert.ok(frame);
+ raw=raw.replace(frame+"\n\n",new Array(4).fill(frame+"\n\n").join(""));
+ const annotationName="session.response.choices[].items[].message.content[].text.annotations[].added";
+ let annotation="";
+ for(let i=0;i<4;i++){
+  const o={type:annotationName};
+  o[annotationName]={index:i,annotation:{url:"https://QWEN_PRIVATE_CITATION.example/"+i,
+   title:"QWEN_PRIVATE_CITATION"}};
+  annotation+="event: "+annotationName+"\ndata: "+JSON.stringify(o)+"\n\n";
+ }
+ raw=raw.replace("event: session.response.choices[].items[].message.content[].done\n",
+  annotation+"event: session.response.choices[].items[].message.content[].done\n");
+ assert.equal(raw.trim().split("\n\n").length,18);
+ const b=e.invoke({...req,headers:{...req.headers,...token}},
+  {status:200,headers:{"Content-Type":"text/event-stream"},body:raw});
+ assert.equal(b.returned[0].status,200);
+ assert.ok(b.returned[0].body.includes("DEEPSEEK_EXCLUSIVE_REPLY"));
+ assert.ok(!b.returned[0].body.includes("QWEN_FOLLOWUP_ONLY"));
+ assert.ok(!b.returned[0].body.includes("QWEN_PRIVATE_CITATION"));
+ assert.ok(!b.returned[0].body.includes(annotationName));
+ assert.equal(e.requests.length,2);
+});
+test("followup response without UA uses valid same-transaction tag only",()=>{
+ const e=env(),first=completeFirstSiriTurn(e),req=siriFollowupRequest(e,first.sid,first.prev);
+ const a=e.invoke(req),tag=a.returned[0].headers["X-AIES-Request-ID"];
+ const b=e.invoke({...req,headers:{"X-AIES-Request-ID":tag},body:undefined},
+  {status:200,body:siriFollowupFixture(first.sid,"lost-ua")});
+ assert.equal(b.returned[0].status,200);
+ assert.equal(e.requests.length,2);
+});
+test("followup response body cannot change previous_choice_id under a trusted transaction tag",()=>{
+ const e=env(),first=completeFirstSiriTurn(e),req=siriFollowupRequest(e,first.sid,first.prev);
+ const a=e.invoke(req),tag=a.returned[0].headers;
+ const changed=JSON.stringify({...JSON.parse(req.body),previous_choice_id:"choice_changed"});
+ const b=e.invoke({...req,body:changed,headers:{...req.headers,...tag}},
+  {status:200,body:siriFollowupFixture(first.sid,"changed-prev")});
+ assert.equal(b.returned[0].status,502);
+ assert.ok(e.logs.includes("[AIES_V06] ERROR_CORRELATION_MISMATCH"));
+ assert.equal(e.requests.length,1);
+});
+test("invalid placement of followup Qwen annotations fails closed before DeepSeek",()=>{
+ const e=env(),first=completeFirstSiriTurn(e),req=siriFollowupRequest(e,first.sid,first.prev);
+ const a=e.invoke(req),token=a.returned[0].headers;
+ let raw=siriFollowupFixture(first.sid,"unsafe-annotation");
+ const name="session.response.choices[].items[].message.content[].text.annotations[].added";
+ const o={type:name};o[name]={annotation:{title:"QWEN_PRIVATE_ANNOTATION"}};
+ const frame="event: "+name+"\ndata: "+JSON.stringify(o)+"\n\n";
+ raw=raw.replace("event: session.response.choices[].items[].message.content[].text.value.done\n",
+  frame+"event: session.response.choices[].items[].message.content[].text.value.done\n");
+ const b=e.invoke({...req,headers:{...req.headers,...token}},
+  {status:200,body:raw});
+ assert.equal(b.returned[0].status,502);
+ assert.equal(e.requests.length,1);
+ assert.ok(!JSON.stringify(b.returned[0]).includes("QWEN_PRIVATE_ANNOTATION"));
+});
 function annotatedQwenSse(raw,annotationCount=5,position="after_text_done"){
  const eventName="session.response.choices[].items[].message.content[].text.annotations[].added";
  let out=raw;
