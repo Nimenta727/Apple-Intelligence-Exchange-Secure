@@ -457,14 +457,29 @@ var E={
  responseDone:"session.response.done"
 };
 function validId(x){return typeof x==="string"&&/^[A-Za-z0-9_-]{1,160}$/.test(x);}
+// Reconstruct the real observed Qwen SSE *field layout*, not its text.
+// Only IDs and carefully validated transport metadata are read from Qwen.
+// All answer-bearing fields and output items are created from DeepSeek text.
+function validEpoch(v){return typeof v==="number"&&isFinite(v)&&v>=0&&v<=9999999999999&&Math.floor(v)===v;}
+function epochOr(v,fallback){return validEpoch(v)?v:fallback;}
+function safeObjectName(v,fallback){
+ return typeof v==="string"&&/^[a-z][a-z0-9_.-]{0,60}$/.test(v)?v:fallback;
+}
+function safeContinueUrl(v){
+ // The URL goes only back to the same Siri client, never to DeepSeek.
+ // Restrict it to the original Qwen origin to prevent unexpected endpoints.
+ return typeof v==="string"&&v.length<=1200&&
+  (v===""||/^https:\/\/prod-yabuli\.qianwen\.com(?:\/|$)/i.test(v))?v:"";
+}
+function emptyOrMissing(v){return typeof v==="undefined"||(Array.isArray(v)&&v.length===0);}
 function rewriteSse(original,answer){
- // This parser intentionally rejects unknown SSE events rather than copy any
- // potentially answer-bearing Qwen text through to Siri.
- if(typeof original!=="string"||original.length>C.maxSse||!original.length)return null;
- var frames=original.replace(/\r\n/g,"\n").split("\n\n"),out=[],entries=[],i;
+ // Exact event sequence known from native Siri/Qwen. Unknown frames or tool
+ // variants fail CLOSED. Never copy a full original SSE payload.
+ if(typeof original!=="string"||original.length>C.maxSse||!original.length||
+    typeof answer!=="string"||!answer.trim())return null;
+ var frames=original.replace(/\r\n/g,"\n").split("\n\n"),entries=[],i;
  for(i=0;i<frames.length;i++){
-  var f=frames[i].trim();
-  if(!f)continue;
+  var f=frames[i].trim();if(!f)continue;
   var lines=f.split("\n");
   if(lines.length!==2||lines[0].slice(0,7)!=="event: "||
      lines[1].slice(0,6)!=="data: ")return null;
@@ -475,44 +490,75 @@ function rewriteSse(original,answer){
   entries.push({name:name,payload:obj[name]});
  }
  if(entries.length<12||entries.length>256)return null;
- // Require complete, known event progression and one or more deltas.
  var names=entries.map(function(x){return x.name;});
  var prefix=[E.session,E.created,E.choice,E.item,E.added];
  var suffix=[E.textDone,E.contentDone,E.itemDone,E.completed,E.choiceDone,E.responseDone];
  for(i=0;i<5;i++)if(names[i]!==prefix[i])return null;
  for(i=0;i<6;i++)if(names[names.length-6+i]!==suffix[i])return null;
  for(i=5;i<names.length-6;i++)if(names[i]!==E.delta)return null;
- if(names.length<12)return null;
  var s=entries[0].payload,r=entries[1].payload;
  if(!s||!r||!validId(s.id)||!validId(r.id)||r.session_id!==s.id||
-    typeof s.expires_at!=="number"||!isFinite(s.expires_at)||
-    s.expires_at<0||Math.floor(s.expires_at)!==s.expires_at)return null;
- var ids={s:s.id,r:r.id};
- // No Qwen answer strings or arbitrary keys are preserved. Recreate event
- // payloads from verified IDs + DeepSeek output only.
- var body=safeJson({content:answer,suggestions:[],summary:"DeepSeek"});
- var outputs=[{message:{content:[{text:{value:body}}]}}];
- var n=[
- {id:ids.s,object:"realtime.session",expires_at:s.expires_at},
- {id:ids.r,session_id:ids.s,model:"aies/deepseek",status:"in_progress"},
- {choice_index:0,choice:{index:0,status:"in_progress"}},
- {choice_index:0,item_index:0,item:{id:"item_aies_"+ids.r.slice(0,40),type:"message",message:{role:"assistant",content:[]}}},
- {choice_index:0,item_index:0,content_index:0,content:{type:"text",text:{value:""}}}
+    !validEpoch(s.expires_at))return null;
+ // Modality / safety: never synthesize an answer for active tool executions,
+ // notices, moderation decisions or unexpected non-message output.
+ var choiceAdded=entries[2].payload&&entries[2].payload.choice;
+ var itemAdded=entries[3].payload&&entries[3].payload.item;
+ var choiceDone=entries[entries.length-3].payload&&entries[entries.length-3].payload.choice;
+ var lastResponse=entries[entries.length-1].payload;
+ if(!emptyOrMissing(r.notices)||!emptyOrMissing(lastResponse&&lastResponse.notices)||
+    !emptyOrMissing(choiceDone&&choiceDone.moderation))return null;
+ if(itemAdded&&itemAdded.type&&itemAdded.type!=="message")return null;
+ if(itemAdded&&itemAdded.message&&itemAdded.message.role&&
+    itemAdded.message.role!=="assistant")return null;
+ // Do not copy model text from any source field; keep only bounded identity
+ // metadata that Siri already received from its own Qwen backend.
+ var now=Math.floor(Date.now()/1000);
+ var created=epochOr(s.created_at,now);
+ var lastActive=epochOr(s.last_active_at,created);
+ var responseCreated=epochOr(r.created_at,created);
+ var expireAfter=s.expires_after;
+ var seconds=expireAfter&&validEpoch(expireAfter.seconds)&&expireAfter.seconds<=86400?
+   expireAfter.seconds:120;
+ var anchor=expireAfter&&(expireAfter.anchor==="last_active_at"||
+   expireAfter.anchor==="created_at")?expireAfter.anchor:"created_at";
+ var sid=s.id,rid=r.id;
+ var choiceId=choiceAdded&&validId(choiceAdded.id)?choiceAdded.id:
+   "choice_aies_"+rid.slice(0,80);
+ var continuation=safeContinueUrl(choiceAdded&&choiceAdded.continue_url);
+ var content=safeJson({content:answer,suggestions:[],summary:"DeepSeek"});
+ var textContent={type:"text",text:{annotations:[],value:content}};
+ var outputItem={type:"message",message:{role:"assistant",content:[textContent]}};
+ var choiceOpen={output:[],id:choiceId,continue_url:continuation,status:"in_progress"};
+ var choiceClosed={output:[outputItem],moderation:[],id:choiceId,
+  continue_url:continuation,status:"completed"};
+ var start=[
+  {expires_at:s.expires_at,expires_after:{seconds:seconds,anchor:anchor},
+   last_active_at:lastActive,created_at:created,id:sid,
+   object:safeObjectName(s.object,"realtime.session")},
+  {notices:[],session_id:sid,created_at:responseCreated,
+   model:"aies/deepseek",id:rid,choices:[],
+   object:safeObjectName(r.object,"realtime.response")},
+  {index:0,choice:choiceOpen},
+  {choice_index:0,item:{type:"message",message:{role:"assistant",content:[]}},index:0},
+  {item_index:0,choice_index:0,index:0,
+   content:{text:{annotations:[],value:""},type:"text"}}
  ];
- for(i=5;i<names.length-6;i++)n.push({choice_index:0,item_index:0,content_index:0,delta:i===5?body:""});
+ var out=[],n=start.slice();
+ for(i=5;i<names.length-6;i++)
+  n.push({item_index:0,choice_index:0,content_index:0,delta:i===5?content:""});
  n.push(
- {choice_index:0,item_index:0,content_index:0,value:body},
- {choice_index:0,item_index:0,content_index:0,content:{type:"text",text:{value:body}}},
- {choice_index:0,item_index:0,item:{type:"message",message:{role:"assistant",content:[{type:"text",text:{value:body}}]}}},
- {choice_index:0,choice:{output:outputs}},
- {choice_index:0,choice:{output:outputs}},
- {id:ids.r,choices:[{output:outputs}]}
+  {item_index:0,choice_index:0,content_index:0,value:content},
+  {item_index:0,choice_index:0,index:0,content:textContent},
+  {choice_index:0,item:outputItem,index:0},
+  {index:0,choice:choiceClosed},
+  {index:0,choice:choiceClosed},
+  {notices:[],session_id:sid,created_at:responseCreated,model:"aies/deepseek",
+   id:rid,choices:[choiceClosed],object:safeObjectName(r.object,"realtime.response")}
  );
+ if(n.length!==names.length)return null;
  for(i=0;i<names.length;i++)out.push(event(names[i],n[i]));
  var joined=out.join("");
- // The answer may contain newlines: compare JSON-escaped serialized content,
- // not the raw plaintext, which is absent verbatim from SSE JSON frames.
- if(joined.length>C.maxSse||joined.indexOf(safeJson(body))<0)return null;
+ if(joined.length>C.maxSse||joined.indexOf(safeJson(content))<0)return null;
  return joined;
 }
 function randomToken(){
