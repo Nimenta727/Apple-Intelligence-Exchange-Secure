@@ -43,3 +43,7 @@
 只分享经过本人检查的 `[AIES_V06]` 或 `[AIES_QWEN_PASSIVE]` 固定日志类别、模块固定 SHA 和 Siri 显示结果。停止实验时依次停用 60、61 和旧 REJECT，并按原备份决定是否关闭不再需要的目标域 MITM。所需的本地辅助采样可通过对应 `*_STOP_ONCE.js` 手动清理，不会误清 DeepSeek API Key。若需主动删除 Key，请使用单独的 [clear_key_ONCE.js](../scripts/clear_key_ONCE.js)。
 
 详细源证据：[调试记录](DEBUG_HISTORY_2026-11-19_ZH.md)、[请求 JSON](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)、[原生 SSE](OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)、[根因与决策](ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)。
+
+## 自愿同题 A/B 诊断（2026-11-19）
+
+新增两个独立、默认关闭的本地单次测试采样键：`AIES_AB_NATIVE_V1_STATE`（61 原生 Qwen）与 `AIES_AB_DEEPSEEK_V1_STATE`（60 DeepSeek）。在用户通过**手动 Script Test**开启后，采集安全的字段/事件类型、模型 HTTP 状态、`finish_reason`、用量、长度和**客户端可见的非隐私测试答案文本**（每个答案最长 7000 字符，常见 token/email/URL 字段遮挡）；不会记录认证 Header、API Key、会话 ID 值、隐藏系统提示词、原始 SSE 或模型推理细节。答案正文脱敏并不绝对，因此不得拿私人题目进行测试，读取结果应先本地检查再选择性分享。用户完全关闭两模块的 A 组不可能同时进行脚本层抓包；实验分为 A 原生基线、A' 61 插桩原生和 B 60 改写三组，避免混淆。参见[实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。
