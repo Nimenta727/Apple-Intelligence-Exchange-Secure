@@ -109,3 +109,27 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 - 原 `QWEN_SESSION_FOLLOWUP_SSE_BLOCKED` 仍可能出现，例如响应没有可信关联标记；不安全的真实后续会话仍返回 502，而不会伪称 DeepSeek 回答。
 
 **安装时必须重新导入 60**：旧模块固定 pin 不会因为 GitHub 的 `main` 更新而自动变成新版。确保 60 四条 Hook 都为上述 SHA、61 停用、旧 `00 REJECT` 和同域 Rewrite 停用。无需重复写入已有的 DeepSeek Key。先做普通纯文本同一 Siri 会话两问，并只查看固定 `[AIES_V06]` 错误码与每轮 UI 是否都显示 `【DeepSeek · AIES】`。如任一轮只显示无标记的 Qwen、错误、或中断，则停用 60，恢复原生模式并记录**非敏感状态码**；当前依然是 **Beta，未通过这条新路径的 iPad 真机 UI 验收**。
+
+## 2026-11-20 00:47：脚本运行时从 raw.githubusercontent.com 下载失败（CFNetwork 310）与本地模块
+
+用户截图显示 Shadowrocket 针对已核对的 `7a698fbaadeb37431d9bd1d43df359292ee78ba0` Runtime 连续出现：
+`script update script url ... => Error Domain=kCFErrorDomainCFNetwork Code=310`、`script exception => aies_siri_deepseek_v06.js`，在匹配目标 URL 时直接将请求/响应继续交给上游或客户端。**同一截图未出现 `[AIES_V06] REQUEST_CAPTURED`、`DEEPSEEK_STARTED`。** 因此主因先按**远程脚本下载/HTTPS 代理连接失败**排查，不要把本次“全是 Qwen”错误当作上一轮多轮解析失败、DeepSeek Key 失效。Apple 将代码 310 定义为 `kCFErrorHTTPSProxyConnectionFailure`（HTTPS proxy connection failure）。
+
+### 优先步骤：排查 GitHub 脚本 URL 下载通路
+
+1. 临时停止 60 后备份当前 Shadowrocket 配置。打开**正在使用的配置文件** → 编辑配置 → **脚本 URL**，查看四条 60 Hook 统一的 `raw.githubusercontent.com` 资源是否显示下载失败或红叉。可以手动重试下载，成功后重新“使用配置/编译配置”，而不是只看模块开关。
+2. 若是 GitHub Raw 域名的代理连接失败，检查当前节点是否可用以及该域名的分流策略，不应将所有域名 HTTPS 解密范围扩大或随意关闭证书验证。可以通过受信任网络在浏览器打开下面的 **固定提交**文件链接核对 JavaScript 是否能完整获取。
+3. 在日志还继续出现 `CFNetwork Code=310` 或 `script exception` 时**不要继续把 Siri 结果认作 DeepSeek**。停用 60 可恢复原生 Qwen；本项目不保证系统级阻止 Qwen。
+
+### 避免运行时下载：可选 62 本地变体（仍需真机校验）
+
+如果 Raw 下载在 Shadowrocket 中反复失败，可以把同一份 60 Runtime 从浏览器保存进 Shadowrocket **本机 `Script/aies_siri_deepseek_v06.js`**，再启用 [`62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule`](../shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule)；该本地模块不是额外的改写器，**它替代 60，而非与 60 同时启用**。
+
+- 固定源码：[GitHub 提交 `7a698fba` 中的 `aies_siri_deepseek_v06.js`](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/7a698fbaadeb37431d9bd1d43df359292ee78ba0/scripts/aies_siri_deepseek_v06.js)。文件名必须保持 `aies_siri_deepseek_v06.js`；不允许将已经填入真实 Key 的本地一次性脚本当作运行时源文件。
+- 将它放在 iPad “文件”App 的 Shadowrocket / Script 文件夹下；若应用版本使用不同本机目录，应在 Shadowrocket 里核对当前 Script 文件的实际路径，**不要仅凭 Script Test 能运行就认定 HTTP Hook 已找到本地文件**。
+- 先关闭 60、61、旧的 `00 REJECT` 与重复同域 Hook，再安装/开启 **62 LOCAL**，保持必要的目标主机 MITM。62 的四条 Hook 同样为 `AIES60 Capture`、`AIES60 Rewrite`、`AIES60 Followup Capture`、`AIES60 Followup Rewrite`，但 `script-path` 一律改为 `aies_siri_deepseek_v06.js`，不再尝试通过 GitHub Raw 下载脚本。
+- **验收本地文件加载**：先对一条无隐私的普通 Siri 问题观察 HTTP Hook 是否开始出现 `[AIES_V06] REQUEST_CAPTURED`；如果仍仅有 `script exception`、`script not found` 或错误，**该设备版本尚不能确认能解析本地模块路径，立即关闭 62**，返回 GitHub 下载网络诊断，不能宣称本地方案已生效。
+- 如果请求捕获成功、但接着出现 `ERROR_FOLLOWUP_CONTEXT_UNAVAILABLE` 或 `ERROR_SSE_REWRITE_UNSUPPORTED`，这才进入之前的协议/会话级问题；分别处理，不把网络下载和模型失败混为一谈。
+- 本地化减少对**GitHub 脚本更新链路**的依赖，**不会**防止系统或网络绕过 MITM，也**不能**保证“每个问题系统级零 Qwen”。本地也不会自动升级：未来更新必须人工替换整个 JS + 模块规则并重新核验 SHA。
+
+建议先修好 Raw 通路并使用原版 60；62 是备用加载方案，其本地路径在用户设备上仍需实测。
