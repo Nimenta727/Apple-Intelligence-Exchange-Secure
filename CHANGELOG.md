@@ -1,5 +1,13 @@
 # Changelog / 更新日志
 
+## 2026-11-19 — DeepSeek 可视来源标签与响应关联诊断
+
+- 用户反馈一次 Siri 原生 Qwen 界面标识、约三次无回答；不能仅凭品牌图标确定正文来源。
+- 仅当 DeepSeek HTTP 成功、答案验证通过、SSE 重写可提交时，由代码为正文加上 **`【DeepSeek · AIES】`**，并在模型提示词中要求如实回答来源；失败时禁止误标。
+- 新增 `RESPONSE_TAG_*`、`RESPONSE_PROMPT_*`、`SSE_PREFLIGHT_PASSED`、`DEEPSEEK_LABEL_APPLIED` 固定日志码，协助区分响应关联故障、SSE 故障与 DeepSeek 完成但 UI 未显示；不记录问题正文、令牌和请求关联 ID。
+- 保留严格的模型/原始 SSE 校验；**不能修改 Siri 上游 Qwen 品牌或保证系统级不会回退显示 Qwen 内容。**
+
+
 ## 2026-11-19 — 输入提示字段与 Siri→Qwen 一次性请求正文探针
 
 - iPad 第二轮结构采样新增根级 `input_hint:string`，严格允许该键的字符串类型，但不将值转发 DeepSeek。
