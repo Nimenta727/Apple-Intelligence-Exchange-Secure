@@ -1,6 +1,6 @@
 # AIES v0.6 当前状态（2026-11-19，真机证据归档后）
 
-> **真实功能状态：实验性 Beta、尚未通过 Siri 原生端到端验收。** 60 模块的 Siri 请求解析在真机曾成功，DeepSeek API 曾至少一次进入有效响应的脚本处理路径，61 模块已两次观测真实 Qwen SSE，其中一次满足 60 严格预检。**最新 60 的完整字段 SSE 改写尚未在 Siri 原生 UI 验证**。不要将离线 CI 或“Qwen 卡片出现”误写成完整成功。
+> **真实功能状态：实验性 Beta、已证实至少一次 Siri 可见 DeepSeek 标记，但复杂问题尚未稳定验收。** 60 模块的 Siri 请求解析在真机曾成功，DeepSeek API 曾至少一次进入有效响应的脚本处理路径，61 模块已两次观测真实 Qwen SSE，其中一次满足 60 严格预检。**最新 60 已至少一次在 Siri UI 显示带来源标记的答案，复杂问答仍待验证**。不要将离线 CI 或“Qwen 卡片出现”误写成完整成功。
 
 ## 一张表看清进展
 
@@ -15,7 +15,7 @@
 | Qwen 原生响应 | 13:50 与 14:49 两次 HTTP 200、13 个 SSE JSON 事件、两次文本 delta | 真实主要 SSE 事件序列及字段类型已掌握 |
 | 60 的 SSE 前置校验 | 14:49 `strict60Preflight=MATCHES_60_PREFLIGHT` | 对**该次**原生 Qwen 响应通过全部当前已知前置条件 |
 | 合成 DeepSeek SSE | 本轮按真实字段类型补齐 Session/Response/Choice/Item/Content/Done，离线测试 | 代码和 mock 通过；真实 Siri 是否接受 **待测** |
-| Siri UI 标识 | 用户曾报告一次 Qwen 标签、数次“无法获得回答” | 不能推断哪些回答由哪个模型生成 |
+| Siri UI 标识 | 新截图已显示 DeepSeek 来源标记，但底部 Qwen 服务标识仍在 | 不能推断哪些回答由哪个模型生成 |
 | 安全限制 | 非纯文本、工具、审核分支拒绝；61 一律 `$done({})` | 保持失败关闭；系统级旁路仍可能显示 Qwen |
 | 稳定版 | 无充分真机成功率和回滚验证 | **未发布** |
 
@@ -25,6 +25,14 @@
 2. 对 `notices`、`moderation`、工具调用、媒体内容的多处后期 SSE 位置增加了拒绝条件，防止错误的强制回答或 Qwen 数据泄漏。
 3. 原有的不可混淆请求关联保护未被弱化：必须有有效 Header+本地 store，或同一响应 Hook 内完整且受支持的 Request body；同时有两者时必须一致。缺失两者则 **502，不猜“最后一条问题”**。
 4. 61 被动诊断代码仍然不改写请求/响应，不调用 DeepSeek，不将问答正文写入仓库或额外服务器；它仍是独立的、手动授权才采样的实验工具。
+
+## 15:51 新真实设备记录与 60 轻量 Guard
+
+原始 PacketTunnel 日志共 1,135 行：主请求 `REQUEST_CAPTURED ×5`；其中 `DEEPSEEK_RESPONSE_ATTEMPTED ×2`，`RESPONSE_TAG_MISSING ×2`，`ERROR_SSE_REWRITE_UNSUPPORTED ×1`。Siri 截图的正文出现 `DeepSeek · AIES`，表明至少有一次脚本生成的 DeepSeek 文本进入可见界面；但系统卡片底部仍标“千问”。
+
+本机 `proxy-2026-11-19-155107.db` 共 40 条代理记录；7 条为目标 Qwen 主机，其中 5 条是原先覆盖的主接口，2 条是之前未覆盖的 `/v1/sessions/{id}/responses`。新增第三条响应 Hook 只对这条会话级 URL 的 Siri SSE 回包返回 502；不覆盖整个域名。这能减少部分 Qwen 原文穿透，但可能提高复杂问题失败率。
+
+主请求的跨 Hook 自定义 Header 丢失仍属未解决 P0。主 SSE 解析器增加合法分帧兼容，DeepSeek 最长 1000 token、等待上限 15 秒，成功回答的正文与 summary 都有来源标记。按用户要求本轮不进行人工或真机测试。
 
 ## 建议查阅顺序
 
