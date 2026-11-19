@@ -51,3 +51,7 @@ The observed Siri group is accepted, but two real requests still failed at `REQU
 ## Device-local schema-only probe (2026-11-19)
 
 The latest Siri failure yields `NORTI_SHAPE_ROOT_FIELDS` and `NORTI_SHAPE_ITEM_WRAPPER_FIELDS`. To avoid loosening media handling without evidence, a new **explicitly armed, ten-minute on-device** [schema probe](docs/SIRI_SCHEMA_PROBE_ZH.md) stores only bounded, screened JSON field **names and types**, not values, prompts or headers. It is inspected once through [manual Script Test](scripts/siri_schema_probe_ONCE.js), then erased. Requires updated 60 module and local helper. This is a diagnostic aid, **not** an end-to-end Siri/DeepSeek fix.
+
+## Real iPad Siri field metadata (2026-11-19 11:54)
+
+Explicit local-only schema probe established root field names/types: `client_tools:array`, `response_format:object`, `server_tools:array`, `stream:boolean`; item wrapper `type:string`; nested message `content:array`, `role:string`. The runtime now accepts only the confirmed additional root fields with matching JSON types (never forwards tool metadata to DeepSeek), and an optional wrapper `type` only if it equals `message`. Unknown discriminators and content element types remain fail-closed. **Refresh the 60 module** for the next nonsensitive Siri test; no need to rerun the schema probe. Native DeepSeek/SSE/Siri output remains unverified.
