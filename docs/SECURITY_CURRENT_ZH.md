@@ -41,3 +41,7 @@
 任何显示千问答案、混合答案、串话、密钥泄露、流式错误或不明绕过都应记录为失败，停止测试并按[安装指南](INSTALL_SIRI_DEEPSEEK_V06_ZH.md)回滚。只记录阶段码和版本，**不提交**真实问题、API Key、Authorization、Cookie、完整 HTTP/SSE 或网络抓包。
 
 只有 [发布验收清单](RELEASE_CHECKLIST_ZH.md) 所列设备与安全门槛达成，才考虑 Stable。
+
+## noRTI 真机输入结构诊断补充
+
+已观察到 noRTI 首次兼容后仍出现 `REQUEST_DIAG_INPUT_UNSUPPORTED`。新增 `NORTI_SHAPE_*` 仅输出固定的字段层级/类型异常分类，最多两项；**不会因为发现结构差异而自动放开原本拒绝的媒体和未知字段**。获取具体完整 JSON 仍须另行安全评估，禁止上传带认证信息的原始日志。

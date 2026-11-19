@@ -43,3 +43,7 @@ The `deepseek-flash` model ID is documented by the [official DeepSeek Chat Compl
 Run `npm run check` with Node.js >=20. See the [architecture](docs/ARCHITECTURE_CURRENT_ZH.md), [debugging runbook](docs/DEBUGGING_ZH.md), [operations](docs/OPERATIONS_ZH.md), [release gates](docs/RELEASE_CHECKLIST_ZH.md), and [verification status](docs/CURRENT_STATUS_ZH.md).
 
 API keys, CA private keys, real prompts, Authorization headers and traffic captures must not be submitted. AIES is MIT licensed and credits the published research in [boitar/sair](https://github.com/boitar/sair).
+
+## Latest noRTI on-device input diagnosis (2026-11-19)
+
+The observed Siri group is accepted, but two real requests still failed at `REQUEST_DIAG_INPUT_UNSUPPORTED`. The new runtime adds fixed `NORTI_SHAPE_*` categories for top-level fields, input containers and message wrappers, without recording actual field names or values or widening the allowed media payloads. Refresh the 60 module and share fixed AIES diagnostic codes only. DeepSeek/SSE/native Siri remain unverified.

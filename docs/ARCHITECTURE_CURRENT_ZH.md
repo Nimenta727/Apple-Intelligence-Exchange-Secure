@@ -61,7 +61,7 @@ Siri 原生 UI 是否接受：尚待真机验证
 | `done`、`error` | 一次性响应、超时与尝试 502 错误 |
 | `log` | 固定阶段日志，不主动输出问题和 Key |
 
-2026-11-19 真机通过本地只读探针确认了 `siri.multimodal.noRTI`。本次仅对这个精确标识且 User-Agent 符合 Siri 的请求增加受限纯文本适配；`observedSiriTextOnlyEnvelope` 只接受顶层 `configuration` + `input`，每项仅接受纯文本 `content` 或受限 `message` 包装，拒绝媒体附件、意外字段与非用户角色；随后继续复用 `textAtom` 和 SSE 的严格检查。**真实 noRTI 请求的完整 JSON 结构尚未验证，拒绝不代表系统有问题**。日志仍只输出固定码。
+2026-11-19 真机通过本地只读探针确认了 `siri.multimodal.noRTI`。本次仅对这个精确标识且 User-Agent 符合 Siri 的请求增加受限纯文本适配；`observedSiriTextEnvelopeReasons` 只接受顶层 `configuration` + `input`，每项仅接受纯文本 `content` 或受限 `message` 包装，拒绝媒体附件、意外字段与非用户角色；随后继续复用 `textAtom` 和 SSE 的严格检查。**真实 noRTI 请求的完整 JSON 结构尚未验证，拒绝不代表系统有问题**。日志仍只输出固定码。
 
 ## 真机组名诊断（2026-11-19）
 
@@ -83,3 +83,7 @@ v2 的 `probeObserveRequest`、`probeObserveWritingTools` **不会改变解析�
 ## 修改原则
 
 统一修改 `scripts/aies_siri_deepseek_v06.js`、当前测试，并对模块中两个相同的不可变 Git SHA 引用同步更新。保持未知 SSE 不透传千问答案、Key 不上传仓库、失败路径不自动回退。详见 [维护手册](OPERATIONS_ZH.md)。
+
+## noRTI 结构细分诊断（2026-11-19）
+
+设备真实请求已到达精确的 noRTI 分支，但出现 `INPUT_UNSUPPORTED`。函数 `observedSiriTextEnvelopeReasons` 在仍然拒绝原始请求的前提下，返回不超过两个固定结构分类（根级字段、input 容器和消息包装错误）；主脚本通过 `NORTI_SHAPE_*` 记录常量，**不打印未知键名、键值、正文或请求头**。一旦结构正确，则复用原纯文本解析、SSE 校验和 Key 安全路径。现阶段未证明真实请求结构被接受。

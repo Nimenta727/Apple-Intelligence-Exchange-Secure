@@ -84,3 +84,20 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 ```
 
 参阅 [安装](INSTALL_SIRI_DEEPSEEK_V06_ZH.md) · [架构](ARCHITECTURE_CURRENT_ZH.md) · [安全](SECURITY_CURRENT_ZH.md)。
+
+## 2026-11-19 真机 INPUT_UNSUPPORTED 的精细分类
+
+真机在更新 noRTI 兼容脚本后，连续两次出现 `REQUEST_DIAG_INPUT_UNSUPPORTED` / `ERROR_UNSUPPORTED_SIRI_REQUEST`，没有证据说明已进入 DeepSeek 调用。PacketTunnel 日志没有提供可安全复原的完整输入 JSON 结构，因此**不得猜测并放行所有额外字段**。
+
+新模块在 `siri.multimodal.noRTI` 严格文本检查失败时，在原错误码前额外打印最多两个常量 `NORTI_SHAPE_*`，不打印请求正文、字段名或字段值。代码含义：
+
+| 诊断码后缀 | 安全含义 |
+|---|---|
+| `ROOT_FIELDS` | 顶层键不恰好为 `configuration` + `input` |
+| `INPUT_MISSING` / `INPUT_NOT_ARRAY` / `INPUT_COUNT` | 缺少 input、不是数组，或数量超限 |
+| `ITEM_NOT_OBJECT` | 某条 input 不是对象 |
+| `ITEM_WRAPPER_FIELDS` / `MESSAGE_NOT_OBJECT` | message 包装存在额外结构，或 message 不是对象 |
+| `ITEM_FIELDS` / `CONTENT_MISSING` | 消息含不允许的字段，或缺少 content |
+| `ROLE_UNSUPPORTED` / `ITEM_TYPE_UNSUPPORTED` | 角色或消息类型不是严格允许的文本值 |
+
+复测：只刷新 60 模块（两个 Hook SHA 应以 `bc726e60` 开头），直接问 Siri 一次，不需要重跑组名探针；只反馈 `[AIES_V06] NORTI_SHAPE_*`、`REQUEST_DIAG_*` 和 `ERROR_*` 行。**即使新的 INPUT_UNSUPPORTED 消失，也必须继续验证原始 SSE 与 DeepSeek，不能宣称成功。**
