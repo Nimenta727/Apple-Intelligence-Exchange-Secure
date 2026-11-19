@@ -94,3 +94,10 @@
 7. **MITM 本身有副作用**：即使被动 `$done({})` 也可能因响应缓冲超时而改变流式体验，需要基线对照。
 
 后续验收与回滚操作：[测试矩阵](VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)。相关历史：[完整时间线](DEBUG_HISTORY_2026-11-19_ZH.md)。
+
+## 2026-11-19 15:51 新增：轻量拒绝特定会话级 SSE 的取舍
+
+新上传的本机代理库在主接口以外证实 2 次 Siri `/v1/sessions/{opaque-id}/responses` 访问，而历史 60 的 Hook 仅覆盖 `/v1/sessions/responses`。因此新增一条限定 Siri、HTTP 200、SSE 类型的 Response Guard。仅拒绝这些未验证来源的响应，不阻止 Qwen 域名或主请求；不尝试在没有请求关联与协议证据的情况下合并 DeepSeek 回答。
+
+这是一项**可用性与来源防漏之间的显式权衡**：复杂 Siri 请求可能不再显示原生 Qwen 文字，却变成“无法获得回答”。同时，主接口仍存在两次 `RESPONSE_TAG_MISSING` 和一次 `SSE_REWRITE_UNSUPPORTED`。截图证明 DeepSeek 标记至少一次可见，不代表全部 Qwen 都已屏蔽。用户要求本轮不做额外测试，故此修改尚未通过真机验收。
+
