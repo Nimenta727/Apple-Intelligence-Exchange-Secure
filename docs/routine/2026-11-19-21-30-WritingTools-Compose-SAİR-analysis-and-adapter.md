@@ -42,3 +42,11 @@
 5. `docs/QWEN_PASSIVE_DIAG_ZH.md`、`docs/COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md`、安装、安全、维护和 README 解释如何安全采集无隐私场景结构，不误称 Apple 官方协议。
 
 **下一步规划**：等全部 GitHub CI（尤其 61 不改写、Siri 原回归、WritingTools 失败关闭与双场景隔离）通过，再合并 PR #29。设备上先停 60、只启用 61 手动读取一次 WritingTools 非隐私 Compose 请求真实 group 和 SSE 结构；随后仅启用 60 验证 Compose Beta 是否实际调用 DeepSeek，最后回归 Siri。未知校对/摘要/视觉操作继续不宣称已支持；Request-ID 丢失场景仍失败关闭，不使用最近请求猜测。
+
+## 21:48 复查：CI 语法修复与验证结果
+
+- PR #30 首次自动 CI 在 `scripts/writing_schema_probe_STOP_ONCE.js` 的 `say()` 控制台输出函数中检测到 JavaScript `SyntaxError: Unexpected token ';'`。该错误**只存在于本地手动停止脚本**，并不改变 HTTP Hook 或用户写作内容的处理。已修改为先检测 `console.log` 存在再输出固定状态码。
+- 修复后 [GitHub Actions #44537157658](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44537157658) **91 项 Node 测试全部成功、0 失败**，28 份 Markdown / 211 条相对链接检查通过。涵盖原有 Siri 回归、WritingTools Compose 的 `body/refinements`、跨场景关联防混淆、61 原样透传及新独立结构探针不收集文本/凭据。
+- **尚未完成真机 WritingTools Compose 的 HTTP/SSE 结构核实和最终 UI 验收**。CI 只能证明当前假设结构下程序可运行，不能将“SAIR 逆向提及的 group”写成 Apple 官方规范。
+
+**合并后下一步**：先在 Shadowrocket 停用 60、启用 61，用新 `writing_schema_probe_ONCE.js` 手动打开 600 秒窗口，在写作工具“千问创作”输入一句无隐私文本，等待结束后读取本地 `AIES_WRITING_SCHEMA_LOCAL`；验证 `group` 是否为 `compose_selectedAndAllText` 以及响应 SSE 的字段类型。随后关闭 61、仅启用 60，用同一无隐私任务检查固定 `WRITINGTOOLS_*` / `DEEPSEEK_*` 状态码及编辑器的实际正文；最后回归 Siri 简单与复杂提问。其他写作模式只有取得结构证据后才能扩展。
