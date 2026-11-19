@@ -79,3 +79,7 @@
 用户本人已运行新版 61 `siri_followup_schema_probe_ONCE.js`，输出 `CAPTURED_LOCAL_PROTOCOL_SCHEMA`、`RECORDS=2`，一条会话级 Siri 请求（`siri.multimodal.noRTI`、`previous_choice_id:string`）和一条 HTTP 200 SSE 响应（共 18 帧，开头 `session.response.created`、4 个 delta、4 个注释、0 解析失败），并经本地清理。**这些是事实，不代表原生 Siri 已成功接受合成 SSE，也不代表两条诊断记录已被严格证实属于同事务。**
 
 基于该结构，新增 60 四 Hook 续答 Beta 适配：严格解析 previous_choice / session、临时 tag 关联与短期同会话 DeepSeek-only 历史、支持 followup SSE 不存在 session.created 的事件序列、丢弃原生引用、失败关闭；拒绝跨会话与非纯文本。主接口/WritingTools 的行为保留。CI 与 PR 发布状态以 GitHub Actions 为准，**真机多轮验收仍待用户执行**。完整记录见 [routine](routine/2026-11-20-00-25-Siri-verified-followup-DeepSeek-beta.md)。
+
+## 2026-11-20 最新：PR #33 已合并，106/106 tests 通过，真实多轮 UI 仍待验收
+
+[PR #33](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/33) 已合并（`345ec50c45c8966ed3ad5ec005148ba3203318cc`），[CI](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44567918717) 通过 106/106。60 四条 Request/Response Hook 统一固定 `7a698fbaadeb37431d9bd1d43df359292ee78ba0`；61 四条保持 `506e51ad1ad549722242611f174b527cc12c4d21`。最新 60 会尝试将同一 Siri session、可信 choice / tag 的后续纯文本请求重写为 DeepSeek 回答并保留最多三轮短期本地对话上下文；不具备可靠关联时仍失败关闭。用户当前仅完成 61 的真实 followup 结构诊断，**尚未安装并验收此新版 60 的第二问/第三问实际显示**。这不是稳定版，短期本地历史的逻辑 TTL 也不等于物理清除。详见 [维护记录](routine/2026-11-20-00-25-Siri-verified-followup-DeepSeek-beta.md)。
