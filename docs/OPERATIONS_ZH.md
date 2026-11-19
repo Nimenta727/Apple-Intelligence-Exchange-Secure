@@ -1,64 +1,41 @@
-# AIES v0.6 维护、升级与发布流程
+# AIES 当前维护、代码审查与发布流程
 
-> `main` 仅维护当前 v0.6 Beta 实验路线；未完成的 Siri 真机验收与来源保证不得因合并代码而标记通过。
+## 两条独立路线
 
-## 真机组名诊断维护要求（2026-11-19）
+**60**：`scripts/aies_siri_deepseek_v06.js` + `shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule`，实验 Siri → DeepSeek 问答改写。
 
-- **新增 noRTI 字段结构探针**：`siri_schema_probe_ONCE.js` 与 `siri_schema_probe_STOP_ONCE.js` 是两份**手动测试**辅助文件；结构摘要只包含受限键名与数据类型，不包含字段值。必须单独进行 opt-in、有效期、WritingTools 和错误路径隐私测试；不添加为自动 Hook。
+**61**：`scripts/aies_qwen_passive_diag.js` + `shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule`，完全被动的原生 Qwen 结构采集（有手动授权窗口时才持久化）。
 
-- Siri 与 WritingTools 共用目标路径，不能仅凭 URL 放宽 Siri 组白名单，也不能把 WritingTools 当成 Siri。
-- `scripts/siri_group_probe_ONCE.js` 与 `scripts/siri_group_probe_STOP_ONCE.js` 仅供本地 Script Test；检查脚本首次开启 **600 秒**，再次执行仅报告状态、不会误取消；停止须显式运行 STOP。它们不是自动 Hook；正式模块仍只有两条相同固定提交的 HTTP Hook。
-- 升级必须同时刷新远程 60 模块和**覆盖 iPad 已缓存的本地手动检查脚本**。保留单键状态验证、到期清理、固定阶段码及敏感组名过滤的测试。
-- 组名仅在人工明确授权时暂存，主运行日志不包含组名、请求正文和认证凭据；原生 PacketTunnel 日志仍可能显示私有令牌。
-- 获得不敏感的真实场景标识后，应先添加明确的 Siri-only 兼容测试，再决定是否调整白名单；SSE / DeepSeek / 原生 UI 仍各自需要验收。
+两套模块绝不能在设备上同时启用；旧的 `00 REJECT` 和任何同域 Hook 也必须关闭。**从 GitHub 删除旧模块不会自动删除 Shadowrocket 已导入配置。**
 
-## 日常开发
+## 仓库开发命令
 
 ```bash
 git clone https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure.git
 cd Apple-Intelligence-Exchange-Secure
-git switch main
+npm ci
 npm run check
+npm test
 npm run docs:check
 ```
 
-需要 Node.js 20 或更高版本；CI 当前使用 Node 22。**不需要旧式 build/bundle 生成步骤**。
+Node.js >=20；没有旧式 bundle 构建步骤。CI 检查 JS 语法、60 双钩子模拟、61 只读行为、失败/隐私/并发/SSE 场景、文档链接、模块固定 Git SHA 和文件清单。**全部通过后才能合并**，但仍须按[验收矩阵](VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)另做真机检查。
 
-维护文件：
-- `scripts/aies_siri_deepseek_v06.js` — 唯一运行脚本。
-- `shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule` — 唯一模块。
-- `tests/siri-deepseek-v06.test.js` 与 `tests/fixtures/siri-sse.js` — 纯模拟回归，不代表真实 Siri。
-- `tools/check-docs.js` — 文档链接、部署钩子、版本与冗余文件检查。
-- 根目录 README、CHANGELOG、CONTRIBUTING 与 `docs/` — 现行文档。
+## 代码修改原则
 
-## 改动与回归步骤
+1. 先在 [调试史](DEBUG_HISTORY_2026-11-19_ZH.md) 确认真实失败码和脚本 SHA，再提出有限、可测试的修改。
+2. 改请求解析时先比对 [实测 JSON](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)：仅支持经过证明的纯文本和类型，不盲目接受未知工具/媒体、隐藏 context。
+3. 改 SSE 时先比对 [13 事件 schema](OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)：**原 Qwen 答案在任意 `delta`、`done`、`output` 路径都不得进入新 SSE**；只复用有界的非答案元数据。
+4. 改跨 Hook 关联时必须补**两个并发问题错配**的负测试。不能通过扫描 `$persistentStore` 选择“最新一条”解决 `RESPONSE_TAG_MISSING`。
+5. 改 60 运行脚本后，必须将 **60 请求和响应的两个 `script-path` 都 pin 到同一个新不可变 commit SHA**，更新对应测试的 pin 和安装指南，检查历史缓存不会误执行旧版。
+6. 修改 61 时同理同步两个 61 Hook；运行脚本任何异常必须 `$done({})`，不得主动上传、记录用户正文或调用 DeepSeek。
+7. 各个 `*_ONCE.js` 和 `*_STOP_ONCE.js` 只能在 Shadowrocket **手动 Script Test** 使用，不能注册为 HTTP/event/cron 自动采样；首次开启、状态复查、过期、清理与存储失败都要覆盖测试。
+8. 代码在 PR 分支完成、CI 成功后合并。**GitHub 主分支 CI 通过也不能代表真机 UI 兼容**；发布必须明确证据和未完成事项。
 
-1. 从 `main` 创建开发分支；明确当前修改解决的错误码和验收前提。
-2. 修改运行脚本时一并补充正向和失败测试，禁止将真实问题、Authorization 或 Key 写进测试 fixture。
-3. `npm run check` 检查语法、自动测试与文档/安装文件一致性；对安全扫描出现的异常必须修复，不能关掉检查。
-4. **固定脚本版本**：先提交已测试的 JS，获得真实 40 位提交 SHA；将模块的 Request 和 Response 两条 `script-path` 都修改为该提交，再跑 CI 并提交模块。
-5. 同步更新中英文 README、CHANGELOG、安装、调试、安全与发布记录；版本说明只写真正得到证据的功能。
-6. 真实设备用非隐私问题验收，记录 Shadowrocket / OS 版本和脱敏错误码。没有设备证据就保持 Beta。
+## 真实调试记录格式与隐私
 
-## 代码审查重点
+以文件名和固定状态码做最小来源索引；不要上传原始 PacketTunnel、HTTP 头、Cookie、token、proxy 数据库或私密用户输入。当前已经积累的 15 份日志（含重复文件）已在 [调试史](DEBUG_HISTORY_2026-11-19_ZH.md) 中脱敏归档；不要将日志完整字节提交仓库。
 
-- 固定 URL/path、方法、Siri 文本类型，未知 SSE 不透传千问。
-- DeepSeek API 仅访问固定 HTTPS 地址；Key 只在设备本地，不写日志或远端配置。
-- 超时、HTTP 错误、异常与重复回调只能尝试安全失败；不要增加自动千问回退。
-- 每次请求关联必须避免串话；注意目前 `$persistentStore` 中问题原文可能残留。
-- 现有 `deepseek-flash` 模型标识需要用官方信息和真实 API 核验。
-- 系统级绕过不受脚本控制，不得宣传无条件 DeepSeek-only。
+## 快速回滚
 
-## 发布与升级纪律
-
-- 通过 [发布验收表](RELEASE_CHECKLIST_ZH.md) 才能考虑稳定版；合并 `main` 不是发布证明。
-- 任何正式发布须锁定安装模块、脚本 commit、说明文档与测试结果；提供回滚方式。
-- 避免直接覆盖运行中的远程脚本，以免用户安装配置在不知情情况下改变。
-- 每次修复后保留当前模块原件的可回滚来源；不能泄露真实 Siri 问题及网络抓包。
-- 如果脚本未运行就会直接返回千问，必须在文档中明确此系统级限制。
-
-参考 [架构](ARCHITECTURE_CURRENT_ZH.md)、[调试](DEBUGGING_ZH.md)、[安全](SECURITY_CURRENT_ZH.md)。
-
-## 61 临时 Qwen 被动诊断模块的维护约束
-
-该模块必须与原有 60 Siri→DeepSeek 改写模块互斥，在设备操作指南中要求先验证不插入脚本的 Qwen 原生基线；不得在同一请求上并行安装两个模块。61 的 Request/Response 钩子始终 `$done({})`，不能添加 DeepSeek HTTP 调用、Header 注入、错误状态注入、原始问题/答案持久化或未知 SSE 的直接白名单放行。模块 URL 必须固定到与被审查运行脚本一致的不可变 SHA，新增测试检查单次/时效、信息脱敏、WritingTools 跳过与响应只读。出错回滚应停用 61、恢复用户配置，不能以原生 Qwen 回复证明 DeepSeek 改写版已成功。
+先停 60，停 61，停旧 REJECT/冲突 Hook；根据原备份决定是否关闭对应域名 MITM，验证原生 Siri/Qwen，再重新选择调试模式。详细见 [验收与回滚](VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)。
