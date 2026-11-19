@@ -86,3 +86,9 @@
 - **安全与回滚**：如果 DeepSeek 代理不稳定，停用 60 恢复原生 Qwen；不要同时启用 60 与 61；在诊断完成后关闭无须继续使用的目标域 MITM。
 
 相关文档：[请求结构](OBSERVED_SIRI_QWEN_REQUEST_PROTOCOL_ZH.md)、[响应 SSE](OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)、[决策与待办](ROOT_CAUSE_DECISIONS_2026-11-19_ZH.md)、[验收矩阵](VALIDATION_AND_ROLLBACK_2026-11-19_ZH.md)。
+
+## 16:15–16:17：新一轮复杂 Siri 故障与 A/B 实验准备
+
+用户额外上传 `PacketTunnel-20261119161456.log`（2,987 行）及 `proxy-2026-11-19-161456.db`（175 条代理记录）。由固定诊断码确认：16:15:16 的主请求在 16:15:17 因缺少 Header/Request body 关联失败；16:15:31 的主请求在 16:15:33 提交 DeepSeek SSE；16:15:50、16:16:03、16:16:15 的会话级请求均被 Guard 拒绝；16:16:33 的主请求在 16:16:36 因 SSE 预检失败；16:16:51 的主请求在 16:16:53 再次提交 DeepSeek SSE；16:17:08 的会话级请求在 16:17:11 被 Guard 拒绝。**这是三类并存的故障，不能把所有复杂失败归为 DeepSeek 模型内容不一致。**
+
+用户要求用同一道问题在**完全停用 60/61 的原生 Qwen**与**仅启用 60 的 DeepSeek 实验**作对照。由于完全停用脚本时无法取得 HTTPS SSE 正文，实验增加第三个可比组：61 只读插桩的原生 Qwen，在非私密单题测试时手动采集客户端可见 Qwen 答案与 SSE 事件结构；60 侧则手动记录 DeepSeek API 的 HTTP 状态、`finish_reason`、usage、受限答案、合成 SSE 与失败阶段。操作详见[三阶段同题 A/B 指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。原始日志/代理库与会话 ID 值不进入 Git 仓库。
