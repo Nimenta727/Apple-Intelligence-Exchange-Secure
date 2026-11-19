@@ -214,7 +214,7 @@ function observedSiriTextEnvelopeReasons(o){
  // Root metadata is not forwarded to DeepSeek. Unknown keys, tool calls, media
  // and unsupported message types remain blocked by this and textAtom().
  var reasons=[],top=Object.keys(o);
- var allowedRoot=["configuration","input","client_tools","response_format","server_tools","stream"];
+ var allowedRoot=["configuration","input","client_tools","input_hint","response_format","server_tools","stream"];
  if(top.some(function(k){return allowedRoot.indexOf(k)<0;})||
     top.indexOf("configuration")<0||top.indexOf("input")<0)
   reasons.push("ROOT_FIELDS");
@@ -222,7 +222,8 @@ function observedSiriTextEnvelopeReasons(o){
     (Object.prototype.hasOwnProperty.call(o,"server_tools")&&!Array.isArray(o.server_tools))||
     (Object.prototype.hasOwnProperty.call(o,"response_format")&&
       (!o.response_format||typeof o.response_format!=="object"||Array.isArray(o.response_format)))||
-    (Object.prototype.hasOwnProperty.call(o,"stream")&&typeof o.stream!=="boolean"))
+    (Object.prototype.hasOwnProperty.call(o,"stream")&&typeof o.stream!=="boolean")||
+    (Object.prototype.hasOwnProperty.call(o,"input_hint")&&typeof o.input_hint!=="string"))
   reasons.push("ROOT_FIELD_TYPES");
  if(!Object.prototype.hasOwnProperty.call(o,"input")){
   reasons.push("INPUT_MISSING");return reasons;
