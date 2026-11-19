@@ -34,7 +34,7 @@ const activeNames=[
  "README.md","README_EN.md","CHANGELOG.md","CONTRIBUTING.md",
  "docs/README.md","docs/CURRENT_STATUS_ZH.md","docs/ISSUES_AND_DECISIONS_ZH.md",
  "docs/INSTALL_SIRI_DEEPSEEK_V06_ZH.md","docs/USER_GUIDE_ZH.md",
- "docs/DEBUGGING_ZH.md","docs/SIRI_GROUP_PROBE_ZH.md","docs/SIRI_SCHEMA_PROBE_ZH.md","docs/ARCHITECTURE_CURRENT_ZH.md",
+ "docs/DEBUGGING_ZH.md","docs/SIRI_GROUP_PROBE_ZH.md","docs/SIRI_SCHEMA_PROBE_ZH.md","docs/SIRI_QWEN_BODY_CAPTURE_ZH.md","docs/ARCHITECTURE_CURRENT_ZH.md",
  "docs/OPERATIONS_ZH.md","docs/SECURITY_CURRENT_ZH.md",
  "docs/RELEASE_CHECKLIST_ZH.md",
  "scripts/aies_siri_deepseek_v06.js","scripts/provision_key_ONCE.js",
