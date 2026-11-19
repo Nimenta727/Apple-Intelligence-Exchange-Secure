@@ -61,6 +61,33 @@ function textAtom(v){
     Object.keys(t).length===1&&typeof t.value==="string")return t.value;
  return null;
 }
+// One-shot local diagnostic: never log the observed identifier from the request.
+var GROUP_PROBE_ARM="AIES_SIRI_GROUP_PROBE_ARM";
+var GROUP_PROBE_RESULT="AIES_SIRI_GROUP_PROBE_RESULT";
+function isWritingTools(){
+ return /^WritingTools(?:\s|\()/i.test(header(req&&req.headers,"User-Agent"));
+}
+function isSiriForProbe(){
+ return /^Siri\s*\(/i.test(header(req&&req.headers,"User-Agent"));
+}
+function safeGroupIdentifier(v){
+ return typeof v==="string"&&v.length>=2&&v.length<=80&&
+   /^[A-Za-z][A-Za-z0-9_.-]*$/.test(v)&&
+   !/[A-Za-z0-9]{25,}/.test(v)&&
+   !/^(?:bearer|token|secret|sk-)/i.test(v);
+}
+function captureUnknownSiriGroup(g){
+ if(!isSiriForProbe())return;
+ var arm=storeRead(GROUP_PROBE_ARM),exp=0;
+ try{exp=JSON.parse(arm).expiresAt;}catch(e){return;}
+ if(typeof exp!=="number"||!isFinite(exp)||exp<=Date.now()||exp>Date.now()+180000)return;
+ // Consume opt-in on the first eligible request; no implicit background collection.
+ storeWrite(GROUP_PROBE_ARM,"");
+ if(!safeGroupIdentifier(g)){log("SIRI_GROUP_PROBE_UNSAFE_ID");return;}
+ if(storeWrite(GROUP_PROBE_RESULT,JSON.stringify({id:g,expiresAt:Date.now()+180000})))
+  log("SIRI_GROUP_CAPTURED_LOCAL");
+ else log("SIRI_GROUP_PROBE_STORE_FAILED");
+}
 function parseRequest(raw){
  if(!raw){if(requestDiagnostic==="UNSET")requestDiagnostic="BODY_EMPTY";return null;}
  if(raw.length>C.maxRequest){requestDiagnostic="BODY_OVERSIZE";return null;}
@@ -70,7 +97,7 @@ function parseRequest(raw){
  try{
   var g=o.configuration&&o.configuration.response_configuration_group_id;
   if(typeof g!=="string"){requestDiagnostic="GROUP_MISSING";return null;}
-  if(!/^(siri\.tqa|siri_tqa)$/i.test(g)){requestDiagnostic="GROUP_UNSUPPORTED";return null;}
+  if(!/^(siri\.tqa|siri_tqa)$/i.test(g)){requestDiagnostic="GROUP_UNSUPPORTED";captureUnknownSiriGroup(g);return null;}
   if(!Array.isArray(o.input)||o.input.length<1||o.input.length>12){
    requestDiagnostic="INPUT_UNSUPPORTED";return null;
   }
@@ -191,6 +218,8 @@ function storeWrite(key,val){try{return !!(store&&store.write&&store.write(val,k
 function storeRead(key){try{return store&&store.read?store.read(key):null;}catch(e){return null;}}
 function isTarget(){return !!(req&&typeof req.url==="string"&&C.target.test(req.url));}
 if(!isTarget()){done({});return;}
+// WritingTools uses this endpoint too, but is outside this Siri-only product.
+if(isWritingTools()){log("WRITINGTOOLS_SKIPPED");done({});return;}
 if(!res){
  // Phase 1: capture a prompt and explicitly couple request/response using
  // an opaque ID. Unlike "latest prompt", concurrent requests never share a slot.
