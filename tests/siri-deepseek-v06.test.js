@@ -227,6 +227,7 @@ test("confirmed real noRTI root fields and message wrapper allow text-only captu
   client_tools:[{name:"UNTRUSTED_TOOL_SPEC",description:"NEVER_SEND_TO_MODEL"}],
   server_tools:[{name:"UNTRUSTED_SERVER_TOOL"}],
   response_format:{kind:"SIRI_PRIVATE_METADATA"},
+  input_hint:"PRIVATE_DEVICE_HINT_DO_NOT_FORWARD",
   stream:true,
   input:[{type:"message",message:{role:"user",content:[
    {type:"text",text:{value:"Why does sunlight warm Earth?"}}
@@ -246,6 +247,8 @@ test("confirmed real noRTI root fields and message wrapper allow text-only captu
  assert.ok(!api.includes("UNTRUSTED_TOOL_SPEC"));
  assert.ok(!api.includes("UNTRUSTED_SERVER_TOOL"));
  assert.ok(!api.includes("SIRI_PRIVATE_METADATA"));
+ assert.ok(!api.includes("PRIVATE_DEVICE_HINT_DO_NOT_FORWARD"));
+ assert.ok(!JSON.stringify(second.returned[0]).includes("PRIVATE_DEVICE_HINT_DO_NOT_FORWARD"));
  assert.ok(!e.logs.some(x=>x.includes("Why does sunlight")||x.includes("NEVER_SEND")));
 });
 test("confirmed noRTI root field names require exact type, unknown root fields remain denied",()=>{
@@ -256,6 +259,9 @@ test("confirmed noRTI root field names require exact type, unknown root fields r
   {obj:{...base,server_tools:"TOOL_LIST"},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
   {obj:{...base,response_format:[]},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
   {obj:{...base,stream:"true"},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
+  {obj:{...base,input_hint:123},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
+  {obj:{...base,input_hint:null},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
+  {obj:{...base,input_hint:{value:"PRIVATE_HINT"}},stage:"NORTI_SHAPE_ROOT_FIELD_TYPES"},
   {obj:{...base,attachments:["PRIVATE_MEDIA"]},stage:"NORTI_SHAPE_ROOT_FIELDS"},
   {obj:{...base,media:{data:"PRIVATE_MEDIA"}},stage:"NORTI_SHAPE_ROOT_FIELDS"}
  ];
@@ -266,7 +272,7 @@ test("confirmed noRTI root field names require exact type, unknown root fields r
   assert.ok(e.logs.includes("[AIES_V06] "+x.stage));
   assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_INPUT_UNSUPPORTED"));
   assert.equal(e.requests.length,0);
-  assert.ok(e.logs.every(l=>!l.includes("PRIVATE_MEDIA")&&!l.includes("TOOL_LIST")));
+  assert.ok(e.logs.every(l=>!l.includes("PRIVATE_MEDIA")&&!l.includes("TOOL_LIST")&&!l.includes("PRIVATE_HINT")));
  }
 });
 test("confirmed noRTI wrapper only accepts message discriminator and refuses tool calls",()=>{
@@ -692,7 +698,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/13dab6261fc5bf834e286b4e1878faca2941867e/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/c0fe16546e9f2ed3524fa41ec9eb2e10c26d4896/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
