@@ -215,7 +215,8 @@ function observedSiriTextEnvelopeReasons(o){
  // and unsupported message types remain blocked by this and textAtom().
  var reasons=[],top=Object.keys(o);
  var allowedRoot=["configuration","input","client_tools","response_format","server_tools","stream"];
- if(top.some(function(k){return allowedRoot.indexOf(k)<0;}))
+ if(top.some(function(k){return allowedRoot.indexOf(k)<0;})||
+    top.indexOf("configuration")<0||top.indexOf("input")<0)
   reasons.push("ROOT_FIELDS");
  if((Object.prototype.hasOwnProperty.call(o,"client_tools")&&!Array.isArray(o.client_tools))||
     (Object.prototype.hasOwnProperty.call(o,"server_tools")&&!Array.isArray(o.server_tools))||
