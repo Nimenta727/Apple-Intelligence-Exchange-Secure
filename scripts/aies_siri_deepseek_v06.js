@@ -853,7 +853,7 @@ function isFollowupTextSse(){
 if(!isTarget()&&!isFollowup()){done({});return;}
 // Apple WritingTools Compose and Siri have distinct return schemas.
 // Only exact SAIR-observed Compose is opted into the experimental adapter.
-if(isWritingTools())log("WRITINGTOOLS_COMPOSE_SCOPED");
+if(isWritingTools()){probeObserveWritingTools();log("WRITINGTOOLS_COMPOSE_SCOPED");}
 // Light native-Qwen leak guard: extra session-scoped URL observed in the user
 // device proxy DB. Unlike the base request, we cannot safely rewrite these
 // responses with DeepSeek without confirmed same-transaction correlation.
