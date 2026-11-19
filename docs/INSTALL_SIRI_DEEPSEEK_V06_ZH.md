@@ -26,7 +26,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 诊断版更新（2026-11-19）
 
-如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `bf11ab5bdb6d039d0f68d528676eaf2f3986f891`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
+如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `13dab6261fc5bf834e286b4e1878faca2941867e`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
 
 额外的 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) **仅供手动 Script Test**，不是模块自动安装的第三条钩子。**必须在 iPad 本地把旧版同名 JS 覆盖为最新版**；仅刷新远程 60 模块不够。手动运行一次开启 **600 秒**，问一次非隐私 Siri 问题，再运行同一个脚本查看结果、剩余时间和命中次数；重复检查**不自动取消**。需要停止时专门手动运行 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js)。不要把任何辅助脚本放入启用的 `event`、`cron` 或 HTTP 自动规则。详见[完整步骤](SIRI_GROUP_PROBE_ZH.md)。
 
