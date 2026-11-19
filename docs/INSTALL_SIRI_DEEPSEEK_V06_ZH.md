@@ -6,7 +6,7 @@
 
 | 模式 | 模块 | Runtime 固定 SHA |
 |---|---|---|
-| **60 Siri → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `087211c1858eb77d90fd6583de46a2b4f6bcb77a` |
+| **60 Siri → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `d8472b61e546da447b64f16bf1580933b4dce368` |
 | **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `56755369499c85b3bf1594627ec2556633c8cf5b` |
 
 **60 的 Shadowrocket 模块 Raw URL：**
@@ -38,7 +38,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 4. 60 DeepSeek 实验模式
 
-1. 关闭 61 和其它同域冲突模块，再导入并启用 60。确认两条脚本固定 SHA 为 `087211c1858eb77d90fd6583de46a2b4f6bcb77a`。
+1. 关闭 61 和其它同域冲突模块，再导入并启用 60。确认三条脚本规则固定 SHA 为 `d8472b61e546da447b64f16bf1580933b4dce368`。
 2. 在 Siri 问一个非私密且答案容易核对的**纯文本问题**；音频、图像、工具调用、WritingTools、未知 SSE 事件都不应被当作正常文本转给 DeepSeek。
 3. **只查看固定 `[AIES_V06]` 状态码**：`REQUEST_CAPTURED`、`RESPONSE_TAG_*`、`SSE_PREFLIGHT_PASSED`、`DEEPSEEK_STARTED`、`DEEPSEEK_LABEL_APPLIED`、`DEEPSEEK_RESPONSE_ATTEMPTED` 或 `ERROR_*`；不要上传原始请求日志。
 4. 看 Siri **真正显示的内容**。只有用户肉眼看到 `【DeepSeek · AIES】` 的正文、且固定日志链与同一测试一致，才算至少一次 DeepSeek Siri 显示闭环。Qwen 服务卡片可能仍然显示原品牌。
@@ -49,6 +49,16 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 - 真机 61 已验证 Qwen 原生有 13 个 SSE 事件、两个文本增量，14:49 的一次响应满足 `MATCHES_60_PREFLIGHT`。旧版 60 只构建极简的 Choice/Item/Session 事件字段。
 - 最新 60 的脚本改为按[真实响应协议](OBSERVED_QWEN_SSE_RESPONSE_PROTOCOL_ZH.md)重新生成包含完整可见字段结构的所有回答事件，仅从 Qwen 取有界的非模型会话元数据，所有答案文本都来自通过验证的 DeepSeek 回包；工具/媒体/审核路径拒绝。
 - 这一改动仍只通过 Node 离线模拟和静态审查，**不能保证 Siri 真机接收**，也**没有解决 Header 丢失**。
+
+## 5A. Qwen 会话级回答轻量保护（2026-11-19 15:51）
+
+最新设备代理数据库出现 2 条以前没有被 60 拦截的 Siri `/v1/sessions/{会话标识}/responses` 请求。新版 60 因此共有 **3 条规则**：主请求、主响应、会话级 SSE 响应 Guard；统一固定到同一脚本提交。第三条只针对这个特定路径、Siri 客户端、上游 HTTP 200 且识别为 SSE 的响应返回 502，避免直接显示未经验证的 Qwen 原文。不封锁 Qwen 整个域名，也不影响正常主接口。
+
+**权衡**：这个 Guard 并不会把该路径的 Qwen 回答改写成 DeepSeek，因此复杂 Siri 交互可能更频繁出现“无法获得回答”。若优先恢复原生 Qwen，关闭 60、61 与旧 REJECT。固定日志码是 `QWEN_SESSION_FOLLOWUP_SSE_BLOCKED` 和 `ERROR_QWEN_FOLLOWUP_UNVERIFIED_SOURCE`。
+
+主请求偶发的 `RESPONSE_TAG_MISSING` 仍未解决。新代码提高普通 SSE 分帧兼容性、DeepSeek 最多生成 1000 token、15 秒代理等待上限，成功正文与 `summary` 都有强制 `【DeepSeek · AIES】`；底部“千问”系统服务品牌不能通过这类脚本可靠修改。
+
+本轮根据你的要求**不进行人工或真机测试**，这些措施只代表代码改动，并非可靠性验收。
 
 ## 6. 停止和清理
 
