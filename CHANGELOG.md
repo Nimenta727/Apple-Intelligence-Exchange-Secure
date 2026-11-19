@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 2026-11-19 — 真实 Qwen SSE 与 60 模块预检差异诊断
+
+- 13:50 真机 61 被动探针记录 Qwen HTTP 200、13 个可解析 SSE 数据事件（两次文本 delta），事件顺序符合当前 60 代码的预期；原 SSE 确认没有多行 data、SSE id/comment/retry。
+- 发现 60 生成的模拟 SSE 多处嵌套字段与真机 Qwen 正常返回的结构不一致，可能影响 Siri 是否接受替换后的正文，但尚不能证明哪个字段是强制性的。
+- 61 新增只返回**固定类别**的 `strict60Preflight`：分别验证 SSE 格式、事件列表/顺序、封装、ID 字符格式/关联和过期字段；不保存任何 ID、回答、问题或认证值、不调用 DeepSeek、不修改原生 Qwen 请求/响应。包含真实结构对照和离线负测试。
+
+
 ## 2026-11-19 — 独立 Qwen 原生通行与 SSE 被动协议诊断（61）
 
 - 新增和 DeepSeek 60 改写模块严格互斥的 `61-AIES-QWEN-PASSIVE-DIAG.sgmodule`，请求与响应钩子都只调用 `$done({})`，无改写、无阻断、无 DeepSeek API 调用。
