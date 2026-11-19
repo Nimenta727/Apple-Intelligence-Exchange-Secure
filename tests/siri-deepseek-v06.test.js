@@ -13,6 +13,8 @@ const schemaProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_schema_pr
 const schemaStop=fs.readFileSync(path.join(__dirname,"../scripts/siri_schema_probe_STOP_ONCE.js"),"utf8");
 const bodyProbe=fs.readFileSync(path.join(__dirname,"../scripts/siri_qwen_body_probe_ONCE.js"),"utf8");
 const bodyStop=fs.readFileSync(path.join(__dirname,"../scripts/siri_qwen_body_probe_STOP_ONCE.js"),"utf8");
+const abReader=fs.readFileSync(path.join(__dirname,"../scripts/ab_deepseek_trace_ONCE.js"),"utf8");
+const abStop=fs.readFileSync(path.join(__dirname,"../scripts/ab_deepseek_trace_STOP_ONCE.js"),"utf8");
 const URL="https://prod-yabuli.qianwen.com/v1/sessions/responses";
 const fixture=Sse.candidateSse("QWEN_ORIGINAL_ANSWER_TEST","Sample","siri",{now:()=>1730000000000,id:()=>"beta-test"});
 const promptBody=JSON.stringify({configuration:{response_configuration_group_id:"siri.tqa"},input:[{content:"Explain why the sky is blue"}]});
@@ -60,6 +62,73 @@ test("complete dual-hook mock returns only DeepSeek answer and preserves source 
  assert.ok(e.logs.every(x=>!x.includes(KEY)&&!x.includes("Explain why")));
  assert.equal(e.data["AIES_R1_"+injected["X-AIES-Request-ID"]],"");
 });
+test("A-B DeepSeek trace is disabled by default and cannot change HTTP hook behavior",()=>{
+ const e=env(),a=e.invoke(e.request);
+ const r=e.invoke({...e.request,headers:a.returned[0].headers},{status:200,body:fixture});
+ assert.equal(r.returned[0].status,200);
+ assert.equal(e.data.AIES_AB_DEEPSEEK_V1_STATE,undefined);
+ assert.ok(e.logs.every(x=>!x.includes("AIES_AB_DEEPSEEK_LOCAL")));
+});
+test("explicit A-B DeepSeek arm collects bounded model JSON metadata, response structure and sanitized test answer",()=>{
+ const e=env();
+ const time=Date.now();
+ e.data.AIES_AB_DEEPSEEK_V1_STATE=JSON.stringify({
+  v:1,phase:"armed",createdAt:time,expiresAt:time+600000,events:[]
+ });
+ const a=e.invoke({...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"}});
+ const b=e.invoke({...e.request,headers:{...a.returned[0].headers,"User-Agent":"Siri (iPad - Version 27.3.0)"}},
+  {status:200,body:fixture,headers:{"Content-Type":"text/event-stream"}},
+  {post:(_opts,callback)=>callback(null,{statusCode:200},JSON.stringify({
+   id:"PRIVATE_RESPONSE_ID",
+   choices:[{finish_reason:"stop",message:{role:"assistant",content:"Model says contact test@example.com then sk-SENSITIVE01234567890000"}}],
+   usage:{prompt_tokens:120,completion_tokens:44,total_tokens:164}
+  }))});
+ assert.equal(b.returned[0].status,200);
+ const st=JSON.parse(e.data.AIES_AB_DEEPSEEK_V1_STATE);
+ assert.ok(st.events.some(x=>x.stage==="SIRI_REQUEST"&&x.promptChars>0));
+ assert.ok(st.events.some(x=>x.stage==="SSE_STRUCTURE"&&x.route==="MAIN_UPSTREAM"&&x.eventCount===12));
+ const model=st.events.find(x=>x.stage==="DEEPSEEK_API");
+ assert.equal(model.status,200);
+ assert.equal(model.finishReason,"stop");
+ assert.equal(model.outputChars>0,true);
+ assert.equal(model.usage.total_tokens,164);
+ assert.equal(model.reasoningType,"missing_or_other");
+ assert.ok(model.answerText.includes("[REDACTED_EMAIL]"));
+ assert.ok(model.answerText.includes("[REDACTED_KEY]"));
+ assert.ok(!JSON.stringify(st).includes("PRIVATE_RESPONSE_ID"));
+ assert.ok(!JSON.stringify(st).includes("QWEN_ORIGINAL_ANSWER_TEST"));
+ assert.ok(!JSON.stringify(st).includes("test@example.com"));
+ assert.ok(!JSON.stringify(st).includes("sk-SENSITIVE01234567890000"));
+ assert.ok(st.events.some(x=>x.stage==="AIES_OUTPUT"&&x.markerPresent===true));
+ const logs=[],returns=[];
+ vm.runInNewContext(abReader,{$persistentStore:{
+  read:k=>e.data[k]||null,write:(v,k)=>{e.data[k]=v;return true;}
+ },$done:x=>returns.push(x),console:{log:x=>logs.push(x)},Date,Math},{timeout:1000});
+ assert.ok(logs.some(x=>x.endsWith("CAPTURED_LOCAL_READOUT")));
+ assert.ok(logs.some(x=>x.endsWith("CAPTURE_CLEARED")));
+ assert.ok(logs.some(x=>x.includes("TRACE_PART_001=")));
+ assert.equal(e.data.AIES_AB_DEEPSEEK_V1_STATE,"");
+ assert.equal(returns.length,1);
+});
+test("AB trace identifies failed session follow-up SSE without collecting Qwen text or blocking unrelated URLs",()=>{
+ const e=env(),now=Date.now();
+ e.data.AIES_AB_DEEPSEEK_V1_STATE=JSON.stringify({
+  v:1,phase:"armed",createdAt:now,expiresAt:now+600000,events:[]
+ });
+ const req={url:"https://prod-yabuli.qianwen.com/v1/sessions/abcd1234/responses",
+  method:"POST",headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"}};
+ const r=e.invoke(req,{status:200,headers:{"Content-Type":"text/event-stream"},body:fixture});
+ assert.equal(r.returned[0].status,502);
+ const events=JSON.parse(e.data.AIES_AB_DEEPSEEK_V1_STATE).events;
+ assert.ok(events.some(x=>x.stage==="SSE_STRUCTURE"&&x.route==="SESSION_FOLLOWUP_BLOCKED"));
+ assert.ok(events.some(x=>x.code==="QWEN_SESSION_FOLLOWUP_SSE_BLOCKED"));
+ assert.ok(!JSON.stringify(events).includes("QWEN_ORIGINAL_ANSWER_TEST"));
+ assert.ok(!JSON.stringify(events).includes("abcd1234"));
+ const non=env(),r2=non.invoke({...req,url:"https://other.example.com/v1/sessions/responses"},
+  {status:200,headers:{"Content-Type":"text/event-stream"},body:fixture});
+ assert.equal(JSON.stringify(r2.returned[0]),"{}");
+});
+
 test("verified DeepSeek answer is visibly labeled once in the rewritten Siri SSE and provider identity prompt",()=>{
  const e=env();
  const req=e.invoke(e.request);
