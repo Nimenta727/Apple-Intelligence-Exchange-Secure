@@ -13,7 +13,7 @@
 
 最新日志确认 Siri 与 WritingTools 共享同一个接口，并且二者均可能触发 `REQUEST_DIAG_GROUP_UNSUPPORTED`。真实 Siri `response_configuration_group_id` 尚未确定。本次加入**需要手动开启的单次本地诊断**和 WritingTools 跳过逻辑，但**尚未把未知组名加入白名单，不能宣称 Siri 已修复**。
 
-按照 [Siri 场景标识本地诊断指南](docs/SIRI_GROUP_PROBE_ZH.md) 使用新增的 [`siri_group_probe_ONCE.js`](scripts/siri_group_probe_ONCE.js)：本机 Script Test 先运行一次以启用 180 秒窗口，发出一个非隐私 Siri 文本问题，然后再手动运行一次读取并清理结果。不要使用 event/cron，也不要发送原始 PacketTunnel 日志。已有 DeepSeek API Key 不需要重设。
+**诊断 v2（2026-11-19）**：先[刷新 60 模块](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，同时**用新版覆盖 iPad 本地同名 JS**。手动测试 [`siri_group_probe_ONCE.js`](scripts/siri_group_probe_ONCE.js) 一次开启 **600 秒（10 分钟）**，然后实际问 Siri 一次，再手动测试同一个脚本读取结果或查看剩余时间。反复检查不会取消采样；需要取消时专门运行 [`siri_group_probe_STOP_ONCE.js`](scripts/siri_group_probe_STOP_ONCE.js)。不使用 event/cron/HTTP 自动规则，不提交完整 PacketTunnel 日志，已有 API Key 不需重设。详细步骤见[本地诊断指南](docs/SIRI_GROUP_PROBE_ZH.md)。
 
 ## 项目目标
 
