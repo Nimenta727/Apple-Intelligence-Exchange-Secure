@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 2026-11-19 — 输入提示字段与 Siri→Qwen 一次性请求正文探针
+
+- iPad 第二轮结构采样新增根级 `input_hint:string`，严格允许该键的字符串类型，但不将值转发 DeepSeek。
+- 新增手动 opt-in 的 600 秒、一次性本地 JSON 请求正文脱敏采集，针对真实 Siri→Qwen POST 路径，保留受限文本内容和 JSON 结构，敏感元数据遮挡；结果仅在设备本地 Script Test 手动读取一次并清空。
+- 新增手动 STOP、相关隐私回归测试、部署固定脚本同步。**不代表 Qwen 实际收到请求、DeepSeek 已调用或 Siri 原生回答成功。**
+
+
 ## 2026-11-19 — 真机 noRTI 字段结构精确兼容
 
 - 11:54 本机结构探针确认 `client_tools:array`、`response_format:object`、`server_tools:array`、`stream:boolean`，输入外层 `type:string`，内部 `content:array`、`role:string`。PacketTunnel 固定诊断码也印证了这两处原有阻塞。
