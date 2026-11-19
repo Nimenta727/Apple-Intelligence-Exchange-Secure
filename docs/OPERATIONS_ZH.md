@@ -47,3 +47,7 @@ Node.js >=20；没有旧式 bundle 构建步骤。CI 检查 JS 语法、60 主�
 ## 2026-11-19 同题 A/B 探针维护规则
 
 60 的三条 Script Hook 均固定在同一运行脚本 SHA，新增 `ab_deepseek_trace_ONCE.js`/`STOP_ONCE.js`，状态键独立，默认关闭，仅当用户通过本地 Script Test 主动开启才在 10 分钟内采集固定状态码、SSE 事件/长度和经过限制的 DeepSeek 用户可见答案。61 的原主接口双 Hook 不变，另增两条会话级原样放行 Hook，总计四条均固定到同一脚本 SHA。`ab_native_trace_ONCE.js`/`STOP_ONCE.js` 用独立状态键采集原生 Qwen SSE 及用户可见的非私密测试答案。两种模式不能同时启用，新增脚本不能注册自动 HTTP/event/cron。完整流程见 [A/B 同题对照指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。
+
+## 2026-11-19 浏览器社区研究后的 WritingTools 维护约束
+
+WritingTools Compose 初步协议来自 SAIR 的公开逆向，不是 Apple 官方私有 API 文档。今后改变组名白名单时，必须在无隐私真机请求字段类型样本中确认新的值与其用途；不要把 `group.includes('compose')` 复制到生产，不能把所有 WritingTools UA 流量都当 Compose。Siri 与 WritingTools 的答案 schema、模型指令及跨 Hook `scene` 隔离要有独立正反回归。每次代码变更记录在 `docs/routine/`，新运行脚本完整 SHA 需同步 60 三条 Hook、静态测试和安装说明；61 被动诊断保持独立。详见 [来源分析](COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md) 与 [routine](routine/2026-11-19-AppleIntelligence-web-community-and-WritingTools-Compose.md)。
