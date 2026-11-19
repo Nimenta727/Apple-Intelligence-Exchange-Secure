@@ -32,6 +32,12 @@
 - 由于没有注入关联标记，61 单次 Request 摘要与 Response 摘要**不一定属于同一事务**，尤其存在并发时。测试期间一次只提一个问题。
 - `$done({})` 不能消除 HTTPS MITM 和响应缓冲自身的时序影响。**60 和 61 必须互斥**；用户需要纯原生 Qwen 时应同时停用两个模块和所有旧同域 REJECT/Rewrite。
 
+## 新增：只对已观测会话级 Siri SSE 的轻量阻断
+
+本机代理数据库中发现 2 条旧版 60 没有覆盖的 Siri 会话级请求。新模块新增响应 Hook：仅对 `/v1/sessions/{id}/responses`、Siri 客户端和识别出的 HTTP 200 SSE 回包返回 502；不采集实际会话 ID 或原始回答，不封锁整个 Qwen 服务。它可减少一部分 Qwen 原答案直出，但不能阻止 MITM 未命中、非 SSE 或操作系统绕行。可能造成更多 Siri“无法获得回答”。
+
+主路径关联缺失仍失败关闭，不扫描“最近一次请求”。成功 DeepSeek 回答的正文和 summary 由代码写入来源标记；Siri 底部的 Qwen 品牌不可由模型提示词可靠修改。用户本轮未要求、也未执行额外人工/真机测试。
+
 ## 错误报告与回滚
 
 只分享经过本人检查的 `[AIES_V06]` 或 `[AIES_QWEN_PASSIVE]` 固定日志类别、模块固定 SHA 和 Siri 显示结果。停止实验时依次停用 60、61 和旧 REJECT，并按原备份决定是否关闭不再需要的目标域 MITM。所需的本地辅助采样可通过对应 `*_STOP_ONCE.js` 手动清理，不会误清 DeepSeek API Key。若需主动删除 Key，请使用单独的 [clear_key_ONCE.js](../scripts/clear_key_ONCE.js)。
