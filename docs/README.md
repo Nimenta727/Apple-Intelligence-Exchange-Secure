@@ -4,6 +4,9 @@
 
 ## 优先阅读：调试事实与协议归档
 
+**新增：** [Siri 同题 A/B 实验——完全关闭基线 / 原生 Qwen 只读采集 / DeepSeek 改写采集](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)，包含手动诊断脚本、原生 Qwen/DeepSeek 客户端可见文本、SSE 结构、模型 `finish_reason`/token 用量、会话级 Guard 事件的比较方法。
+
+
 | 文档 | 为什么重要 |
 |---|---|
 | [当天完整调试时间线与 PR #17–25](DEBUG_HISTORY_2026-11-19_ZH.md) | 按时间解释全部阶段错误、版本和已修复/仍未修复事项，索引 15 份本机日志 |

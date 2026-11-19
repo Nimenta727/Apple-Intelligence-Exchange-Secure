@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 2026-11-19 — 同题 A/B：原生 Qwen 与 DeepSeek 输出和 SSE 结构对照
+
+- 16:15 最新真实 60 日志证实 4 次主请求、2 次 DeepSeek 提交、1 次关联缺失、1 次 SSE 不兼容，并记录 4 次会话级 Qwen SSE 被 Guard 主动阻断。相关代理数据库 175 条记录中有 4 条主接口与 4 条会话级 Siri 请求。
+- 新增手动 600 秒原生 Qwen A/B 探针（61 仍只读放行，增加会话级 request/response Hook），本机保存 Qwen SSE 类型结构与非私密测试答案；DeepSeek 60 新增手动 A/B 探针，记录请求类型、阶段固定码、DeepSeek HTTP/finish_reason/usage/答案文本和合成 SSE 事件结构。
+- 提供[同题 A/B 指南](docs/AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)，将完全停用 60/61 的纯原生对照与带只读观测的 Qwen A' 明确区分。仅本机主动授权采样且读取后逻辑清空；**这是诊断而非复杂问题的最终修复**。
+
+
 ## 2026-11-19 — Siri 可见 DeepSeek 成功样例与 Qwen 会话级 SSE 轻量防漏
 
 - 新截图首次确认 Siri 正文出现 `【DeepSeek · AIES】`；下方 Qwen 服务品牌不受第三方提示词控制。`PacketTunnel-20261119155107.log` 中 5 次主接口请求有 2 次 DeepSeek 成功提交、2 次请求 Header 关联丢失、1 次原 SSE 不兼容。

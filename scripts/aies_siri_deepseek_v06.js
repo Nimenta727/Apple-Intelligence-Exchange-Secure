@@ -30,7 +30,7 @@ var http=typeof $httpClient!=="undefined" ? $httpClient : null;
 var finish=typeof $done==="function" ? $done : null;
 if(!finish)return;
 var once=false,timer=null;
-function log(s){try{if(typeof console!=="undefined"&&console.log)console.log("[AIES_V06] "+s);}catch(e){}}
+function log(s){try{if(typeof console!=="undefined"&&console.log)console.log("[AIES_V06] "+s);}catch(e){};abStatus(s);}
 function done(data){if(once)return;once=true;if(timer!==null&&typeof clearTimeout==="function")try{clearTimeout(timer);}catch(e){};try{finish(data);}catch(e){log("DONE_EXCEPTION");}}
 function error(code){
  log("ERROR_"+code);
@@ -620,6 +620,134 @@ function rewriteSse(original,answer){
  if(joined.length>C.maxSse||joined.indexOf(safeJson(content))<0)return null;
  return joined;
 }
+// Manually armed, ten-minute DeepSeek-side A/B trace. This is OFF by default.
+// Only one controlled nonsensitive Siri question should be asked per trace.
+// The trace is local only; never copy credentials, HTTP headers, Siri prompts,
+// session IDs or original Qwen text into the persistent snapshot or console.
+var AB_TRACE_STATE="AIES_AB_DEEPSEEK_V1_STATE",AB_TRACE_WINDOW=600000;
+function abState(){
+ var raw=storeRead(AB_TRACE_STATE),st=null,now=Date.now();
+ try{st=raw&&JSON.parse(raw);}catch(e){return null;}
+ if(!st||st.v!==1||st.phase!=="armed"||!Array.isArray(st.events)||
+    typeof st.createdAt!=="number"||typeof st.expiresAt!=="number"||
+    st.createdAt>now||st.expiresAt<=now||
+    st.expiresAt>now+AB_TRACE_WINDOW)return null;
+ return st;
+}
+function abRecord(kind,detail){
+ var st=abState();if(!st||st.events.length>=72)return;
+ var line={tMs:Math.max(0,Date.now()-st.createdAt),stage:kind};
+ if(detail&&typeof detail==="object"){
+  var allowed=["code","route","method","group","promptChars","inputItems",
+   "rootFields","requestType","status","bodyChars","eventCount","eventNames",
+   "deltaCount","deltaChars","doneChars","unparsedFrames","reason",
+   "choiceCount","finishReason","outputChars","answerText","answerTruncated",
+   "reasoningType","reasoningChars","usage","rewrittenChars","markerPresent"];
+  for(var i=0;i<allowed.length;i++){
+   var key=allowed[i];
+   if(Object.prototype.hasOwnProperty.call(detail,key))line[key]=detail[key];
+  }
+ }
+ st.events.push(line);
+ var packed=JSON.stringify(st);
+ if(packed.length<=45000)storeWrite(AB_TRACE_STATE,packed);
+}
+function abText(text){
+ // This MAY include the nonsensitive example answer the user explicitly asks
+ // to compare. Keep it LOCAL until manual read; no reasoning traces or tokens.
+ var clean=typeof text==="string"?text:"";
+ clean=clean.replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g,"[REDACTED_KEY]")
+  .replace(/\bBearer\s+[A-Za-z0-9._-]{8,}\b/ig,"[REDACTED_AUTH]")
+  .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig,"[REDACTED_EMAIL]")
+  .replace(/https?:\/\/[^\s"'<>]+/ig,"[REDACTED_URL]");
+ return {answerText:clean.slice(0,7000),answerTruncated:clean.length>7000};
+}
+function abStatus(code){
+ if(typeof code==="string"&&/^[A-Z0-9_]{3,90}$/.test(code))
+  abRecord("CODE",{code:code});
+}
+function abRequest(raw,prompt){
+ var record={route:"MAIN",method:String(req&&req.method||"").toUpperCase()==="POST"?"POST":"OTHER",
+  promptChars:typeof prompt==="string"?prompt.length:0};
+ if(typeof raw!=="string"||raw.length>300000){
+  record.requestType="UNAVAILABLE";abRecord("SIRI_REQUEST",record);return;
+ }
+ try{
+  var o=JSON.parse(raw),c=o&&o.configuration,g=c&&c.response_configuration_group_id;
+  record.group=g==="siri.multimodal.noRTI"?"siri.multimodal.noRTI":
+   (/^siri[._]tqa$/.test(g)?"siri.tqa":"OTHER_OR_MISSING");
+  record.inputItems=Array.isArray(o.input)?Math.min(o.input.length,99):0;
+  record.rootFields=Object.keys(o).filter(function(k){
+   return ["configuration","input","client_tools","server_tools","response_format","stream","input_hint"].indexOf(k)>=0;
+  }).sort();
+  record.requestType="JSON_OBJECT";
+ }catch(e){record.requestType="JSON_INVALID";}
+ abRecord("SIRI_REQUEST",record);
+}
+function abSse(route,status,body){
+ var info={route:route,status:typeof status==="number"?status:0,
+  bodyChars:typeof body==="string"?body.length:0,
+  eventCount:0,eventNames:[],deltaCount:0,deltaChars:0,doneChars:0,unparsedFrames:0};
+ if(typeof body==="string"&&body.length<=900000){
+  var blocks=body.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n\n");
+  for(var i=0;i<blocks.length&&i<400;i++){
+   var lines=blocks[i].split("\n"),name="",data=[];
+   for(var j=0;j<lines.length;j++){
+    var x=lines[j],pos=x.indexOf(":");
+    if(x.slice(0,6)==="event:")name=x.slice(6).trim();
+    if(x.slice(0,5)==="data:")data.push(x.slice(5).replace(/^ /,""));
+   }
+   if(!name)continue;
+   var label=/^session(?:\.|$)/.test(name)&&
+    /^[a-zA-Z0-9_.\[\]-]{1,110}$/.test(name)?name:"UNKNOWN_EVENT";
+   info.eventCount++;
+   if(info.eventNames.length<24)info.eventNames.push(label);
+   try{
+    var obj=JSON.parse(data.join("\n")),event=obj[name];
+    if(/\.delta$/.test(name)){
+     info.deltaCount++;
+     if(event&&typeof event.delta==="string")info.deltaChars+=event.delta.length;
+    }
+    if(/text\.value\.done$/.test(name)&&event&&typeof event.value==="string")
+     info.doneChars+=event.value.length;
+   }catch(e){info.unparsedFrames++;}
+  }
+ }
+ abRecord("SSE_STRUCTURE",info);
+}
+function abModel(reply,body,err){
+ var info={status:statusCode(reply),bodyChars:typeof body==="string"?body.length:0,
+  reason:err?"NETWORK_ERROR":"NONE"};
+ if(typeof body==="string"&&body.length<=900000){
+  try{
+   var obj=JSON.parse(body),choice=Array.isArray(obj.choices)?obj.choices[0]:null;
+   var m=choice&&choice.message;
+   var txt=m&&m.content;
+   info.choiceCount=Array.isArray(obj.choices)?obj.choices.length:0;
+   info.finishReason=choice&&typeof choice.finish_reason==="string"&&
+     /^(stop|length|content_filter|tool_calls)$/.test(choice.finish_reason)?
+     choice.finish_reason:"OTHER_OR_MISSING";
+   info.outputChars=typeof txt==="string"?txt.length:0;
+   info.reasoningType=m&&typeof m.reasoning_content==="string"?"string":
+     m&&m.reasoning_content===null?"null":"missing_or_other";
+   info.reasoningChars=m&&typeof m.reasoning_content==="string"?m.reasoning_content.length:0;
+   var u=obj.usage;
+   if(u&&typeof u==="object"){
+    info.usage={};
+    ["prompt_tokens","completion_tokens","total_tokens"].forEach(function(k){
+     if(typeof u[k]==="number"&&isFinite(u[k])&&u[k]>=0&&u[k]<10000000)
+      info.usage[k]=Math.floor(u[k]);
+    });
+   }
+   if(typeof txt==="string"){
+    var preview=abText(txt);
+    info.answerText=preview.answerText;info.answerTruncated=preview.answerTruncated;
+   }
+  }catch(e){info.reason="BODY_NOT_JSON";}
+ }
+ abRecord("DEEPSEEK_API",info);
+}
+
 function randomToken(){
  return "aies_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,14)+"_"+Math.random().toString(36).slice(2,14);
 }
@@ -646,6 +774,7 @@ if(isWritingTools()){probeObserveWritingTools();log("WRITINGTOOLS_SKIPPED");done
 // non-SSE metadata, other clients or the whole Qwen domain.
 if(isFollowup()){
  if(res&&isSiriForProbe()&&isFollowupTextSse()){
+  abSse("SESSION_FOLLOWUP_BLOCKED",statusCode(res),res.body);
   log("QWEN_SESSION_FOLLOWUP_SSE_BLOCKED");
   error("QWEN_FOLLOWUP_UNVERIFIED_SOURCE");
  }else{
@@ -659,6 +788,7 @@ if(!res){
  // an opaque ID. Unlike "latest prompt", concurrent requests never share a slot.
  captureQwenRequestBodyOnce();
  var prompt=parseRequest(rawRequest());
+ abRequest(rawRequest(),prompt);
  probeObserveRequest();
  if(!prompt){log("REQUEST_DIAG_"+requestDiagnostic);error("UNSUPPORTED_SIRI_REQUEST");return;}
  if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){error("INVALID_METHOD");return;}
@@ -675,6 +805,7 @@ if(!res){
  return;
 }
 // Phase 2: never return the raw Qwen body from code paths we control.
+abSse("MAIN_UPSTREAM",statusCode(res),res&&res.body);
 if(statusCode(res)!==200){error("ORIGINAL_RESPONSE_STATUS");return;}
 if(!res||typeof res.body!=="string"||res.body.length>C.maxSse){error("SSE_UNAVAILABLE");return;}
 var tag=header(req.headers,"X-AIES-Request-ID"),current=null,prompt2=null;
@@ -718,6 +849,7 @@ try{
   })
  },function(err,reply,bodyText){
   if(once)return;
+  abModel(reply,bodyText,err);
   if(err){error("MODEL_NETWORK");return;}
   var answer=modelReply(reply,bodyText);
   if(!answer){error("MODEL_RESPONSE_INVALID");return;}
@@ -725,6 +857,8 @@ try{
   if(!labeledAnswer){error("MODEL_RESPONSE_INVALID");return;}
   var rewritten=rewriteSse(res.body,labeledAnswer);
   if(!rewritten){error("SSE_REWRITE_UNSUPPORTED");return;}
+  abSse("AIES_SYNTHETIC",200,rewritten);
+  abRecord("AIES_OUTPUT",{rewrittenChars:rewritten.length,markerPresent:rewritten.indexOf(DEEPSEEK_SOURCE_LABEL)>=0});
   log("DEEPSEEK_LABEL_APPLIED");
   log("DEEPSEEK_RESPONSE_ATTEMPTED");
   done({status:200,headers:{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-store","X-AIES-Answer-Source":"deepseek"},body:rewritten});

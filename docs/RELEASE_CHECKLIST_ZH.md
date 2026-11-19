@@ -37,3 +37,7 @@
 
 已取得至少一次真正显示 `【DeepSeek · AIES】` 的 Siri 截图，故“完全没有 Siri UI 证据”已过时；但并没有完成**复杂问题、连续会话、会话级 Guard、跨 Hook 关联**的稳定性验收。日志主接口 2 次成功改写、2 次关联缺失、1 次 SSE 不兼容；额外会话级接口有 2 次未覆盖记录。60 新增第三条仅拦截 Siri SSE 的轻量 Guard，可能减少 Qwen 原文展示但增加失败提示。用户本轮要求不进行额外测试，因此最新改动均不得写成设备已验证。
 
+
+## 16:15 A/B 真实故障分类基线
+
+最新 4 次主请求中 2 次已提交 DeepSeek SSE、1 次关联丢失、1 次 Qwen SSE 预检失败；另有 4 次会话级 SSE 被 60 Guard 主动阻断。仅凭现有日志不能宣称模型有新的输出格式，也不能宣称 Guard 不影响复杂回答。增加 [A/B 同题实验](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)来收集原生 Qwen 和 DeepSeek 的有限客户端可见答案、HTTP/SSE 结构及 `finish_reason` 等。必须看到真正的 Siri UI 结果才能修改“已验收”的状态。

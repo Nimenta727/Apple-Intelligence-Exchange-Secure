@@ -149,3 +149,7 @@ Siri 结果: DeepSeek / Qwen / empty / error / unknown
 ## 13:50 原生 Qwen 成功后对比 60 的严格 SSE 检查
 
 真实 61 摘要显示 13 个完全可解析 SSE JSON 数据事件，其名称和顺序与当前 `rewriteSse` 预期相符。因此原先 `ERROR_SSE_REWRITE_UNSUPPORTED` **并不能仅归因于某个未知事件或错误顺序**：60 代码还强制 Session/Response ID 格式、关联字符串一致和 Session 过期时间为非负整数。最新 61 会在原始响应**内存中**重新执行这部分判断，只输出 `strict60Preflight` 固定分类码，不记录实际值。若结果是 `MATCHES_60_PREFLIGHT`，说明该条原生 SSE 理论上通过当前 60 的预检，**下一处应审查 60 合成事件缺少真实响应中的 `choices`、`created_at`、`index`、`annotations`、`session_id` 等结构字段**，以及请求关联缺失问题。详见[61 临时诊断](QWEN_PASSIVE_DIAG_ZH.md)。
+
+## 16:15 同题实验：避免混淆“模型输出变了”与“Guard 主动阻断”
+
+最新 2,987 行 PacketTunnel 日志同时包含两次 DeepSeek SSE 成功提交、一次跨 Hook 请求关联缺失、一次 SSE 预检失败和四次 `QWEN_SESSION_FOLLOWUP_SSE_BLOCKED`。因此复杂 Siri 无回答不能直接归咎于 DeepSeek 模型输出。新增[三阶段同题 A/B 实验](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)，原生侧使用 61 的手动 Qwen 可见答案/SSE 探针，改写侧使用 60 的手动 DeepSeek HTTP `finish_reason`/usage/答案/SSE 探针。模型实际完成时看 `DEEPSEEK_API.finishReason`；如果只出现 `RESPONSE_TAG_MISSING` 或 `SESSION_FOLLOWUP_BLOCKED` 而没有 `DEEPSEEK_API`，**说明那次失败不是模型回复内容变了**。两个探针只适用于用户亲自选择的非隐私普通问题，读取后逻辑清理。

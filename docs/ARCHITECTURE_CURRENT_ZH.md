@@ -12,7 +12,7 @@ shadowrocket/
   61-AIES-QWEN-PASSIVE-DIAG.sgmodule      互斥的原生 Qwen 被动协议诊断：双 Hook
 scripts/
   aies_siri_deepseek_v06.js                60 三个 Hook 使用的同一个不可变 JS
-  aies_qwen_passive_diag.js                61 两个 Hook 使用的同一个不可变 JS
+  aies_qwen_passive_diag.js                61 四个 Hook 使用的同一个不可变 JS
   provision_key_ONCE.js / clear_key_ONCE.js    DeepSeek Key 手动本机管理
   siri_group_probe_ONCE.js / siri_group_probe_STOP_ONCE.js
   siri_schema_probe_ONCE.js / siri_schema_probe_STOP_ONCE.js
@@ -83,6 +83,10 @@ Siri 用户请求
 - 只有在用户手动运行本地 Script Test 打开 600 秒窗口后，才保存一次请求的字段类型、白名单系统元数据和一次响应的 SSE 事件顺序/个数/类型结构；没有用户问答正文或认证信息。
 - `strict60Preflight` 在本地短暂解析真实响应后仅返回受限分类枚举，内存外不保存实际 `session_id`、模型回答、Cookie 或原始 body。
 - 因为不能改动消息去做跨事务 ID 绑定，这两个**独立一次性捕获可能不属于同一个会话**；一次只提一个问题。HTTPS MITM 和完整响应缓冲仍可能影响原生 Qwen 的时序，需要独立基线。
+
+## 同题对照诊断的新增边界
+
+61 增加两条**会话级** request/response pass-through Hook，整体四条钩子仍一律 `$done({})`；原有结构探针默认行为不变，用户另行手动授权 `ab_native_trace_ONCE.js` 时才本机记录该次测试的可见 Qwen 答案及 SSE 字段结构。60 不改拦截决策，但手动授权 `ab_deepseek_trace_ONCE.js` 后记录 DeepSeek HTTP/finish_reason/usage、受限答案和重建 SSE 的状态。所有本机读取数据均可能包含**用户主动选择的普通测试题的答案**，须自行检查后才可分享。参见[同题 A/B 指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。
 
 ## 仍需完成的工程任务
 

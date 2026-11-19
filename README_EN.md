@@ -38,3 +38,7 @@ A Siri screenshot now visibly contains the code-inserted `【DeepSeek · AIES】
 
 The 60 module now includes a third, narrowly scoped **response-only SSE guard** for this session-scoped URL. It returns a generic error only for Siri HTTP-200 SSE answers; it cannot convert these extra Qwen sessions to DeepSeek and can increase failed complex Siri interactions. The primary SSE parser also tolerates standard framing variants, increases output budget to 1000 tokens/15 seconds, and enforces the source marker in answer and summary data. The intermittent loss of request correlation remains unresolved. No new manual/on-device testing was performed at the user's request.
 
+
+## Same-question Siri Qwen / DeepSeek A-B experiment (2026-11-19)
+
+A new 2,987-line device log confirmed four main Siri requests, two DeepSeek rewrite attempts, one missing correlation tag, one unsupported upstream SSE, and **four intentional failures from the session-scoped follow-up guard**. Native Qwen baseline must be tested with 60/61 fully off; the separate read-only 61 setup captures the Qwen event schema and visible example answer (now including session-scoped requests), and the 60 setup captures opted-in DeepSeek finish_reason, usage, answer text, transformed SSE stages and guard events. [Complete Chinese procedure](docs/AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md). Neither monitoring mode should be confused with the fully uninstrumented control. Never share personal prompts, authorization headers or keys.
