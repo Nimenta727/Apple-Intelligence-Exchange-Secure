@@ -26,7 +26,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 诊断版更新（2026-11-19）
 
-如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `a9912de69bc4ced1b6ccdd3d1de7360d807335cf`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
+如果在 v0.6 日志中已出现 `REQUEST_DIAG_GROUP_UNSUPPORTED`，请刷新 60 模块，确认两条 Hook 的脚本链接都锁定到提交 `bf11ab5bdb6d039d0f68d528676eaf2f3986f891`。此次增加 Siri/写作工具区分及只在本机保存一个受限组名的**手动可选探针**；不需要重置已有 DeepSeek API Key 或证书。
 
 额外的 [`siri_group_probe_ONCE.js`](../scripts/siri_group_probe_ONCE.js) **仅供手动 Script Test**，不是模块自动安装的第三条钩子。**必须在 iPad 本地把旧版同名 JS 覆盖为最新版**；仅刷新远程 60 模块不够。手动运行一次开启 **600 秒**，问一次非隐私 Siri 问题，再运行同一个脚本查看结果、剩余时间和命中次数；重复检查**不自动取消**。需要停止时专门手动运行 [`siri_group_probe_STOP_ONCE.js`](../scripts/siri_group_probe_STOP_ONCE.js)。不要把任何辅助脚本放入启用的 `event`、`cron` 或 HTTP 自动规则。详见[完整步骤](SIRI_GROUP_PROBE_ZH.md)。
 
@@ -63,3 +63,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 ### 11:14 新增：本地 noRTI 结构探针
 
 现在真实 Siri 已命中严格 noRTI 分支，但因根级和消息包装的额外字段被拒绝；不能仅靠原 PacketTunnel 日志判断这些字段是否安全。新模块添加了仅**手动授权**时记录结构键名和类型的能力。需要**刷新 60 模块，同时单独下载新的** [`siri_schema_probe_ONCE.js`](../scripts/siri_schema_probe_ONCE.js) 并在 Script Test 手动运行（无需替换已经正确的组名探针）。完整流程见[结构探针指南](SIRI_SCHEMA_PROBE_ZH.md)。不需要重设 Key 或 CA。此版本**还不能保证 Siri 正常回答**。
+
+### 已确认的 noRTI 外层结构兼容更新（2026-11-19）
+
+本机手动探针已确认 Siri 的根级工具/格式字段名称及 JSON 类型、输入包装 `type:string`、内部 `message` 的 `content:array`、`role:string`。新脚本在 Siri UA + 精确 noRTI 组名下**只放行这些键与类型**，不会将工具配置或格式元数据转发到 DeepSeek。若真实包装 `type` 不是文本消息的 `message` 或内容元素不是纯文本，仍可能被拒绝并输出固定的 `NORTI_SHAPE_*` 或 `NORTI_CONTENT_*`。**只需刷新 60 模块，无需更新已成功的本地探针或重设 API Key/证书。**
