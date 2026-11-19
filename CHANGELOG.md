@@ -2,6 +2,8 @@
 
 ## 2026-11-19 — 浏览器程序员社区 / Apple 请求结构调研，新增 WritingTools Compose Beta
 
+- 同步为 61 只读诊断器增加独立、默认关闭的 **WritingTools group/请求字段类型/SSE 结构一次性探针**，仅采集 600 秒内授权的无隐私测试，不保存选中文本、答案、HTTP Header/密钥。新增独立 ONCE/STOP 本地脚本及正反面隐私测试。
+
 - 查阅 SAIR 源码与协议逆向、Apple WWDC25/WWDC26 官方资料、Eclectic Light Company 对 Apple Intelligence Report 的技术实测、Lumia AppleStorm 安全分析、V2EX/LINUX DO 社区帖子；**已区分私有千问协议一手逆向与仅讨论 UI/端云行为的资料**。详见 [跨站分析文档](docs/COMMUNITY_APPLE_INTELLIGENCE_REQUESTS_2026-11-19_ZH.md)。
 - 60 移除对 WritingTools 的无条件跳过，新增**精确 `compose_selectedAndAllText` + `WritingTools` UA + user/text** 的严格实验分支；Siri 原有独立解析不变。
 - SSE 答案随场景分别构建 `{body,refinements}` 或 `{content,suggestions,summary}`，强制 `【DeepSeek · AIES】` 来源标记仅在有效模型回答后出现；按场景记录临时关联，防止跨 Siri / 写作工具串答。
