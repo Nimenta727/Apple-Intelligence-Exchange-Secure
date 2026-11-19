@@ -7,10 +7,10 @@
 
 ## 已在功能分支修改
 1. `scripts/aies_siri_deepseek_v06.js`：在 response hook 里，仅当 `X-AIES-Request-ID` 与持久层短期记录匹配，且记录含有效 `scene/prompt/TTL`，**同时真实响应 UA 为空**，才允许恢复 WritingTools 的场景选择。保持 Siri 的原有场景和结构化 SSE。
-2. 明确 Siri/其他 UA 与 token 记录冲突时，仍 `CORRELATION_MISMATCH`。缺 token、过期、无完整可信上下文时不采用最近请求或最近正文 fallback。
+2. CI 首轮指出原有跨场景测试会在“无 UA + 正文明确属于 Siri + token 属于 WritingTools”组合下误放行；已加防护：缺 UA 恢复场景时，如响应阶段存在请求正文，该正文也必须严格通过当前恢复场景的解析，否则 `CORRELATION_MISMATCH`，不允许使用 stored prompt 继续回包。明确 Siri/其他 UA 与 token 记录冲突时，仍 `CORRELATION_MISMATCH`。缺 token、过期、无完整可信上下文时不采用最近请求或最近正文 fallback。
 3. 增加 `WRITINGTOOLS_SCENE_RECOVERED_FROM_TAG` 固定状态码；`WRITINGTOOLS_COMPOSE_SCOPED` 延后到纯文本 Compose 请求验证成功才输出。
 4. `tests/siri-deepseek-v06.test.js` 增加：仅凭有效 token 在 response UA 缺失时恢复 WritingTools（带/不带响应期 body）、冲突 UA 拒绝、改写的请求 body 拒绝、无 token 拒绝；同步更新未知组的日志断言。
-5. `shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule` 的三条 Hook 统一固定到本轮脚本不可变提交 `f2a565e197bb0718d9cc6b258d67fb8cc21ab673`，安装文档与测试固定 SHA 一并同步。61 不改变。
+5. `shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule` 的三条 Hook 统一固定到本轮脚本不可变提交 `975599163bafeb8c6ba8aa60624577e2a861d9f0`，安装文档与测试固定 SHA 一并同步。61 不改变。
 6. 本记录保留历史故障判定和设计取舍；不收集私人写作内容或 Qwen/DeepSeek 凭据。
 
 ## 仍然存在的限制
@@ -19,7 +19,7 @@
 - 以上是代码推导与 mock 路径；尚需 GitHub CI 和真实 iPad 验收，不能发布成稳定版。
 
 ## 下一步规划
-1. 运行本分支 `npm run check` 的 GitHub Actions CI；如有失败，修复后再考虑合并 PR。
+1. 首轮 GitHub CI 92/93 通过，其中原有 Siri/WritingTools 跨场景测试暴露上述缺陷；修复后重新运行本分支 `npm run check` 的 GitHub Actions CI；如有失败，修复后再考虑合并 PR。
 2. 确认 60 模块的 3 条 Hook 均固定到同一脚本 SHA，61 的 4 条不受影响；核对 README/安装文档并更新发布矩阵。
 3. 手动互斥启用 61，使用无个人信息的 WritingTools Compose 文本运行一次 `writing_schema_probe_ONCE.js`：获得真实组名、请求字段类型与 SSE 事件名称，不上传完整原文、认证头或 API Key。
 4. 然后只开启 60 对同一非隐私问题运行 Compose，核对 `REQUEST_CAPTURED` → `SSE_PREFLIGHT_PASSED` → `DEEPSEEK_STARTED` → `WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY` 与编辑器实际正文；必要时检查新 `WRITINGTOOLS_SCENE_RECOVERED_FROM_TAG`，验证是否发生 Header 丢失。
