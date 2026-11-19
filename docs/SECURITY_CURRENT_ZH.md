@@ -15,6 +15,18 @@
 - 两个脚本钩子固定到同一不可变 Git commit，避免追踪开发分支更新。
 - 2026-11-19 新增请求解析固定原因码：代码只打印静态分类，不打印请求 body、header、Authorization、Private-Access-Token、Key 或真实问题。**Shadowrocket 自带的 PacketTunnel 日志可能显示敏感请求头，不能将整个日志发送给他人。**
 
+## 2026-11-19 本地一次性组名诊断
+
+真实日志发现 Siri 和 WritingTools 共享目标接口，且真实 Siri 的场景组名与当前白名单不符。本次改动：
+
+- WritingTools 的请求/响应识别为非 Siri 作用域时直接跳过，不调用 DeepSeek，主脚本只输出固定 `WRITINGTOOLS_SKIPPED`。
+- **默认不采集**未知组名。必须在本机通过手动运行 `siri_group_probe_ONCE.js` 主动开启 180 秒窗口，且请求阶段确实为 Siri User-Agent 的 POST，才可能暂存一个被长度和字符集限制的组名。
+- 主脚本不记录组名；第二次手动运行辅助脚本时本地显示一次 `GROUP_ID`，然后以空字符串清理临时状态。**本机存储的逻辑 TTL 和清空不保证物理删除**。这不是强认证或协议可信性证明。
+- 如果标识像随机令牌/凭据或不符合保守格式，直接拒绝采样；不要分享该值。**不得提交**原始 PacketTunnel 日志，它可能包含 Authorization、私有访问令牌和其他数据。
+- Siri 组名仅用于待审查的白名单更新，不得仅凭 User-Agent 就让未知请求进入 DeepSeek；实际端到端安全仍未验证。
+
+详见 [Siri 组名安全诊断](SIRI_GROUP_PROBE_ZH.md)。
+
 ## 尚未解决的重要风险
 
 1. **系统绕过**：VPN 关闭、MITM 不生效、脚本加载失败、Siri 缓存或备用通路可能使用户看到千问回复，脚本无法无条件阻止。
