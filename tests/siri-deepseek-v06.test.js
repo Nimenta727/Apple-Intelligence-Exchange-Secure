@@ -265,7 +265,7 @@ test("unknown SSE blocks API billing before provider is called",()=>{
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,2);
- assert.ok(scripts.every(x=>x.includes("/c1eb3bcb908311bc16790e73ca7da7194f3f97e8/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/f94a2711ccf96457dbb7e532295666bf5dc31ddb/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
