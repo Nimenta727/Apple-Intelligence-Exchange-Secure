@@ -10,7 +10,7 @@
    
    `https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule`
 
-   模块中的两条脚本路径都应固定到 `4d48102cca76fee749835c2e43837bab17aaffac`。
+   模块中的两条脚本路径都应固定到 `eded04f046b8bd1a53af7de2258eda265969442c`。
 
 4. 61 模块只对 `https://prod-yabuli.qianwen.com/v1/sessions/responses` 的 HTTP POST 启用 Request 和 Response 诊断钩子，仅允许 User-Agent 以 `Siri (` 开头。仍需在用户设备上对目标主机启用 HTTPS MITM，**不要将 MITM 扩展到更多域名**。HTTP 脚本可能影响流式响应缓冲与时间，故“代码不改写”**不等于**与完全关闭 MITM 的连接行为完全相同。首次测试后如 Qwen 失败，停用 61 并恢复基线。
 
