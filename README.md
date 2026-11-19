@@ -2,7 +2,7 @@
 
 **实验性 Shadowrocket Siri → DeepSeek 文本回答改写项目。**
 
-> **v0.6.0-beta · 2026-11-19 真实协议已观测，但端到端 Siri UI 仍未验收。**
+> **v0.6.0-beta · 2026-11-19 真实协议已观测，至少一次可见 DeepSeek 标记已成功；复杂问答仍不稳定。**
 >
 > 60 模块可尝试解析 Siri 请求，调用 DeepSeek 并将 DeepSeek 文本转换成 Qwen 形式的 SSE。61 模块只用于原生 Qwen 协议观测。**两者必须互斥启用。** 本项目不是 Apple、Shadowrocket、Qwen 或 DeepSeek 官方产品，也不能保证系统层不会绕过改写直接显示 Qwen。
 
@@ -16,7 +16,7 @@
 | 纯文本请求 | `input[].message.content[].text`，含明确的 `type:"text"` |
 | Qwen 原生响应 | 13 个已解析 SSE 事件、2 个文本 delta、HTTP 200 |
 | 严格 SSE 前置检查 | 一条真实响应在 14:49 返回 `MATCHES_60_PREFLIGHT` |
-| DeepSeek 调用 | 曾观察到 `DEEPSEEK_RESPONSE_ATTEMPTED`，但 Siri UI 未验收 |
+| DeepSeek 调用 | 15:51 日志有 2 次 DeepSeek 提交，截图至少 1 次显示标记 |
 | 请求关联 | 曾发生 `RESPONSE_TAG_MISSING`，**仍是 P0 未解决的真实设备问题** |
 | 新合成 SSE | 按两次真实 Qwen 结构采样补齐字段；离线 CI 测试通过，**真机显示待证实** |
 
@@ -26,10 +26,20 @@
 
 | 模式 | GitHub 模块 | 用途与限制 |
 |---|---|---|
-| **60 实验 DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | 两个固定 SHA 的 HTTP 钩子。Siri 文本 → DeepSeek → 重建完整 SSE。无可靠请求绑定或模型异常时 502 失败关闭；不能保证 Siri UI 最终展示 |
+| **60 实验 DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | 两条主改写钩子加一条会话级 SSE Guard。Siri 文本 → DeepSeek → 重建完整 SSE。无可靠请求绑定或模型异常时 502 失败关闭；不能保证 Siri UI 最终展示 |
 | **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | 两个只读 `$done({})` HTTP 钩子；手动授权后只记录协议结构，不更改 Qwen 回答，不调用 DeepSeek |
 
 **切换前必须停用另一模式和旧的同域 `00 REJECT` 或冲突 Rewrite。** 61 没有修改正文，不代表 MITM/响应缓冲不会影响流式时序；请先验证完全关闭模块时的原生 Qwen 基线。
+
+## 15:51 真机截图与轻量 Qwen 防漏更新
+
+截图已证实 Siri 至少一次真正显示带 `【DeepSeek · AIES】` 的回答，底部仍是系统控制的“千问”服务品牌。当前并非零成功。
+
+最新日志 5 次主请求：2 次有效 DeepSeek SSE 已提交、2 次 `RESPONSE_TAG_MISSING` + `PROMPT_UNAVAILABLE`、1 次 `SSE_REWRITE_UNSUPPORTED`。代理数据库还发现 2 条以前**未被 60 模块覆盖**的 `/v1/sessions/{会话标识}/responses` Siri 访问。
+
+新版 60 新增 **1 条仅处理该会话级 Siri SSE 响应的轻量拒绝规则**，避免未经 DeepSeek 验证的 Qwen SSE 直接显示；同时提高主路径 SSE 标准分帧兼容性、将 DeepSeek 输出上限改为 1000 token，成功回答正文/摘要均强制带来源标记。
+
+注意：该 Guard 可能让某些复杂 Siri 请求从 Qwen 回答变成“无法获得回答”；并不是全域封锁或完整 DeepSeek 替换。跨 Hook 关联偶发丢失仍未安全修复。本轮按用户要求不做额外人工或设备测试。
 
 ## 对开发者最重要的文档
 
