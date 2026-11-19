@@ -13,7 +13,7 @@
 ## 一次性准备
 
 1. 备份 Shadowrocket 配置；确保 VPN、MITM 只针对 prod-yabuli.qianwen.com，并停用冲突规则。
-2. 更新 [唯一 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，确认双钩子固定脚本 SHA 为 **e79d05c3b8ef788abc92d3f1626426914c9dc7ce**。模块原始 URL：
+2. 更新 [唯一 60 模块](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule)，确认双钩子固定脚本 SHA 为 **bc726e60bdbf810d1edf1dbb62d8e6dc79b69d2d**。模块原始 URL：
 
    https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/main/shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule
 
