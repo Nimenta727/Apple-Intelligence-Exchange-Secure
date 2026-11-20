@@ -217,6 +217,69 @@ test("Siri second and third turns retain session/choice linkage and verified his
  assert.deepEqual(JSON.parse(e.requests[2].body).messages.map(x=>x.role),
   ["system","user","assistant","user","assistant","user"]);
 });
+test("empty native Siri previous_choice_id uses only verified same-session DeepSeek history",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ const req=siriFollowupRequest(e,first.sid,"","How big is it?");
+ const a=e.invoke(req);
+ assert.ok(a.returned[0].headers["X-AIES-Request-ID"]);
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_PREVIOUS_CHOICE_EMPTY"));
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_SESSION_CONTEXT_RECOVERED"));
+ const tag=a.returned[0].headers;
+ const b=e.invoke({...req,headers:{...req.headers,...tag}},
+  {status:200,body:siriFollowupFixture(first.sid,"empty-prev")});
+ assert.equal(b.returned[0].status,200);
+ assert.ok(b.returned[0].body.includes("【DeepSeek · AIES】"));
+ assert.ok(!b.returned[0].body.includes("QWEN_FOLLOWUP_ONLY"));
+ assert.deepEqual(JSON.parse(e.requests[1].body).messages.map(x=>x.role),
+  ["system","user","assistant","user"]);
+ const next=siriFollowupRequest(e,first.sid,"","Why?");
+ const a3=e.invoke(next);
+ assert.ok(a3.returned[0].headers["X-AIES-Request-ID"]);
+ const b3=e.invoke({...next,headers:{...next.headers,...a3.returned[0].headers}},
+  {status:200,body:siriFollowupFixture(first.sid,"third-blank")});
+ assert.equal(b3.returned[0].status,200);
+ assert.deepEqual(JSON.parse(e.requests[2].body).messages.map(x=>x.role),
+  ["system","user","assistant","user","assistant","user"]);
+});
+test("empty continuation rejects unrelated sessions and missing prior DeepSeek context",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ const wrong=siriFollowupRequest(e,"sess_other","", "PRIVATE_PROMPT");
+ const r=e.invoke(wrong);
+ assert.equal(r.returned[0].response.status,502);
+ assert.ok(e.logs.includes("[AIES_V06] ERROR_FOLLOWUP_CONTEXT_UNAVAILABLE"));
+ const other=env();
+ const r2=other.invoke(siriFollowupRequest(other,first.sid,""));
+ assert.equal(r2.returned[0].response.status,502);
+ assert.equal(other.requests.length,0);
+ assert.equal(e.requests.length,1);
+});
+test("empty continuation still rejects client-supplied different request-body pointer",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ const req=siriFollowupRequest(e,first.sid,"");
+ const tag=e.invoke(req).returned[0].headers;
+ const changed=JSON.stringify({...JSON.parse(req.body),previous_choice_id:first.prev});
+ const r=e.invoke({...req,body:changed,headers:{...req.headers,...tag}},
+  {status:200,body:siriFollowupFixture(first.sid,"mismatch")});
+ assert.equal(r.returned[0].status,502);
+ assert.ok(e.logs.includes("[AIES_V06] ERROR_CORRELATION_MISMATCH"));
+ assert.equal(e.requests.length,1);
+});
+test("nonempty noncanonical, nonstring and missing previous_choice_id fail closed with fixed diagnosis",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ const raws=["wrong/value",null,42,undefined,"x".repeat(161)];
+ for(const x of raws){
+  const req=siriFollowupRequest(e,first.sid,first.prev);
+  const o=JSON.parse(req.body);
+  if(x===undefined)delete o.previous_choice_id;else o.previous_choice_id=x;
+  const r=e.invoke({...req,body:JSON.stringify(o)});
+  assert.equal(r.returned[0].response.status,502);
+ }
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL"));
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_PREVIOUS_CHOICE_NOT_STRING"));
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_PREVIOUS_CHOICE_OVERSIZE"));
+ assert.ok(e.logs.every(x=>!x.includes("wrong/value")));
+ assert.equal(e.requests.length,1);
+});
 test("Siri followup without verified previous DeepSeek choice is rejected before model billing",()=>{
  const e=env();
  const req=siriFollowupRequest(e,"sess_unknown","choice_unknown");
