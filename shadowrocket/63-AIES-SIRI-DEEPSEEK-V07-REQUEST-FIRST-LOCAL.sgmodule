@@ -1,8 +1,14 @@
-#!name=AIES 63 EXPERIMENTAL - Siri DeepSeek v0.7 Request First
-#!desc=Local-only opt-in request-stage DeepSeek + synthetic Siri SSE. Replaces the request/response transaction split, avoids Qwen upstream on a successfully intercepted request, but Siri native compatibility requires iPad verification. NOT production.
+#!name=AIES 63 DISABLED - Siri v0.7 Request First (Device Failure)
+#!desc=KNOWN REAL-DEVICE FAILURE (2026-11-20): 6 DeepSeek calls completed and synthetic HTTP responses were emitted, but Siri displayed no answers. Module DISABLED by default. Use 62 LOCAL instead; source retained for research only.
 #!system=ios
 
-# EXPERIMENTAL / OPT-IN; NOT TESTED ON IPAD SIRI UI.
+# QUARANTINED: USER IPAD VALIDATION FAILED ON 2026-11-20.
+# DO NOT USE AS A SOLUTION: six [AIES_V07] LOCAL_SSE_RESPONSE_READY and
+# six Shadowrocket "script http request send early response to client",
+# but Siri UI showed no usable answer, and no session followup appeared.
+# Keep disabled (enable=false) while researching native Siri response contract.
+# Working rollback: turn off 63, turn on 62 LOCAL with v0.6 JS.
+# Original prototype retained solely for experimental source review.
 # Enable only 63 OR 62/60/61 -- NEVER together. Disable all historical 00 REJECT hooks.
 # If Siri rejects synthetic SSE or followup, DISABLE 63 and return to working 62.
 # Install scripts/aies_siri_deepseek_v07_request_first.js to iCloud Drive/Shadowrocket/Script/
@@ -19,5 +25,5 @@
 hostname = %APPEND% prod-yabuli.qianwen.com
 
 [Script]
-AIES63 Request Main = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=true
-AIES63 Request Followup = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=true
+AIES63 Request Main = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=false
+AIES63 Request Followup = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=false
