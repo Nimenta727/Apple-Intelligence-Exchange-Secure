@@ -49,7 +49,7 @@ test("offline Shadowrocket fallback has identical four hooks but no remote runti
  const local=localModuleText.split("\n").filter(x=>x.startsWith("AIES60 "));
  assert.equal(remote.length,4);
  assert.equal(local.length,4);
- assert.ok(local.every(x=>x.endsWith(",script-path=aies_siri_deepseek_v06.js")));
+ assert.ok(local.every(x=>x.endsWith(",script-path=Script/aies_siri_deepseek_v06.js,enable=true")));
  assert.ok(!localModuleText.includes("script-path=https://"));
  assert.ok(localModuleText.includes("7a698fbaadeb37431d9bd1d43df359292ee78ba0"));
  for(let i=0;i<remote.length;i++){

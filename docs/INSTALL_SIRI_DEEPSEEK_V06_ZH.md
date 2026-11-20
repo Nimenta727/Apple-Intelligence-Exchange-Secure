@@ -156,3 +156,21 @@ script js file is not found => aies_siri_deepseek_v06.js
 7. 若 iCloud Script 文件已完全下载、文件名准确、模块只有 62 且仍找不到，优先核对 Shadowrocket 版本的本地路径解析方式；**不要随意尝试 `Script/`、`file://` 等未经该版本验证的路径前缀**。返回 60 Remote 的下载通路修复或根据设备文档做单点兼容实验，保留原脚本不改动。
 
 以上为**结合实际日志和公开说明的设备修复步骤**，非远程设备验证。没有必要再次开启 `siri_followup_schema_probe_ONCE.js`；前次 61 协议探针已经成功，当前故障是脚本载入层。
+
+## 2026-11-20 09:26：修复 62 LOCAL 的本地脚本引用前缀和默认启用状态
+
+**此节取代上文所有 62 LOCAL 示例中未带 `Script/` 的旧写法。** 用户再次确认：一旦开启 62 LOCAL，Shadowrocket UI 的脚本开关会自动关闭；之前已有 `script js file is not found`，但 `Script Test` 运行本地文件无异常。排查发现旧 62 四条 Hook 均写成：
+
+```ini
+script-path=aies_siri_deepseek_v06.js
+```
+
+参考 [Shadowrocket 官方新闻频道中本地文件使用示例](https://t.me/s/shadowrocketnews/973)：将 JavaScript 保存在 `iCloud 云盘/Shadowrocket/Script`，并使用 **`script-path=Script/header.js`**、`enable=true`。所以已修改项目的 62 模块四条 Hook，统一为：
+
+```ini
+script-path=Script/aies_siri_deepseek_v06.js,enable=true
+```
+
+**操作**：保持 60 / 61 关闭；在 Shadowrocket 的 62 模块中**重新下载/导入 main 的最新 62 LOCAL 模块或覆盖本地模块文本**，因为已保存的模块不会自动采用仓库新内容。确认四条 Hook 都显示 `Script/aies_siri_deepseek_v06.js,enable=true`。JS 仍是固定 SHA `7a698fbaadeb37431d9bd1d43df359292ee78ba0`，无需更换 DeepSeek Key、重复下载 JS 或新建证书。重新应用当前配置，先检查脚本开关是否维持开启、`script js file is not found` 是否消失；**没有真实 `[AIES_V06] REQUEST_CAPTURED` 前不继续做多轮 Siri 模型验收**。
+
+注意：日志只证明旧路径无法读取；`Script/` 前缀和 `enable=true` 是根据 Shadowrocket 发布的可用格式提出的具体修正，**尚未验证用户本机的自动关闭问题已被消除**。如果刷新模块后依旧自动关闭，应保持 62 停用，采用备份配置后直接在现有 `[Script]` 节添加四条与 62 相同的规则，不再同时使用任一 AIES 模块，并检查当前 Shadowrocket 版本的模块/脚本 UI 生效方式。

@@ -90,7 +90,7 @@ const localHooks=localModule.match(/^AIES60 .+type=http-(?:request|response).+sc
 if(localHooks.length!==4||
  localHooks.filter(x=>x.includes("type=http-request")).length!==2||
  localHooks.filter(x=>x.includes("type=http-response")).length!==2||
- localHooks.some(x=>!x.includes("script-path=aies_siri_deepseek_v06.js")))
+ localHooks.some(x=>!x.endsWith(",script-path=Script/aies_siri_deepseek_v06.js,enable=true")))
  fail("local fallback must have four main/followup hooks for same local script file");
 if(/https:\/\/raw\.githubusercontent\.com|https:\/\/cdn\.jsdelivr\.net/.test(localModule))
  fail("local fallback must not reference remote runtime URL");
