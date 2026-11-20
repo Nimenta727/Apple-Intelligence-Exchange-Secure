@@ -27,3 +27,11 @@
 3. 在同一 Siri 会话里只进行一组普通无隐私的两轮提问；第二轮观察 `FOLLOWUP_PREVIOUS_CHOICE_NULL` 或 `..._MISSING` / `FOLLOWUP_SESSION_CONTEXT_RECOVERED`、`REQUEST_CAPTURED`、`DEEPSEEK_STARTED` 与 UI `【DeepSeek · AIES】`；不成功只汇报固定日志。
 4. 如第二轮仍 `NONSTRING_UNSUPPORTED`，保留失败关闭，再用无正文类型探针区分具体 JSON 类型；不要采集真实 ID。若进入模型后 `SSE_REWRITE_UNSUPPORTED`，按 SSE 特定校验单独修。
 5. 多轮真机完成后，再处理响应 tag 缺失、并发与超时安全性，不能把局部功能测试当作生产稳定版。
+
+## PR #38 合并与验收计划补记
+
+- [PR #38](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/38) 已合并到 `main`，merge commit `7d8064b1535f07f05fbb9808c982bc8922982f01`。
+- [GitHub CI](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44658856364)：**115 tests / 115 passed / 0 failed**。含 null/missing 第二/三轮回归以及跨会话、过期、原始 pointer 类型被修改、无效数字/数组/对象的严格拒绝测试。
+- 主分支 **60 Remote** 四条 Hook 已固定 `c3a7014cdd8ec47841001748c615e704059d9370`。用户在 **62 LOCAL** 模式必须**手工更新** iCloud `Shadowrocket/Script/aies_siri_deepseek_v06.js` 的源码至该 commit；仅刷新 sgmodule 不会更换本地 JS。
+- 用户不需要再运行 Siri followup schema 诊断辅助脚本。下一步只测试一组普通、无隐私的两轮 Siri 连续追问，核对第二轮 `FOLLOWUP_PREVIOUS_CHOICE_NULL` / `_MISSING` / `_NONSTRING_UNSUPPORTED` 及 `FOLLOWUP_SESSION_CONTEXT_RECOVERED`、`DEEPSEEK_STARTED`，最终以 Siri UI 实际来源标签判定。
+- **真实 previous_choice_id 的值类型仍未知**；PR 成功不代表真机连答已经成功。若是其他非 string 类型将继续安全拒绝，并由固定状态码精确定位下一步。
