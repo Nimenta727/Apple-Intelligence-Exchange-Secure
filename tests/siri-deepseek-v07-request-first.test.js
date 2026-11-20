@@ -45,14 +45,16 @@ function followupBody(group="siri.multimodal.noRTI",question="Why is it that col
  if(pointer!==undefined)obj.previous_choice_id=pointer;
  return JSON.stringify(obj);
 }
-test("63 is opt-in local-only and deliberately uses two request hooks with zero response hooks",()=>{
+test("failed 63 is quarantined with disabled request hooks and zero response hooks",()=>{
  const hooks=mod.split("\n").filter(x=>x.startsWith("AIES63 "));
  assert.equal(hooks.length,2);
  assert.ok(hooks.every(x=>x.includes("type=http-request")));
- assert.ok(hooks.every(x=>x.endsWith(",script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=true")));
+ assert.ok(hooks.every(x=>x.endsWith(",script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=false")));
  assert.equal(mod.includes("type=http-response"),false);
  assert.equal(mod.includes("script-path=https://"),false);
  assert.match(mod,/NEVER together/);
+ assert.match(mod,/QUARANTINED/);
+ assert.match(mod,/KNOWN REAL-DEVICE FAILURE/);
  assert.match(code,/version:"0.7.0-request-first-experimental"/);
 });
 test("first Siri question returns validated local SSE with DeepSeek attribution, no upstream tag or Qwen body",()=>{
