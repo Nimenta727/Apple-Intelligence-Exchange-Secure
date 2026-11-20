@@ -374,16 +374,31 @@ function parseRequest(raw,allowRecoveredSiri,followupMode){
   if(typeof g!=="string"){requestDiagnostic="GROUP_MISSING";return null;}
   requestGroup=g;
   var observedGroup=g==="siri.multimodal.noRTI";
-   if(followupMode&&!observedGroup){requestDiagnostic="FOLLOWUP_GROUP_UNVERIFIED";return null;}
-  if(!/^(siri\.tqa|siri_tqa)$/i.test(g)&&!observedGroup){
-   requestDiagnostic="GROUP_UNSUPPORTED";return null;
-  }
-  // The newly observed multimodal group is never accepted for WritingTools,
-  // unknown clients or unverified non-text JSON envelopes.
-  if(observedGroup&&!isSiriForProbe()&&!allowRecoveredSiri){
-   requestDiagnostic="GROUP_UNSUPPORTED";return null;
-  }
-  if(observedGroup){
+   var tqaGroup=/^(siri\.tqa|siri_tqa)$/i.test(g);
+   if(followupMode&&!observedGroup&&!tqaGroup){
+    // Fixed category only. Never log raw group identifiers or request data.
+    if(safeGroupIdentifier(g)&&/^siri[._]/i.test(g))
+     log("FOLLOWUP_GROUP_OTHER_SIRI");
+    else log("FOLLOWUP_GROUP_OTHER_UNVERIFIED");
+    requestDiagnostic="FOLLOWUP_GROUP_UNVERIFIED";return null;
+   }
+   if(!tqaGroup&&!observedGroup){
+    if(!followupMode&&isSiriForProbe()){
+     // Categories only. Keep the actual group identifier private.
+     if(safeGroupIdentifier(g)&&/^siri[._]/i.test(g))
+      log("MAIN_GROUP_OTHER_SIRI");
+     else log("MAIN_GROUP_OTHER_UNVERIFIED");
+    }
+    requestDiagnostic="GROUP_UNSUPPORTED";return null;
+   }
+   // TQA followups must satisfy the same strict text envelope as noRTI,
+   // with a verified same-session history and protected response SSE.
+   if((observedGroup||(followupMode&&tqaGroup))&&
+      !isSiriForProbe()&&!allowRecoveredSiri){
+    requestDiagnostic="GROUP_UNSUPPORTED";return null;
+   }
+   if(followupMode&&tqaGroup)log("FOLLOWUP_GROUP_TQA_TEXT");
+   if(observedGroup||(followupMode&&tqaGroup)){
    var shapeReasons=observedSiriTextEnvelopeReasons(o,!!followupMode);
    if(followupMode){
     // Only fixed classification codes are logged, never the opaque choice value.
@@ -882,7 +897,8 @@ function followupIds(){
  try{obj=JSON.parse(req.body);}catch(e){return null;}
  if(!obj||typeof obj!=="object"||Array.isArray(obj)||
     !obj.configuration||
-    obj.configuration.response_configuration_group_id!=="siri.multimodal.noRTI")return null;
+    !((obj.configuration.response_configuration_group_id==="siri.multimodal.noRTI")||
+      /^(siri\.tqa|siri_tqa)$/i.test(obj.configuration.response_configuration_group_id)))return null;
  var present=Object.prototype.hasOwnProperty.call(obj,"previous_choice_id");
  var v=obj.previous_choice_id,kind=present?(v===null?"null":
     typeof v==="string"?(v===""?"empty":"canonical"):"invalid"):"missing";

@@ -205,3 +205,20 @@ script-path=Script/aies_siri_deepseek_v06.js,enable=true
 **62 LOCAL 用户只替换本地 JS 内容**，从 <https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/c3a7014cdd8ec47841001748c615e704059d9370/scripts/aies_siri_deepseek_v06.js> 获取全部源码，保存到 `iCloud 云盘/Shadowrocket/Script/aies_siri_deepseek_v06.js`，确认文件已在本机下载并覆盖之前的版本。62 LOCAL 的四条脚本路径仍为 `script-path=Script/aies_siri_deepseek_v06.js,enable=true`，不需要重新安装模块、重新设置 DeepSeek Key 或修改 MITM 证书。60 Remote 的固定脚本 SHA 也同步升级，但远程下载在用户设备上曾报 310/超时，因此优先沿用本地 62。
 
 更新后**只做一组**无隐私的两轮 Siri 问答，确认第二轮是否出现 `FOLLOWUP_SESSION_CONTEXT_RECOVERED`、`REQUEST_CAPTURED`、`DEEPSEEK_STARTED`，最终须在 Siri UI 看到 `【DeepSeek · AIES】` 才算通过。若出现 `..._NONSTRING_UNSUPPORTED` 或 `ERROR_SSE_REWRITE_UNSUPPORTED`，不要循环重试或发送原始请求数据，返回固定状态码即可。
+
+## 2026-11-20 10:32：直接提问偶尔失败、首次/多轮显示“无法从千问获得回答”
+
+在 `PacketTunnel-20261120101542.log`（10:15–10:29）中，**16 次**从缺失 `previous_choice_id` 恢复同会话上下文，**23 次**完成 DeepSeek SSE 改写尝试，但还有**9 次**后续请求 `FOLLOWUP_GROUP_UNVERIFIED`、**1 次**主请求 `GROUP_UNSUPPORTED`，以及**5 次**主请求 `RESPONSE_TAG_MISSING` / `ERROR_PROMPT_UNAVAILABLE`。
+
+这份日志**不能**反推出“请问一下千问”对应的具体配置组，只能确认 Siri 在不同请求中采用不同协议组，且首个新连接请求的相关性有时丢失。AIES 不能仅凭出现 `DEEPSEEK_RESPONSE_ATTEMPTED` 宣告 Siri UI 显示成功。
+
+本次新增**严格的已知纯文本 TQA 续答适配**：如果后续会话使用 `siri.tqa` 或 `siri_tqa`，在继续满足 Siri 客户端、纯文本结构、相同 URL session 内 DeepSeek-only 历史、request/response tag 与 SSE preflight 条件后才可进入 DeepSeek。**其他未知组仍拒绝**，避免工具媒体误路由。新日志固定分类：
+- `FOLLOWUP_GROUP_TQA_TEXT`：已知 TQA 纯文本组（仍需后续所有校验）；
+- `FOLLOWUP_GROUP_OTHER_SIRI`：其他 `siri.` 或 `siri_` 风格未验证组（未输出真实值，继续拒绝）；
+- `FOLLOWUP_GROUP_OTHER_UNVERIFIED`：未知或不符合安全组名约束（继续拒绝）；
+- `MAIN_GROUP_OTHER_SIRI` / `MAIN_GROUP_OTHER_UNVERIFIED`：主请求未知组（仍拒绝）；
+- `RESPONSE_TAG_MISSING`：HTTP 响应未收到前一请求的事务标记；此问题**没有**在本次更新中解决，不能通过任意取“最近一个用户问题”修复。
+
+**62 LOCAL：无需换模块，只更新脚本文件。** 从 <https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/637484295c10627f06e610bfe040dd58e67d309a/scripts/aies_siri_deepseek_v06.js> 获取整个固定 SHA 的源码，覆盖 `iCloud 云盘/Shadowrocket/Script/aies_siri_deepseek_v06.js`，保留 `script-path=Script/aies_siri_deepseek_v06.js,enable=true` 四条规则；保持 60、61 和历史同域 REJECT 关闭。无需重新配置 Key 或 MITM。只在 iPad 真机确认新脚本已载入后，再进行一组普通无隐私的两轮提问，观察 `[AIES_V06]` 固定状态和 Siri UI 的 `【DeepSeek · AIES】` 来源标记。
+
+如果更新后主要仍是 `FOLLOWUP_GROUP_OTHER_SIRI` 或 `RESPONSE_TAG_MISSING`，停止重复问答，把固定诊断码作为下一轮具体兼容性证据；不建议把未知配置组一概允许，也不建议在缺失 tag 时直接回传原生 Qwen 作为 DeepSeek。

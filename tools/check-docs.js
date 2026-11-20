@@ -97,7 +97,7 @@ if(/https:\/\/raw\.githubusercontent\.com|https:\/\/cdn\.jsdelivr\.net/.test(loc
 if(localHooks.some(x=>!hooks.some(remote=>remote.slice(0,remote.indexOf(",script-path="))===
      x.slice(0,x.indexOf(",script-path=")))))
  fail("local and remote production route matching must remain identical");
-if(!localModule.includes("c3a7014cdd8ec47841001748c615e704059d9370"))
+if(!localModule.includes("637484295c10627f06e610bfe040dd58e67d309a"))
  fail("local module must disclose reviewed script pin in comments");
 const passiveModule=fs.readFileSync(path.join(root,"shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule"),"utf8");
 const passiveScript=fs.readFileSync(path.join(root,"scripts/aies_qwen_passive_diag.js"),"utf8");
