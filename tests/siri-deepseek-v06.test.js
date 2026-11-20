@@ -264,20 +264,82 @@ test("empty continuation still rejects client-supplied different request-body po
  assert.ok(e.logs.includes("[AIES_V06] ERROR_CORRELATION_MISMATCH"));
  assert.equal(e.requests.length,1);
 });
-test("nonempty noncanonical, nonstring and missing previous_choice_id fail closed with fixed diagnosis",()=>{
+test("noncanonical or wrong-type nonempty previous_choice_id fails closed with fixed diagnosis",()=>{
  const e=env(),first=completeFirstSiriTurn(e);
- const raws=["wrong/value",null,42,undefined,"x".repeat(161)];
+ const raws=["wrong/value",42,true,{},[], "x".repeat(161)];
  for(const x of raws){
   const req=siriFollowupRequest(e,first.sid,first.prev);
-  const o=JSON.parse(req.body);
-  if(x===undefined)delete o.previous_choice_id;else o.previous_choice_id=x;
+  const o=JSON.parse(req.body);o.previous_choice_id=x;
   const r=e.invoke({...req,body:JSON.stringify(o)});
   assert.equal(r.returned[0].response.status,502);
  }
  assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL"));
- assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_PREVIOUS_CHOICE_NOT_STRING"));
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_PREVIOUS_CHOICE_NONSTRING_UNSUPPORTED"));
  assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_PREVIOUS_CHOICE_OVERSIZE"));
  assert.ok(e.logs.every(x=>!x.includes("wrong/value")));
+ assert.equal(e.requests.length,1);
+});
+test("null Siri followup pointer uses verified same-session DeepSeek history, never Qwen",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ const req=siriFollowupRequest(e,first.sid,null,"Tell me more about that");
+ const t=e.invoke(req);
+ assert.ok(t.returned[0].headers["X-AIES-Request-ID"]);
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_PREVIOUS_CHOICE_NULL"));
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_SESSION_CONTEXT_RECOVERED"));
+ const b=e.invoke({...req,headers:{...req.headers,...t.returned[0].headers}},
+  {status:200,body:siriFollowupFixture(first.sid,"null-pointer")});
+ assert.equal(b.returned[0].status,200);
+ assert.ok(b.returned[0].body.includes("【DeepSeek · AIES】"));
+ assert.ok(!b.returned[0].body.includes("QWEN_FOLLOWUP_ONLY"));
+ assert.deepEqual(JSON.parse(e.requests[1].body).messages.map(x=>x.role),
+  ["system","user","assistant","user"]);
+});
+test("missing Siri followup pointer uses verified same-session history and can continue third turn",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ function missingReq(question){
+  const req=siriFollowupRequest(e,first.sid,"");
+  const b=JSON.parse(req.body);delete b.previous_choice_id;
+  b.input[0].message.content[0].text=question;
+  return {...req,body:JSON.stringify(b)};
+ }
+ const req=missingReq("Another question");
+ const tag=e.invoke(req).returned[0].headers;
+ assert.ok(tag["X-AIES-Request-ID"]);
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_PREVIOUS_CHOICE_MISSING"));
+ const b=e.invoke({...req,headers:{...req.headers,...tag}},
+  {status:200,body:siriFollowupFixture(first.sid,"missing-pointer-2")});
+ assert.equal(b.returned[0].status,200);
+ const thirdReq=missingReq("Next detail");
+ const thirdTag=e.invoke(thirdReq).returned[0].headers;
+ assert.ok(thirdTag["X-AIES-Request-ID"]);
+ const third=e.invoke({...thirdReq,headers:{...thirdReq.headers,...thirdTag}},
+  {status:200,body:siriFollowupFixture(first.sid,"missing-pointer-3")});
+ assert.equal(third.returned[0].status,200);
+ assert.deepEqual(JSON.parse(e.requests[2].body).messages.map(x=>x.role),
+  ["system","user","assistant","user","assistant","user"]);
+});
+test("null/missing pointer never recovers expired, absent or another-session context",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ for(const v of [null,undefined]){
+  const request=siriFollowupRequest(e,"sess_unrelated",v);
+  const r=e.invoke(request);
+  assert.equal(r.returned[0].response.status,502);
+ }
+ const stored=JSON.parse(e.data["AIES_CTX_"+first.prev]);
+ stored.exp=Date.now()-1;
+ e.data["AIES_CTX_"+first.prev]=JSON.stringify(stored);
+ assert.equal(e.invoke(siriFollowupRequest(e,first.sid,null)).returned[0].response.status,502);
+ assert.equal(e.requests.length,1);
+});
+test("trusted followup transaction cannot change missing/null pointer kind in response hook",()=>{
+ const e=env(),first=completeFirstSiriTurn(e),req=siriFollowupRequest(e,first.sid,null);
+ const tag=e.invoke(req).returned[0].headers;
+ assert.ok(tag["X-AIES-Request-ID"]);
+ const altered=JSON.stringify({...JSON.parse(req.body),previous_choice_id:""});
+ const r=e.invoke({...req,body:altered,headers:{...req.headers,...tag}},
+  {status:200,body:siriFollowupFixture(first.sid,"null-to-blank")});
+ assert.equal(r.returned[0].status,502);
+ assert.ok(e.logs.includes("[AIES_V06] ERROR_CORRELATION_MISMATCH"));
  assert.equal(e.requests.length,1);
 });
 test("Siri followup without verified previous DeepSeek choice is rejected before model billing",()=>{
