@@ -53,6 +53,10 @@ const activeNames=[
  "scripts/siri_followup_schema_probe_ONCE.js","scripts/siri_followup_schema_probe_STOP_ONCE.js",
  "shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule",
  "shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule",
+ "shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule",
+ "scripts/aies_siri_deepseek_v07_request_first.js",
+ "docs/INSTALL_SIRI_DEEPSEEK_V07_REQUEST_FIRST_ZH.md",
+ "tests/siri-deepseek-v07-request-first.test.js",
  "tests/siri-deepseek-v06.test.js","tests/qwen-passive-diag.test.js","tests/fixtures/siri-sse.js"
 ];
 for(const item of activeNames)if(!fs.existsSync(path.join(root,item)))fail("missing active file: "+item);
@@ -62,13 +66,13 @@ const obsolete=["src","docs/history","docs/MAINTENANCE_ZH.md","docs/PROJECT_HAND
  "tools/build.js","tools/check-boundary.js","tools/evaluate-boundary.js"];
 for(const file of obsolete)if(fs.existsSync(path.join(root,file)))fail("obsolete file still tracked: "+file);
 const modules=all.filter(x=>x.endsWith(".sgmodule")).map(relative);
-const expectedModules=["shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule","shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule"];
-if(modules.length!==3||expectedModules.some(x=>modules.indexOf(x)<0))
- fail("expected one remote production, one opt-in passive and one local fallback module, got "+modules.join(","));
+const expectedModules=["shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule","shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule","shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule"];
+if(modules.length!==4||expectedModules.some(x=>modules.indexOf(x)<0))
+ fail("expected remote v06, passive, local v06 and opt-in v07 request-first modules, got "+modules.join(","));
 const scripts=all.filter(x=>relative(x).startsWith("scripts/")&&x.endsWith(".js")).map(relative);
-if(scripts.length!==20)fail("expected production runtime, passive runtime, two Key scripts and sixteen manual diagnostic helpers: "+scripts.join(","));
+if(scripts.length!==21)fail("expected 21 scripts including the independent opt-in v07 engine: "+scripts.join(","));
 const tests=all.filter(x=>relative(x).startsWith("tests/")&&x.endsWith(".test.js")).map(relative);
-if(tests.length!==2||!tests.includes("tests/siri-deepseek-v06.test.js")||!tests.includes("tests/qwen-passive-diag.test.js"))fail("unexpected unit tests present: "+tests.join(","));
+if(tests.length!==3||!tests.includes("tests/siri-deepseek-v06.test.js")||!tests.includes("tests/qwen-passive-diag.test.js")||!tests.includes("tests/siri-deepseek-v07-request-first.test.js"))fail("unexpected unit tests present: "+tests.join(","));
 const moduleText=fs.readFileSync(path.join(root,"shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");
 const js=fs.readFileSync(path.join(root,"scripts/aies_siri_deepseek_v06.js"),"utf8");
 const hooks=moduleText.match(/^AIES60 .+type=http-(?:request|response).+script-path=.+$/gm)||[];
@@ -99,6 +103,26 @@ if(localHooks.some(x=>!hooks.some(remote=>remote.slice(0,remote.indexOf(",script
  fail("local and remote production route matching must remain identical");
 if(!localModule.includes("637484295c10627f06e610bfe040dd58e67d309a"))
  fail("local module must disclose reviewed script pin in comments");
+// v0.7 is an opt-in request-first transport experiment: it MUST NOT inherit
+// the response-hook correlation bug or silently modify stable v0.6 module.
+const v07Module=fs.readFileSync(path.join(root,"shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule"),"utf8");
+const v07Js=fs.readFileSync(path.join(root,"scripts/aies_siri_deepseek_v07_request_first.js"),"utf8");
+const v07Hooks=v07Module.match(/^AIES63 .+type=http-request.+script-path=.+$/gm)||[];
+if(v07Hooks.length!==2||v07Hooks.some(x=>!x.endsWith(",script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=true"))||
+  /type=http-response/.test(v07Module))
+ fail("v07 request-first module requires exactly two local request hooks and NO response hooks");
+if(v07Hooks.some(x=>!hooks.filter(x=>x.includes("type=http-request")).some(remote=>
+    x.slice(x.indexOf(",pattern="),x.indexOf(",script-path="))===
+    remote.slice(remote.indexOf(",pattern="),remote.indexOf(",script-path=")))))
+ fail("v07 request hook path/payload parameters must match verified v06 request hooks");
+if(/script-path=https:\/\/|https:\/\/raw\.githubusercontent\.com/.test(v07Module))
+ fail("v07 must never depend on remote script downloads");
+if(!v07Js.includes('version:"0.7.0-request-first-experimental"')||
+  !v07Js.includes("LOCAL_SSE_RESPONSE_READY")||!v07Js.includes("buildSyntheticSiriSkeleton")||
+  !v07Js.includes("FOLLOWUP_STRUCTURAL_GROUP_CANDIDATE"))
+ fail("v07 must explicitly version and expose request-first synthetic/SSE paths");
+if(!/NEVER together/.test(v07Module)||!/EXPERIMENTAL/.test(v07Module))
+ fail("v07 must disclose experimental and mutual-exclusion limitations");
 const passiveModule=fs.readFileSync(path.join(root,"shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule"),"utf8");
 const passiveScript=fs.readFileSync(path.join(root,"scripts/aies_qwen_passive_diag.js"),"utf8");
 const passiveHooks=passiveModule.match(/^AIES61 Passive (?:Followup )?(?:Request|Response) = .*type=http-(?:request|response).*script-path=.+$/gm)||[];
