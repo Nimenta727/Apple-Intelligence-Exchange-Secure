@@ -561,6 +561,145 @@ var E={
  responseDone:"session.response.done"
 };
 function validId(x){return typeof x==="string"&&/^[A-Za-z0-9_-]{1,160}$/.test(x);}
+
+/*
+ * Layer 3: native upstream SSE contract verification. Operates on the ACTUAL
+ * Qwen stream, not generated IDs, before spending a DeepSeek API request.
+ * Never log/store original answer text, IDs, headers, or model credentials.
+ * All unknown event sequences fail closed. The research lists 27 event TYPES,
+ * not 27 mandatory frames: deltas repeat and citations are optional.
+ */
+function auditNativeSse(raw,scene,route,expectedSid){
+ function fail(code){return {ok:false,code:code};}
+ if(typeof raw!=="string"||!raw.length||raw.length>C.maxSse)
+  return fail("BODY_BOUNDS");
+ var fragments=raw.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n\n");
+ var rows=[],i,j;
+ for(i=0;i<fragments.length;i++){
+  if(!fragments[i].trim())continue;
+  var name="",parts=[],lines=fragments[i].trim().split("\n");
+  for(j=0;j<lines.length;j++){
+   var line=lines[j],pos=line.indexOf(":"),field=pos<0?line:line.slice(0,pos);
+   if(field==="event"){
+    if(name)return fail("DUPLICATE_EVENT_FIELD");
+    name=line.slice(pos+1).trim();
+   }else if(field==="data"){
+    parts.push(line.slice(pos+1).replace(/^ /,""));
+    if(parts.length>16)return fail("DATA_FIELD_LIMIT");
+   }else if(field!=="id"&&field!=="retry"&&line.charAt(0)!==":"&&line.trim())
+    return fail("UNKNOWN_SSE_FIELD");
+  }
+  if(!name||!parts.length)return fail("INCOMPLETE_FRAME");
+  if(Object.keys(E).every(function(k){return E[k]!==name;}))
+   return fail("UNKNOWN_EVENT");
+  var payload;
+  try{
+   var parsed=JSON.parse(parts.join("\n"));
+   if(!parsed||parsed.type!==name||
+      !Object.prototype.hasOwnProperty.call(parsed,name))
+    return fail("EVENT_TYPE_MISMATCH");
+   payload=parsed[name];
+  }catch(e){return fail("EVENT_JSON_INVALID");}
+  rows.push({name:name,data:payload});
+  if(rows.length>256)return fail("FRAME_LIMIT");
+ }
+ var follow=route==="followup",head=follow?
+  [E.created,E.choice,E.item,E.added]:
+  [E.session,E.created,E.choice,E.item,E.added];
+ var tail=[E.textDone,E.contentDone,E.itemDone,
+  E.completed,E.choiceDone,E.responseDone];
+ if(rows.length<head.length+tail.length+1)return fail("FRAME_COUNT");
+ var events=[],annotations=0,textDone=false,contentDone=false;
+ for(i=0;i<rows.length;i++){
+  var r=rows[i];
+  if(r.name===E.annotation){
+   if(!textDone||contentDone||++annotations>64||
+      !r.data||typeof r.data!=="object"||Array.isArray(r.data))
+    return fail("ANNOTATION_ORDER");
+   continue;
+  }
+  if(r.name===E.textDone){
+   if(textDone)return fail("DUPLICATE_TEXT_DONE");
+   textDone=true;
+  }
+  if(r.name===E.contentDone){
+   if(contentDone)return fail("DUPLICATE_CONTENT_DONE");
+   contentDone=true;
+  }
+  events.push(r);
+ }
+ if(events.length<head.length+tail.length+1)return fail("FRAME_COUNT");
+ for(i=0;i<head.length;i++)if(events[i].name!==head[i])return fail("EVENT_ORDER");
+ for(i=0;i<tail.length;i++)
+  if(events[events.length-tail.length+i].name!==tail[i])
+   return fail("EVENT_ORDER");
+ var delta="",deltas=0;
+ for(i=head.length;i<events.length-tail.length;i++){
+  if(events[i].name!==E.delta||!events[i].data||
+     typeof events[i].data.delta!=="string")return fail("DELTA_SHAPE");
+  delta+=events[i].data.delta;deltas++;
+  if(delta.length>C.maxSse)return fail("DELTA_OVERSIZE");
+ }
+ if(!deltas)return fail("DELTA_MISSING");
+ var done=events[events.length-6].data;
+ if(!done||typeof done.value!=="string"||done.value!==delta)
+  return fail("DELTA_DONE_MISMATCH");
+ var response=events[follow?0:1].data;
+ var session=follow?{id:expectedSid}:events[0].data;
+ var complete=events[events.length-1].data;
+ if(!response||!session||!validId(session.id)||
+    !validId(response.id)||response.session_id!==session.id||
+    !complete||complete.id!==response.id||
+    (complete.session_id!==undefined&&complete.session_id!==session.id)||
+    (follow&&(!validId(expectedSid)||session.id!==expectedSid)))
+  return fail("SESSION_RESPONSE_IDENTITY");
+ var added=events[follow?1:2].data,choice=added&&added.choice;
+ var id=choice&&choice.id;
+ var choiceComp=events[events.length-3].data;
+ var choiceDone=events[events.length-2].data;
+ var lastChoice=complete.choices&&complete.choices[0];
+ if(id!==undefined&&id!==null){
+  if(!validId(id))return fail("CHOICE_IDENTITY");
+  var related=[choiceComp&&choiceComp.choice,
+   choiceDone&&choiceDone.choice,lastChoice];
+  for(i=0;i<related.length;i++)
+   if(related[i]&&related[i].id!==undefined&&related[i].id!==id)
+    return fail("CHOICE_IDENTITY");
+ }
+ // Check any present terminal snapshots, not arbitrary unknown SSE fields.
+ function atom(x){return x&&x.text&&typeof x.text.value==="string"?x.text.value:null;}
+ function item(x){return x&&x.item&&x.item.message&&
+   Array.isArray(x.item.message.content)&&x.item.message.content[0]?
+   atom(x.item.message.content[0]):null;}
+ function output(x){return x&&Array.isArray(x.output)&&x.output[0]&&
+   x.output[0].message&&Array.isArray(x.output[0].message.content)&&
+   x.output[0].message.content[0]?atom(x.output[0].message.content[0]):null;}
+ var contentDone=events[events.length-5].data;
+ var snaps=[
+  contentDone&&contentDone.content?atom(contentDone.content):null,
+  item(events[events.length-4].data),
+  output(choiceComp&&choiceComp.choice),
+  output(choiceDone&&choiceDone.choice),
+  output(lastChoice)
+ ];
+ for(i=0;i<snaps.length;i++)if(snaps[i]!==null&&snaps[i]!==delta)
+  return fail("TERMINAL_TEXT_MISMATCH");
+ var obj;
+ try{obj=JSON.parse(done.value);}catch(e){return fail("SCHEMA_JSON_INVALID");}
+ if(!obj||typeof obj!=="object"||Array.isArray(obj))
+  return fail("SCHEMA_OBJECT");
+ if(scene==="writing"){
+  if(typeof obj.body!=="string"||!Array.isArray(obj.refinements)||
+    obj.refinements.some(function(v){return typeof v!=="string";}))
+   return fail("SCHEMA_WRITING");
+ }else if(typeof obj.content!=="string"||!Array.isArray(obj.suggestions)||
+    typeof obj.summary!=="string"||
+    obj.suggestions.some(function(v){return typeof v!=="string";}))
+   return fail("SCHEMA_SIRI");
+ return {ok:true,code:"OK",eventCount:rows.length,
+  deltaCount:deltas,annotationCount:annotations};
+}
+
 // Reconstruct the real observed Qwen SSE *field layout*, not its text.
 // Only IDs and carefully validated transport metadata are read from Qwen.
 // All answer-bearing fields and output items are created from DeepSeek text.
