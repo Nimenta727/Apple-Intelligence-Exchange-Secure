@@ -6,7 +6,7 @@
 
 | 模式 | 模块 | Runtime 固定 SHA |
 |---|---|---|
-| **60 Siri / 写作工具 → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `7a698fbaadeb37431d9bd1d43df359292ee78ba0` |
+| **60 Siri / 写作工具 → DeepSeek 改写** | [60-AIES-SIRI-DEEPSEEK-V06.sgmodule](../shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule) | `c9e8ac6332c7726594006fd243839742dba5d88a` |
 | **61 原生 Qwen 被动诊断** | [61-AIES-QWEN-PASSIVE-DIAG.sgmodule](../shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule) | `506e51ad1ad549722242611f174b527cc12c4d21` |
 
 **60 的 Shadowrocket 模块 Raw URL：**
@@ -38,7 +38,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 4. 60 DeepSeek 实验模式
 
-1. 关闭 61 和其它同域冲突模块，再导入并启用 60。确认三条脚本规则固定 SHA 为 `7a698fbaadeb37431d9bd1d43df359292ee78ba0`。
+1. 关闭 61 和其它同域冲突模块，再导入并启用 60。确认三条脚本规则固定 SHA 为 `c9e8ac6332c7726594006fd243839742dba5d88a`。
 2. 在 Siri 问一个非私密且答案容易核对的**纯文本问题**；音频、图像、工具调用、未经验证的 WritingTools 操作、未知 SSE 事件都不应被当作受支持的纯文本转给 DeepSeek。
 3. **只查看固定 `[AIES_V06]` 状态码**：`REQUEST_CAPTURED`、`RESPONSE_TAG_*`、`SSE_PREFLIGHT_PASSED`、`DEEPSEEK_STARTED`、`DEEPSEEK_LABEL_APPLIED`、`DEEPSEEK_RESPONSE_ATTEMPTED` 或 `ERROR_*`；不要上传原始请求日志。
 4. 看 Siri **真正显示的内容**。只有用户肉眼看到 `【DeepSeek · AIES】` 的正文、且固定日志链与同一测试一致，才算至少一次 DeepSeek Siri 显示闭环。Qwen 服务卡片可能仍然显示原品牌。
@@ -71,7 +71,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 同题 A/B 实验（2026-11-19 16:15 后）
 
-为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `7a698fbaadeb37431d9bd1d43df359292ee78ba0`；61 的四条原样放行规则均固定到 `506e51ad1ad549722242611f174b527cc12c4d21`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
+为了比较复杂问题在原生 Qwen 和 AIES→DeepSeek 下的实际差异，使用[同题 A/B 实验指南](AB_SIRI_QWEN_DEEPSEEK_COMPARISON_ZH.md)。60 的三条规则均固定到 `c9e8ac6332c7726594006fd243839742dba5d88a`；61 的四条原样放行规则均固定到 `506e51ad1ad549722242611f174b527cc12c4d21`。先进行所有模块关闭的原生基线，再用 61 观察同题 SSE 与客户端可见答案，最后切换 60 观察 DeepSeek API 的 `finish_reason`、token 用量、合成 SSE、关联丢失和会话级 Guard。任何步骤都不要同时启用 60 和 61；专用脚本只能手动 Script Test，不要注册自动网络钩子。
 
 ## 写作工具 Compose Beta（2026-11-19 浏览器协议研究后新增）
 
@@ -99,7 +99,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 **这节描述当前新版，覆盖上面旧版本关于“60 只有三条 Hook、第三条永远返回 502”的历史说明。** 本次 iPad 61 无正文探针证实：后续会话 POST 的路径是 `/v1/sessions/{id}/responses`，具有严格 `siri.multimodal.noRTI` 纯文本输入及 `previous_choice_id:string`；原生 HTTP 200 的 SSE **从 `session.response.created` 开始，不包含 `session.created`**，18 个可解析事件里包括 4 个文本增量和 4 个在 `text.value.done` 后的引用注释。之前的 `EVENT_ORDER_UNSUPPORTED` 因此是**主接口预检不可直接用于续答响应**，不代表原生 SSE 无效。
 
-新版 60 **共四条 Hook**：主请求、主响应、会话级请求、会话级响应，全部固定 SHA `7a698fbaadeb37431d9bd1d43df359292ee78ba0`。后续请求必须有有效 Siri UA、明确纯文本、合法 `previous_choice_id`，且该 choice 必须关联到**同一 Qwen session 中上一轮成功生成并返回的 DeepSeek 答案**。AIES 仅在设备本地 `$persistentStore` 保留最多三轮经 DeepSeek 验证的问答历史，逻辑有效期 **5 分钟**；注意过期只代表拒绝继续读取，**不保证底层物理擦除**。回答前还需通过请求/响应同事务临时 token（45 秒）和 SSE 结构与会话身份双重校验。只有这些校验都成功，才把经过验证的历史 + 本轮纯文本发送给 DeepSeek。Qwen 答案、引用链接及原始上下文元数据都不会被转交或回显。
+新版 60 **共四条 Hook**：主请求、主响应、会话级请求、会话级响应，全部固定 SHA `c9e8ac6332c7726594006fd243839742dba5d88a`。后续请求必须有有效 Siri UA、明确纯文本、合法 `previous_choice_id`，且该 choice 必须关联到**同一 Qwen session 中上一轮成功生成并返回的 DeepSeek 答案**。AIES 仅在设备本地 `$persistentStore` 保留最多三轮经 DeepSeek 验证的问答历史，逻辑有效期 **5 分钟**；注意过期只代表拒绝继续读取，**不保证底层物理擦除**。回答前还需通过请求/响应同事务临时 token（45 秒）和 SSE 结构与会话身份双重校验。只有这些校验都成功，才把经过验证的历史 + 本轮纯文本发送给 DeepSeek。Qwen 答案、引用链接及原始上下文元数据都不会被转交或回显。
 
 新固定日志：
 - `SIRI_CONTEXT_STORED`：经 DeepSeek 验证的当轮回答在本地建立了续答关联；
@@ -112,7 +112,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 ## 2026-11-20 00:47：脚本运行时从 raw.githubusercontent.com 下载失败（CFNetwork 310）与本地模块
 
-用户截图显示 Shadowrocket 针对已核对的 `7a698fbaadeb37431d9bd1d43df359292ee78ba0` Runtime 连续出现：
+用户截图显示 Shadowrocket 针对已核对的 `c9e8ac6332c7726594006fd243839742dba5d88a` Runtime 连续出现：
 `script update script url ... => Error Domain=kCFErrorDomainCFNetwork Code=310`、`script exception => aies_siri_deepseek_v06.js`，在匹配目标 URL 时直接将请求/响应继续交给上游或客户端。**同一截图未出现 `[AIES_V06] REQUEST_CAPTURED`、`DEEPSEEK_STARTED`。** 因此主因先按**远程脚本下载/HTTPS 代理连接失败**排查，不要把本次“全是 Qwen”错误当作上一轮多轮解析失败、DeepSeek Key 失效。Apple 将代码 310 定义为 `kCFErrorHTTPSProxyConnectionFailure`（HTTPS proxy connection failure）。
 
 ### 优先步骤：排查 GitHub 脚本 URL 下载通路
@@ -125,7 +125,7 @@ https://raw.githubusercontent.com/Nimenta727/Apple-Intelligence-Exchange-Secure/
 
 如果 Raw 下载在 Shadowrocket 中反复失败，可以把同一份 60 Runtime 从浏览器保存进 Shadowrocket **本机 `Script/aies_siri_deepseek_v06.js`**，再启用 [`62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule`](../shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule)；该本地模块不是额外的改写器，**它替代 60，而非与 60 同时启用**。
 
-- 固定源码：[GitHub 提交 `7a698fba` 中的 `aies_siri_deepseek_v06.js`](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/7a698fbaadeb37431d9bd1d43df359292ee78ba0/scripts/aies_siri_deepseek_v06.js)。文件名必须保持 `aies_siri_deepseek_v06.js`；不允许将已经填入真实 Key 的本地一次性脚本当作运行时源文件。
+- 固定源码：[GitHub 提交 `7a698fba` 中的 `aies_siri_deepseek_v06.js`](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/c9e8ac6332c7726594006fd243839742dba5d88a/scripts/aies_siri_deepseek_v06.js)。文件名必须保持 `aies_siri_deepseek_v06.js`；不允许将已经填入真实 Key 的本地一次性脚本当作运行时源文件。
 - 将它放在 iPad “文件”App 的 Shadowrocket / Script 文件夹下；若应用版本使用不同本机目录，应在 Shadowrocket 里核对当前 Script 文件的实际路径，**不要仅凭 Script Test 能运行就认定 HTTP Hook 已找到本地文件**。
 - 先关闭 60、61、旧的 `00 REJECT` 与重复同域 Hook，再安装/开启 **62 LOCAL**，保持必要的目标主机 MITM。62 的四条 Hook 同样为 `AIES60 Capture`、`AIES60 Rewrite`、`AIES60 Followup Capture`、`AIES60 Followup Rewrite`，但 `script-path` 一律改为 `aies_siri_deepseek_v06.js`，不再尝试通过 GitHub Raw 下载脚本。
 - **验收本地文件加载**：先对一条无隐私的普通 Siri 问题观察 HTTP Hook 是否开始出现 `[AIES_V06] REQUEST_CAPTURED`；如果仍仅有 `script exception`、`script not found` 或错误，**该设备版本尚不能确认能解析本地模块路径，立即关闭 62**，返回 GitHub 下载网络诊断，不能宣称本地方案已生效。
@@ -171,6 +171,23 @@ script-path=aies_siri_deepseek_v06.js
 script-path=Script/aies_siri_deepseek_v06.js,enable=true
 ```
 
-**操作**：保持 60 / 61 关闭；在 Shadowrocket 的 62 模块中**重新下载/导入 main 的最新 62 LOCAL 模块或覆盖本地模块文本**，因为已保存的模块不会自动采用仓库新内容。确认四条 Hook 都显示 `Script/aies_siri_deepseek_v06.js,enable=true`。JS 仍是固定 SHA `7a698fbaadeb37431d9bd1d43df359292ee78ba0`，无需更换 DeepSeek Key、重复下载 JS 或新建证书。重新应用当前配置，先检查脚本开关是否维持开启、`script js file is not found` 是否消失；**没有真实 `[AIES_V06] REQUEST_CAPTURED` 前不继续做多轮 Siri 模型验收**。
+**操作**：保持 60 / 61 关闭；在 Shadowrocket 的 62 模块中**重新下载/导入 main 的最新 62 LOCAL 模块或覆盖本地模块文本**，因为已保存的模块不会自动采用仓库新内容。确认四条 Hook 都显示 `Script/aies_siri_deepseek_v06.js,enable=true`。JS 仍是固定 SHA `c9e8ac6332c7726594006fd243839742dba5d88a`，无需更换 DeepSeek Key、重复下载 JS 或新建证书。重新应用当前配置，先检查脚本开关是否维持开启、`script js file is not found` 是否消失；**没有真实 `[AIES_V06] REQUEST_CAPTURED` 前不继续做多轮 Siri 模型验收**。
 
 注意：日志只证明旧路径无法读取；`Script/` 前缀和 `enable=true` 是根据 Shadowrocket 发布的可用格式提出的具体修正，**尚未验证用户本机的自动关闭问题已被消除**。如果刷新模块后依旧自动关闭，应保持 62 停用，采用备份配置后直接在现有 `[Script]` 节添加四条与 62 相同的规则，不再同时使用任一 AIES 模块，并检查当前 Shadowrocket 版本的模块/脚本 UI 生效方式。
+
+## 2026-11-20 09:43：真机仅第一问成功——previous_choice_id 严格校验与空值备用关联
+
+用户使用已正常启动的 62 LOCAL，提交 `PacketTunnel-20261120094303.log`。在真机日志中，两次主 Siri 请求都进入了 `REQUEST_CAPTURED → RESPONSE_TAG_PRESENT → SSE_PREFLIGHT_PASSED → DEEPSEEK_STARTED → SIRI_CONTEXT_STORED → DEEPSEEK_LABEL_APPLIED → DEEPSEEK_RESPONSE_ATTEMPTED`；但两个后续会话请求分别在 09:44:03 和 09:44:39 报 `NORTI_SHAPE_PREVIOUS_CHOICE_INVALID → ERROR_UNSUPPORTED_SIRI_REQUEST`，**甚至还没调用 DeepSeek**。另有一次主请求响应丢失 tag，导致 `ERROR_PROMPT_UNAVAILABLE`；此错误与两次追问失败是独立问题。
+
+初代 60 以 `/^[A-Za-z0-9_-]{1,160}$/` 强制校验 `previous_choice_id`。而 61 原始无正文探针只证明字段**类型是字符串**，未披露值，因此当前日志**不能推断该字符串究竟为空、含特殊字符还是超长**。
+
+**已修复但仍需真机验收的限定场景**：
+
+- 当 `previous_choice_id === ""` 时，新版允许在同一 Siri `/v1/sessions/{id}/responses` URL session 中读取此前**已通过 DeepSeek + SSE 校验**的最新本地 choice，绑定在原 5 分钟 TTL 内继续；请求/响应 tag、纯文本白名单、模型来源标记、SSE 审核仍必须通过。
+- `previous_choice_id` **是非空、规范 ID** 时继续严格按原 choice ID 精确查找，不做宽松兜底。
+- `previous_choice_id` 是**非空、含不支持字符、超长、缺失、非字符串**时仍拒绝，不允许错误串用其他会话的回答。
+- 固定诊断日志新增 `FOLLOWUP_PREVIOUS_CHOICE_EMPTY`、`FOLLOWUP_PREVIOUS_CHOICE_NOT_STRING`、`FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL`、`FOLLOWUP_PREVIOUS_CHOICE_OVERSIZE`，**只输出分类，不记录 ID 值、提问文本或敏感元数据**。空指针且从同一会话找回上下文时记录 `FOLLOWUP_SESSION_CONTEXT_RECOVERED`。新源码固定到 `c9e8ac6332c7726594006fd243839742dba5d88a`。
+- 62 LOCAL 的四条 Hook 仍为 `script-path=Script/aies_siri_deepseek_v06.js,enable=true`，**仅本地文件内容需要从上述新 SHA 覆盖**；60 Remote 四条 Hook 则已重新 pin 新 SHA。不能把“模块已更新”等同于本地 JS 已经替换。
+- 若再出现 `FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL` 或 `OVERSIZE`，不要上传真实 previous choice 值，保留 fail-closed。依据固定分类再决定是否需要更精准的安全格式解析。
+
+**验收顺序**：先保存备份，使用新版 62 LOCAL + 新版 JS；原 60/61 关闭。仅做普通无隐私的同一次 Siri 交互两问。看第二轮是否有 `FOLLOWUP_SESSION_CONTEXT_RECOVERED` / `REQUEST_CAPTURED` 和最终 `【DeepSeek · AIES】`；若未修复，仅分享 `[AIES_V06]` 固定代码，停止重复提问。已通过单轮还不足以宣称多轮 UI 成功。
