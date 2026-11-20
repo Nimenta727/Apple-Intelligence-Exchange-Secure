@@ -54,6 +54,10 @@ const activeNames=[
  "shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule",
  "shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule",
  "shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule",
+ "shadowrocket/64-AIES-SIRI-DEEPSEEK-V08-NATIVE-SESSION-LOCAL.sgmodule",
+ "scripts/aies_siri_deepseek_v08_native_sse.js",
+ "tests/siri-deepseek-v08-native.test.js",
+ "docs/INSTALL_SIRI_DEEPSEEK_V08_NATIVE_ZH.md",
  "scripts/aies_siri_deepseek_v07_request_first.js",
  "docs/INSTALL_SIRI_DEEPSEEK_V07_REQUEST_FIRST_ZH.md",
  "tests/siri-deepseek-v07-request-first.test.js",
@@ -66,13 +70,13 @@ const obsolete=["src","docs/history","docs/MAINTENANCE_ZH.md","docs/PROJECT_HAND
  "tools/build.js","tools/check-boundary.js","tools/evaluate-boundary.js"];
 for(const file of obsolete)if(fs.existsSync(path.join(root,file)))fail("obsolete file still tracked: "+file);
 const modules=all.filter(x=>x.endsWith(".sgmodule")).map(relative);
-const expectedModules=["shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule","shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule","shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule"];
-if(modules.length!==4||expectedModules.some(x=>modules.indexOf(x)<0))
+const expectedModules=["shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule","shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule","shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule","shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule","shadowrocket/64-AIES-SIRI-DEEPSEEK-V08-NATIVE-SESSION-LOCAL.sgmodule"];
+if(modules.length!==5||expectedModules.some(x=>modules.indexOf(x)<0))
  fail("expected remote v06, passive, local v06 and opt-in v07 request-first modules, got "+modules.join(","));
 const scripts=all.filter(x=>relative(x).startsWith("scripts/")&&x.endsWith(".js")).map(relative);
-if(scripts.length!==21)fail("expected 21 scripts including the independent opt-in v07 engine: "+scripts.join(","));
+if(scripts.length!==22)fail("expected 22 scripts including isolated v07 and v08 engines: "+scripts.join(","));
 const tests=all.filter(x=>relative(x).startsWith("tests/")&&x.endsWith(".test.js")).map(relative);
-if(tests.length!==3||!tests.includes("tests/siri-deepseek-v06.test.js")||!tests.includes("tests/qwen-passive-diag.test.js")||!tests.includes("tests/siri-deepseek-v07-request-first.test.js"))fail("unexpected unit tests present: "+tests.join(","));
+if(tests.length!==4||!tests.includes("tests/siri-deepseek-v06.test.js")||!tests.includes("tests/qwen-passive-diag.test.js")||!tests.includes("tests/siri-deepseek-v07-request-first.test.js")||!tests.includes("tests/siri-deepseek-v08-native.test.js"))fail("unexpected unit tests present: "+tests.join(","));
 const moduleText=fs.readFileSync(path.join(root,"shadowrocket/60-AIES-SIRI-DEEPSEEK-V06.sgmodule"),"utf8");
 const js=fs.readFileSync(path.join(root,"scripts/aies_siri_deepseek_v06.js"),"utf8");
 const hooks=moduleText.match(/^AIES60 .+type=http-(?:request|response).+script-path=.+$/gm)||[];
@@ -123,6 +127,32 @@ if(!v07Js.includes('version:"0.7.0-request-first-experimental"')||
  fail("v07 must explicitly version and expose request-first synthetic/SSE paths");
 if(!/NEVER together/.test(v07Module)||!/QUARANTINED/.test(v07Module)||!/DISABLED/.test(v07Module))
  fail("v07 must disclose actual device failure and stay quarantined");
+// v0.8 must be a separate LOCAL four-hook experiment and stay disabled.
+const v08Module=fs.readFileSync(path.join(root,"shadowrocket/64-AIES-SIRI-DEEPSEEK-V08-NATIVE-SESSION-LOCAL.sgmodule"),"utf8");
+const v08Js=fs.readFileSync(path.join(root,"scripts/aies_siri_deepseek_v08_native_sse.js"),"utf8");
+const v08Hooks=v08Module.match(/^AIES64 .+type=http-(?:request|response).+script-path=.+$/gm)||[];
+if(v08Hooks.length!==4||
+  v08Hooks.filter(x=>x.includes("type=http-request")).length!==2||
+  v08Hooks.filter(x=>x.includes("type=http-response")).length!==2||
+  v08Hooks.some(x=>!x.endsWith(",script-path=Script/aies_siri_deepseek_v08_native_sse.js,enable=false")))
+ fail("v08 must have exactly FOUR disabled local native session hooks");
+if(v08Hooks.some(x=>!localHooks.some(old=>
+  x.slice(x.indexOf(",pattern="),x.indexOf(",script-path="))===
+  old.slice(old.indexOf(",pattern="),old.indexOf(",script-path=")))))
+ fail("v08 must preserve all four known-working v06 HTTP match patterns");
+if(/script-path=https:\/\/|https:\/\/raw\.githubusercontent\.com/.test(v08Module))
+ fail("v08 must be local only, with no remote runtime download");
+if(!v08Js.includes('version:"0.8.0-native-session-beta"')||
+  !v08Js.includes("function auditNativeSse")||
+  !v08Js.includes("SSE_AUDIT_PASSED")||
+  !v08Js.includes("CLIENT_WINDOW_ESTIMATE_EXCEEDED")||
+  !v08Js.includes("CORRELATION_NO_TAG_NO_VALID_BODY"))
+ fail("v08 must include real native session audit, fixed diagnostic and deadline contracts");
+if(!localHooks.every(x=>x.endsWith(",script-path=Script/aies_siri_deepseek_v06.js,enable=true")))
+ fail("62 must remain enabled and unmodified by v08 addition");
+if(!v07Hooks.every(x=>x.endsWith(",script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=false")))
+ fail("real-device failed 63 must remain disabled");
+
 const passiveModule=fs.readFileSync(path.join(root,"shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule"),"utf8");
 const passiveScript=fs.readFileSync(path.join(root,"scripts/aies_qwen_passive_diag.js"),"utf8");
 const passiveHooks=passiveModule.match(/^AIES61 Passive (?:Followup )?(?:Request|Response) = .*type=http-(?:request|response).*script-path=.+$/gm)||[];

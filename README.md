@@ -85,3 +85,7 @@ npm test
 ## 2026-11-20：63 请求优先实验模块（与 v0.6 稳定版隔离）
 
 已新增独立的 [AIES 63 LOCAL v0.7 请求优先实验模块](shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule) 及 [中文安装/回滚指南](docs/INSTALL_SIRI_DEEPSEEK_V07_REQUEST_FIRST_ZH.md)。它由**同一个请求 Hook**完成 Siri 纯文本校验、DeepSeek 调用和本地 SSE 合成，目的在于绕开当前 60/62 新连接偶发的 `RESPONSE_TAG_MISSING`。63 仅是**真机待验收的独立实验**，保留原本可用的 [62 LOCAL](shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule)，二者**不能同时启用**。成功拦截的请求不需要由脚本访问 Qwen 上游；MITM 绕过或 Siri 不接受合成 SSE 的风险仍存在。详见 [维护日志](docs/routine/2026-11-20-10-32-v07-request-first-siri-engine-refactor.md)。
+
+## 2026-11-21：全新 AIES 64 Native Session 协议验证版（默认关闭）
+
+已依据 [SAIR 第三方协议研究](https://github.com/boitar/sair/blob/main/docs/protocol_analysis.md) 和 AIES 真机日志，新建**完全独立**的 [64 LOCAL v0.8 模块](shadowrocket/64-AIES-SIRI-DEEPSEEK-V08-NATIVE-SESSION-LOCAL.sgmodule) 与 [独立 JavaScript](scripts/aies_siri_deepseek_v08_native_sse.js)：保留官方 Qwen session/response/choice 身份及安全 SSE 事件顺序，在调用 DeepSeek 之前审核 delta/done、终态文本、场景 Schema 和会话关联，并增加仅记录时间档位的诊断。**四条 64 Hook 默认 `enable=false`，不自动启用，不覆盖已经可用的 62 LOCAL；63 仍禁用。** 原有新连接响应 tag 丢失不是已解决的问题，未经过真实 Siri UI 验收，不能宣称更稳定。参见 [隔离安装/回滚指南](docs/INSTALL_SIRI_DEEPSEEK_V08_NATIVE_ZH.md) 与 [routine 维护记录](docs/routine/2026-11-21-00-34-AIES64-native-session-protocol-rebuild.md)。
