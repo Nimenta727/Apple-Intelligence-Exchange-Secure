@@ -8,8 +8,18 @@ const oldModule=fs.readFileSync(path.join(__dirname,"../shadowrocket/62-AIES-SIR
 const KEY="sk_fake_test_12345678901234567890";
 const URL="https://prod-yabuli.qianwen.com/v1/sessions/responses";
 function nativeSse(salt="main",answer="QWEN_NATIVE_PRIVATE_ANSWER"){
- return Sse.candidateSse(answer,"Native title","siri",
+ // A verified-native-ID synthetic test fixture: unlike v0.6 fixtures,
+ // deliberately include one consistent upstream choice ID across events.
+ // This is a test fixture, NOT a captured iPad response.
+ let raw=Sse.candidateSse(answer,"Native title","siri",
   {now:()=>1730000000000,id:()=>salt});
+ const id="choice_native_"+salt.replace(/[^A-Za-z0-9_-]/g,"");
+ raw=mutateEvent(raw,"session.response.choices[].added",x=>{x.choice.id=id;});
+ for(const name of ["session.response.choices[].completed",
+  "session.response.choices[].done"])
+  raw=mutateEvent(raw,name,x=>{x.choice.id=id;});
+ raw=mutateEvent(raw,"session.response.done",x=>{x.choices[0].id=id;});
+ return raw;
 }
 function requestBody(group="siri.multimodal.noRTI",text="What is Saturn?"){
  return JSON.stringify({configuration:{response_configuration_group_id:group},
@@ -109,6 +119,15 @@ test("first Siri native session SSE uses the real upstream IDs/model, replacing 
  assert.ok(!out.body.includes("QWEN_NATIVE_PRIVATE_ANSWER"));
  assert.ok(e.logs.every(s=>!s.includes(KEY)&&!s.includes("What is Saturn")));
  assert.equal(e.sent.length,1);
+});
+test("upstream missing genuine choice ID fails closed before DeepSeek, never fabricates one",()=>{
+ const e=env(),req=e.capture(request());
+ const unverified=Sse.candidateSse("QWEN_ANSWER","Native title","siri",
+  {now:()=>1730000000000,id:()=>"no-choice"});
+ const result=e.respond(req,unverified);
+ assert.equal(result.returns[0].status,502);
+ assert.ok(e.logs.includes("[AIES_V08] SSE_AUDIT_CHOICE_ID_MISSING"));
+ assert.equal(e.sent.length,0);
 });
 test("native main + followup preserve same official session, previous choice and DeepSeek-only history",()=>{
  const e=env(),one=e.capture(request()),first=e.respond(one,nativeSse());
@@ -231,7 +250,7 @@ test("unknown prior choice, wrong session and untagged response never use most-r
  const url=URL.replace("/sessions/responses","/sessions/"+sid+"/responses");
  const follow=e.invoke(request(followupBody("choice_unverified"),url));
  assert.equal(follow.returns[0].response.status,502);
- const untagged=e.respond(request(undefined===null?"":requestBody()),native);
+ const untagged=e.respond(request(requestBody()),native);
  // Response contains parseable same-transaction request body, so MAIN route may
  // use it; the FOLLOWUP route without a tag must never use global latest.
  const f=e.respond(request(followupBody("choice_unverified"),url),followupSse(sid));
