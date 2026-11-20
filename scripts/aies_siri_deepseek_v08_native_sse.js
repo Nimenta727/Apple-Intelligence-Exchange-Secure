@@ -18,7 +18,7 @@ var C={
   model:"deepseek-flash",
   keyName:"SAIRS_DEEPSEEK_API_KEY",
   maxRequest:300000,maxPrompt:14000,maxSse:900000,maxAnswer:12000,
-  timeoutMs:15000,sessionTtlMs:45000,followupContextTtlMs:300000
+  timeoutMs:6200,clientWindowEstimateMs:7400,sessionTtlMs:45000,followupContextTtlMs:300000
 };
 // Only add this human-visible source label to successfully validated DeepSeek
 // replies. Siri/Qwen service branding is controlled upstream and may not change.
@@ -458,6 +458,43 @@ function parseRequest(raw,allowRecoveredSiri,followupMode){
   return prompt;
  }catch(e){requestDiagnostic="STRUCTURE_UNSUPPORTED";return null;}
 }
+
+/*
+ * Layer 1: fixed routing classification for diagnostics ONLY. Unknown Siri
+ * groups and vision remain blocked by the existing strict request parser.
+ */
+function classifyScene(raw,followup){
+ if(typeof raw!=="string"||!raw.length)return "BODY_UNAVAILABLE";
+ var obj;try{obj=JSON.parse(raw);}catch(e){return "JSON_INVALID";}
+ if(!obj||typeof obj!=="object"||Array.isArray(obj))return "ROOT_INVALID";
+ var group=obj.configuration&&obj.configuration.response_configuration_group_id;
+ if(isWritingTools())return group==="compose_selectedAndAllText"?
+   "WRITING_COMPOSE":"WRITING_UNVERIFIED";
+ if(!isSiriForProbe())return "OTHER_CLIENT";
+ if(group==="siri.multimodal.noRTI")
+  return followup?"SIRI_FOLLOWUP_NORTI":"SIRI_MAIN_NORTI";
+ if(group==="siri.tqa"||group==="siri_tqa")
+  return followup?"SIRI_FOLLOWUP_TQA":"SIRI_MAIN_TQA";
+ if(group==="siri.visualIntelligenceCamera")return "VISION_UNSUPPORTED";
+ return typeof group==="string"&&/^siri[._]/i.test(group)?
+  "SIRI_GROUP_UNVERIFIED":"OTHER_GROUP_UNVERIFIED";
+}
+function latencyBand(ms){
+ if(typeof ms!=="number"||!isFinite(ms)||ms<0)return "UNKNOWN";
+ if(ms<500)return "LT_500MS";
+ if(ms<1000)return "500_1000MS";
+ if(ms<2000)return "1_2S";
+ if(ms<4000)return "2_4S";
+ if(ms<6000)return "4_6S";
+ if(ms<8000)return "6_8S";
+ return "GE_8S";
+}
+function timeLog(stage,at){
+ if(typeof at==="number"&&isFinite(at)&&at<=Date.now()&&
+    Date.now()-at<600000)
+  log(stage+"_"+latencyBand(Date.now()-at));
+}
+
 // Compose is documented by boitar/sair's iOS 27.3 Qwen reverse analysis.
 // Exact allowlist: other WritingTools modes and rich/media input are NOT proven.
 function parseWritingToolsRequest(raw,allowRecoveredScene){
@@ -848,6 +885,8 @@ function rewriteSse(original,answer,scene,route,expectedSession){
  var anchor=expireAfter&&(expireAfter.anchor==="last_active_at"||
    expireAfter.anchor==="created_at")?expireAfter.anchor:"created_at";
  var sid=s.id,rid=r.id;
+ var nativeModel=safeObjectName(r.model,null);
+ if(!nativeModel)return null;
  var choiceId=choiceAdded&&validId(choiceAdded.id)?choiceAdded.id:
    "choice_aies_"+rid.slice(0,80);
  var continuation=safeContinueUrl(choiceAdded&&choiceAdded.continue_url);
@@ -864,7 +903,7 @@ function rewriteSse(original,answer,scene,route,expectedSession){
    last_active_at:lastActive,created_at:created,id:sid,
    object:safeObjectName(s.object,"realtime.session")},
   {notices:[],session_id:sid,created_at:responseCreated,
-   model:"aies/deepseek",id:rid,choices:[],
+   model:nativeModel,id:rid,choices:[],
    object:safeObjectName(r.object,"realtime.response")},
   {index:0,choice:choiceOpen},
   {choice_index:0,item:{type:"message",message:{role:"assistant",content:[]}},index:0},
@@ -881,7 +920,7 @@ function rewriteSse(original,answer,scene,route,expectedSession){
   {choice_index:0,item:outputItem,index:0},
   {index:0,choice:choiceClosed},
   {index:0,choice:choiceClosed},
-  {notices:[],session_id:sid,created_at:responseCreated,model:"aies/deepseek",
+  {notices:[],session_id:sid,created_at:responseCreated,model:nativeModel,
    id:rid,choices:[choiceClosed],object:safeObjectName(r.object,"realtime.response")}
  );
  if(n.length!==names.length)return null;
@@ -1160,6 +1199,7 @@ if(!res){
  // an opaque ID. Unlike "latest prompt", concurrent requests never share a slot.
  captureQwenRequestBodyOnce();
  var requestRaw=rawRequest();
+ log("SCENE_"+classifyScene(requestRaw,followupRoute));
  var prompt=parseApplePrompt(requestRaw,"",followupRoute);
  abRequest(requestRaw,prompt);
  probeObserveRequest();
@@ -1178,7 +1218,7 @@ if(!res){
    sid:followupDetails&&followupDetails.sid,prev:resolvedPrevious,
    previousRaw:followupDetails&&followupDetails.prev,
    previousKind:followupDetails&&followupDetails.kind,
-   exp:Date.now()+C.sessionTtlMs}))){
+   exp:Date.now()+C.sessionTtlMs,capturedAt:Date.now()}))){
   error("SESSION_STORE_UNAVAILABLE");return;
  }
  var headers={};Object.keys(req.headers||{}).forEach(function(k){
