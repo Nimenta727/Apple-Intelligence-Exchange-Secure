@@ -51,7 +51,7 @@ test("offline Shadowrocket fallback has identical four hooks but no remote runti
  assert.equal(local.length,4);
  assert.ok(local.every(x=>x.endsWith(",script-path=Script/aies_siri_deepseek_v06.js,enable=true")));
  assert.ok(!localModuleText.includes("script-path=https://"));
- assert.ok(localModuleText.includes("7a698fbaadeb37431d9bd1d43df359292ee78ba0"));
+ assert.ok(localModuleText.includes("c9e8ac6332c7726594006fd243839742dba5d88a"));
  for(let i=0;i<remote.length;i++){
   assert.equal(remote[i].slice(0,remote[i].indexOf(",script-path=")),
    local[i].slice(0,local[i].indexOf(",script-path=")));
@@ -1506,7 +1506,7 @@ test("DeepSeek Flash is requested in documented disabled-thinking mode for short
 test("v0.6 module references an immutable reviewed script commit",()=>{
  const scripts=[...moduleText.matchAll(/script-path=https:\/\/raw\.githubusercontent\.com\/[^\s]+/g)].map(m=>m[0]);
  assert.equal(scripts.length,4);
- assert.ok(scripts.every(x=>x.includes("/7a698fbaadeb37431d9bd1d43df359292ee78ba0/scripts/aies_siri_deepseek_v06.js")));
+ assert.ok(scripts.every(x=>x.includes("/c9e8ac6332c7726594006fd243839742dba5d88a/scripts/aies_siri_deepseek_v06.js")));
  assert.ok(!moduleText.includes("scripts/aies_siri_deepseek_beta.js"));
 });
 test("unsupported response never triggers the model and never returns Qwen text",()=>{
