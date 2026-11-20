@@ -232,6 +232,17 @@ test("TQA followup supports missing pointer only when URL session is verified",(
  assert.equal(e.invoke(wrong).returned[0].response.status,502);
  assert.equal(e.requests.length,2);
 });
+test("unknown Siri main group classifies fixed category without logging raw ID",()=>{
+ const e=env(),req={...e.request,headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"}};
+ const body=JSON.parse(req.body);
+ body.configuration.response_configuration_group_id="siri.unknown_private_mode";
+ const result=e.invoke({...req,body:JSON.stringify(body)});
+ assert.equal(result.returned[0].response.status,502);
+ assert.ok(e.logs.includes("[AIES_V06] MAIN_GROUP_OTHER_SIRI"));
+ assert.ok(e.logs.includes("[AIES_V06] REQUEST_DIAG_GROUP_UNSUPPORTED"));
+ assert.ok(e.logs.every(x=>!x.includes("unknown_private_mode")));
+ assert.equal(e.requests.length,0);
+});
 test("unknown Siri followup groups stay fail-closed and log category, not group value",()=>{
  const e=env(),first=completeFirstSiriTurn(e);
  for(const group of ["siri.unknown_private_mode","unsafe_private_mode"]){
