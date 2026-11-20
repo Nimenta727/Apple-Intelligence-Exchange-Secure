@@ -199,6 +199,74 @@ test("Siri followup uses prior verified DeepSeek-only context and emits observed
  assert.ok(e.logs.includes("[AIES_V06] SIRI_CONTEXT_STORED"));
  assert.ok(!e.logs.some(x=>x.includes("Which planet")||x.includes("Explain why")));
 });
+test("Siri followup in known TQA group requires verified exact-session DeepSeek history",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ const req=siriFollowupRequest(e,first.sid,first.prev,"Please explain further");
+ const parsed=JSON.parse(req.body);
+ parsed.configuration.response_configuration_group_id="siri.tqa";
+ const tqa={...req,body:JSON.stringify(parsed)};
+ const request=e.invoke(tqa);
+ assert.ok(request.returned[0].headers["X-AIES-Request-ID"]);
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_GROUP_TQA_TEXT"));
+ const resp=e.invoke({...tqa,headers:{...tqa.headers,...request.returned[0].headers}},
+   {status:200,headers:{"Content-Type":"text/event-stream"},body:siriFollowupFixture(first.sid,"tqa")});
+ assert.equal(resp.returned[0].status,200);
+ assert.ok(resp.returned[0].body.includes("【DeepSeek · AIES】"));
+ assert.ok(!resp.returned[0].body.includes("QWEN_FOLLOWUP_ONLY"));
+ assert.equal(e.requests.length,2);
+});
+test("TQA followup supports missing pointer only when URL session is verified",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ const req=siriFollowupRequest(e,first.sid,undefined);
+ const obj=JSON.parse(req.body);
+ delete obj.previous_choice_id;
+ obj.configuration.response_configuration_group_id="siri_tqa";
+ const tqa={...req,body:JSON.stringify(obj)};
+ const call=e.invoke(tqa);
+ assert.ok(call.returned[0].headers["X-AIES-Request-ID"]);
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_SESSION_CONTEXT_RECOVERED"));
+ const r=e.invoke({...tqa,headers:{...tqa.headers,...call.returned[0].headers}},
+  {status:200,body:siriFollowupFixture(first.sid,"tqa-missing")});
+ assert.equal(r.returned[0].status,200);
+ const wrong={...tqa,url:tqa.url.replace(first.sid,"sess_unrelated")};
+ assert.equal(e.invoke(wrong).returned[0].response.status,502);
+ assert.equal(e.requests.length,2);
+});
+test("unknown Siri followup groups stay fail-closed and log category, not group value",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ for(const group of ["siri.unknown_private_mode","unsafe_private_mode"]){
+  const req=siriFollowupRequest(e,first.sid,first.prev);
+  const body=JSON.parse(req.body);body.configuration.response_configuration_group_id=group;
+  const r=e.invoke({...req,body:JSON.stringify(body)});
+  assert.equal(r.returned[0].response.status,502);
+ }
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_GROUP_OTHER_SIRI"));
+ assert.ok(e.logs.includes("[AIES_V06] FOLLOWUP_GROUP_OTHER_UNVERIFIED"));
+ assert.ok(e.logs.includes("[AIES_V06] ERROR_UNSUPPORTED_SIRI_REQUEST"));
+ assert.ok(e.logs.every(x=>!x.includes("unknown_private_mode")&&!x.includes("unsafe_private_mode")));
+ assert.equal(e.requests.length,1);
+});
+test("TQA followup rejects non-text content, non-Siri UA, and unverified user sessions",()=>{
+ const e=env(),first=completeFirstSiriTurn(e);
+ function tqa(ua,content){
+  const req=siriFollowupRequest(e,first.sid,first.prev);
+  const body=JSON.parse(req.body);
+  body.configuration.response_configuration_group_id="siri.tqa";
+  body.input[0].message.content=content;
+  return {...req,headers:{"User-Agent":ua},body:JSON.stringify(body)};
+ }
+ const siriUA="Siri (iPad - Version 27.3.0)";
+ const media=e.invoke(tqa(siriUA,[{type:"image",text:"PRIVATE_IMAGE"}]));
+ assert.equal(media.returned[0].response.status,502);
+ const tool=e.invoke(tqa(siriUA,[{type:"tool_call",text:"PRIVATE_TOOL"}]));
+ assert.equal(tool.returned[0].response.status,502);
+ const other=e.invoke(tqa("OtherApp 1.0",[{type:"text",text:"PRIVATE_PROMPT"}]));
+ assert.equal(JSON.stringify(other.returned[0]),"{}");
+ const unknownReq=tqa(siriUA,[{type:"text",text:"PRIVATE_PROMPT"}]);
+ const noHistory={...unknownReq,url:unknownReq.url.replace(first.sid,"sess_unrelated")};
+ assert.equal(e.invoke(noHistory).returned[0].response.status,502);
+ assert.equal(e.requests.length,1);
+});
 test("Siri second and third turns retain session/choice linkage and verified history",()=>{
  const e=env(),first=completeFirstSiriTurn(e);
  const req=siriFollowupRequest(e,first.sid,first.prev,"What is its color?");
