@@ -115,6 +115,9 @@ test("first Siri native session SSE uses the real upstream IDs/model, replacing 
   eventBody(native,"session.response.created").id);
  assert.equal(eventBody(out.body,"session.response.created").model,
   eventBody(native,"session.response.created").model);
+ assert.equal(eventBody(out.body,"session.response.choices[].added").choice.id,
+  eventBody(native,"session.response.choices[].added").choice.id,
+  "native choice ID must survive rewrite without synthesis");
  assert.ok(out.body.includes("【DeepSeek · AIES】"));
  assert.ok(!out.body.includes("QWEN_NATIVE_PRIVATE_ANSWER"));
  assert.ok(e.logs.every(s=>!s.includes(KEY)&&!s.includes("What is Saturn")));
