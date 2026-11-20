@@ -40,3 +40,11 @@
 4. 记录固定日志 `SCENE_*`、`SSE_AUDIT_*`、`UPSTREAM_ELAPSED_*`、`MODEL_ELAPSED_*` 和最终 Siri UI 是否展示 `【DeepSeek · AIES】`，若失败立即回滚 62，避免继续让用户耗时试错。
 5. 以真机抓到的**脱敏事件类别、数量和序列**扩展协议状态机，不收集真实内容；专门研究 Shadowrocket 新连接 `pending data` 下无 tag 的可靠事务载体，不能用 global latest 回退替代验证。
 6. 通过两轮/三轮、直问与显式千问唤醒、并发、弱网、延迟的真机回归后，才考虑 v0.8 生产版。完整场景视觉及其他写作工具功能仍需各自独立协议验证。
+
+## 续答标识一致性二次审查与补充测试
+
+用户提出“必须维护 Apple 期待的会话生命周期”，因此在初版 147 项测试通过后进一步审查了 `choice_id`。发现最初从 62 派生的 `rewriteSse` 仍留有 `choice_aies_<response_id>` 的本地 ID fallback。这个行为可能造成类似 63 的未经验证 continuation 身份，所以 **64 现已删除该 fallback**：SSE 审核必须在真实上游 `session.response.choices[].added.choice.id` 中获得合规 ID，最终重新构建后的 SSE 仍使用这个原生 ID；缺失时直接记录 `SSE_AUDIT_CHOICE_ID_MISSING` 并返回 502，**在 DeepSeek 计费之前终止**。先前 62 保留原逻辑未动。
+
+独立测试 `nativeSse` 的模拟样本明确附加跨 added/completed/done/final 一致的 choice ID，并新增“上游缺失 ID → 拒绝 → DeepSeek 不调用”的反向回归。**此测试用例是人工模拟，不是用户真实 iPad SSE 包**；尚不确定真实 Qwen 在每种事件中都提供 ID，因此 64 可能拒绝一些真实但不完整的会话骨架，仍应保持默认禁用。
+
+后续规划更新：先以真实设备的仅类型/事件阶段日志验证 choice identity 的存在性，再评估能否兼容其他已验证的官方指针承载方式；绝不自行猜测或合成会话指针。
