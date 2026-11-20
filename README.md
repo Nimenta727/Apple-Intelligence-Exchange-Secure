@@ -79,3 +79,7 @@ npm test
 ### WritingTools 真机协议校验
 
 当前 60 只对原 SAIR 已逆向描述的 `compose_selectedAndAllText` 写作创作子场景开放 **Beta**；其他校对、摘要/多模态请求尚未由本机 Qwen JSON 样本证实。为避免再次上传原始抓包，61 已内置默认关闭的 [WritingTools 一次性字段类型探针](docs/QWEN_PASSIVE_DIAG_ZH.md)，只需手动开启 600 秒，用一段无隐私测试文本即可观察软件分组及响应事件结构。61 与 60 必须互斥启用。
+
+## 2026-11-20：63 请求优先实验模块（与 v0.6 稳定版隔离）
+
+已新增独立的 [AIES 63 LOCAL v0.7 请求优先实验模块](shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule) 及 [中文安装/回滚指南](docs/INSTALL_SIRI_DEEPSEEK_V07_REQUEST_FIRST_ZH.md)。它由**同一个请求 Hook**完成 Siri 纯文本校验、DeepSeek 调用和本地 SSE 合成，目的在于绕开当前 60/62 新连接偶发的 `RESPONSE_TAG_MISSING`。63 仅是**真机待验收的独立实验**，保留原本可用的 [62 LOCAL](shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule)，二者**不能同时启用**。成功拦截的请求不需要由脚本访问 Qwen 上游；MITM 绕过或 Siri 不接受合成 SSE 的风险仍存在。详见 [维护日志](docs/routine/2026-11-20-10-32-v07-request-first-siri-engine-refactor.md)。
