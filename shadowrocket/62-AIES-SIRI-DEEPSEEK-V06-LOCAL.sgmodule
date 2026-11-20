@@ -6,8 +6,8 @@
 # Shadowrocket local script example uses script-path=Script/header.js. Four hooks now explicitly use Script/aies_siri_deepseek_v06.js,enable=true.
 # Check Files > iCloud Drive > Shadowrocket > Script > aies_siri_deepseek_v06.js.
 # A file visible only in On My iPad/Script Test may NOT be found by the module HTTP hooks.
-# New source version includes exact-session fallback ONLY for empty previous_choice_id, not unknown nonempty choice IDs.
-# LOCAL JS must match reviewed commit c9e8ac6332c7726594006fd243839742dba5d88a; iCloud file must be fully downloaded.
+# New source supports only absent / JSON null / empty previous_choice_id fallback with verified DeepSeek context from SAME URL session; unknown other types fail closed.
+# LOCAL JS must match reviewed commit c3a7014cdd8ec47841001748c615e704059d9370; iCloud file must be fully downloaded.
 # Do not turn on together with remote 60, diagnostic 61 or any historical 00 REJECT.
 # Local file resolution varies by Shadowrocket version: verify in actual device logs BEFORE any Siri trial.
 # Two main Siri/WritingTools hooks and two Siri session-followup request/response hooks.
