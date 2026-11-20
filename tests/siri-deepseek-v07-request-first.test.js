@@ -154,6 +154,80 @@ test("DeepSeek timeout, network failure, and invalid completion return 502 witho
   assert.ok(!r.response.body.includes("DEEPSEEK_ANSWER"));
  }
 });
+test("simultaneous first requests keep independent DeepSeek callbacks and sessions without tags",()=>{
+ const data={SAIRS_DEEPSEEK_API_KEY:key},pending=[],doneA=[],doneB=[],logs=[];
+ function start(question,results){
+  const ctx={$request:{url:URL,method:"POST",
+     headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},
+     body:initialBody("siri.multimodal.noRTI",question)},
+   $persistentStore:{read:k=>data[k]||null,write:(v,k)=>{data[k]=v;return true;}},
+   $httpClient:{post:(opts,cb)=>pending.push({opts,cb})},
+   $done:x=>results.push(x),console:{log:x=>logs.push(x)},Date,Math,
+   setTimeout:()=>1,clearTimeout:()=>{}};
+  vm.runInNewContext(code,ctx,{timeout:1000});
+ }
+ start("FIRST_PRIVATE_TEST_A",doneA);
+ start("SECOND_PRIVATE_TEST_B",doneB);
+ assert.equal(pending.length,2);
+ assert.equal(doneA.length,0);
+ assert.equal(doneB.length,0);
+ const respond=(entry,answer)=>entry.cb(null,{statusCode:200},
+  JSON.stringify({choices:[{finish_reason:"stop",message:{content:answer}}]}));
+ respond(pending[1],"DEEPSEEK_B");
+ respond(pending[0],"DEEPSEEK_A");
+ assert.equal(doneA.length,1);
+ assert.equal(doneB.length,1);
+ assert.equal(doneA[0].response.status,200);
+ assert.equal(doneB[0].response.status,200);
+ assert.ok(doneA[0].response.body.includes("DEEPSEEK_A"));
+ assert.ok(!doneA[0].response.body.includes("DEEPSEEK_B"));
+ assert.ok(doneB[0].response.body.includes("DEEPSEEK_B"));
+ assert.ok(!doneB[0].response.body.includes("DEEPSEEK_A"));
+ const sidA=extract(doneA[0].response.body,"session.created").id;
+ const sidB=extract(doneB[0].response.body,"session.created").id;
+ assert.notEqual(sidA,sidB);
+ assert.ok(data["AIES_CTX_SESSION_"+sidA]);
+ assert.ok(data["AIES_CTX_SESSION_"+sidB]);
+ assert.equal(JSON.stringify(doneA[0]).includes("FIRST_PRIVATE_TEST_A"),false);
+ assert.equal(logs.some(x=>x.includes("FIRST_PRIVATE_TEST_A")||x.includes("SECOND_PRIVATE_TEST_B")),false);
+});
+test("timeout finalizes one 502, late DeepSeek callback cannot overwrite or store a session",()=>{
+ const data={SAIRS_DEEPSEEK_API_KEY:key},returns=[],timeouts=[];
+ let later=null;
+ const ctx={$request:{url:URL,method:"POST",
+   headers:{"User-Agent":"Siri (iPad - Version 27.3.0)"},body:initialBody()},
+  $persistentStore:{read:k=>data[k]||null,write:(v,k)=>{data[k]=v;return true;}},
+  $httpClient:{post:(opts,cb)=>{later=cb;}},
+  $done:x=>returns.push(x),console:{log:()=>{}},Date,Math,
+  setTimeout:fn=>{timeouts.push(fn);return 1;},clearTimeout:()=>{}};
+ vm.runInNewContext(code,ctx,{timeout:1000});
+ assert.equal(timeouts.length,1);
+ assert.equal(returns.length,0);
+ timeouts[0]();
+ assert.equal(returns.length,1);
+ assert.equal(returns[0].response.status,502);
+ later(null,{statusCode:200},JSON.stringify({
+  choices:[{finish_reason:"stop",message:{content:"LATE_RESPONSE_PRIVATE"}}]}));
+ assert.equal(returns.length,1);
+ assert.ok(!Object.keys(data).some(k=>k.startsWith("AIES_CTX_")));
+});
+test("model request contains user text only, never Siri tools, response format, or input hints",()=>{
+ const e=createEnv();
+ const obj=JSON.parse(initialBody());
+ obj.client_tools=[{function:{name:"TOOL_PRIVATE_NEVER_SEND"}}];
+ obj.server_tools=[{type:"SERVER_PRIVATE_NEVER_SEND"}];
+ obj.response_format={type:"RESPONSE_PRIVATE_NEVER_SEND"};
+ obj.input_hint="INPUT_HINT_PRIVATE_NEVER_SEND";
+ const r=e.invoke(e.request(JSON.stringify(obj)));
+ assert.equal(r.response.status,200);
+ const sent=JSON.stringify(JSON.parse(e.requests[0].body));
+ for(const privateText of ["TOOL_PRIVATE_NEVER_SEND","SERVER_PRIVATE_NEVER_SEND",
+  "RESPONSE_PRIVATE_NEVER_SEND","INPUT_HINT_PRIVATE_NEVER_SEND"]){
+  assert.equal(sent.includes(privateText),false);
+  assert.equal(r.response.body.includes(privateText),false);
+ }
+ assert.ok(!r.response.body.includes("AIES_INTERNAL_PLACEHOLDER"));
+});
 test("direct synthetic preflight rejects any forged response-hook invocation",()=>{
  const e=createEnv(),r=e.request();
  const out=[];
