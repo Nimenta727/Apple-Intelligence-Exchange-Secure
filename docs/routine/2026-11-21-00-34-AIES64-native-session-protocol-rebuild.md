@@ -48,3 +48,11 @@
 独立测试 `nativeSse` 的模拟样本明确附加跨 added/completed/done/final 一致的 choice ID，并新增“上游缺失 ID → 拒绝 → DeepSeek 不调用”的反向回归。**此测试用例是人工模拟，不是用户真实 iPad SSE 包**；尚不确定真实 Qwen 在每种事件中都提供 ID，因此 64 可能拒绝一些真实但不完整的会话骨架，仍应保持默认禁用。
 
 后续规划更新：先以真实设备的仅类型/事件阶段日志验证 choice identity 的存在性，再评估能否兼容其他已验证的官方指针承载方式；绝不自行猜测或合成会话指针。
+
+## 合并结果与最新测试（2026-11-21）
+
+- [PR #42](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/42) **已合并到 main**，merge commit `d67055bb9bffdc9d8bf9ea7af522de77544f7b17`。
+- [GitHub Actions](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44777642089) 最终 **148 项测试全部通过、0 项失败**，包括新增“原生 choice ID 缺失则拒绝且不调用 DeepSeek”的反向测试、原 ID 无改写的正向断言，以及原 v0.6/0.7 全量回归、Node 语法和静态配置检查。
+- PR 修改文件逐项核对：只添加新的 64 运行时、64 本地模块、v0.8 单元测试、中文指南和本 routine，并更新 README（中英）、当前状态、package.json 与 tools/check-docs.js。**未修改** 60/61/62/63、旧 JS 运行时或用户本机配置。
+- main 的 64 **四条 Hook 仍为 `enable=false`**，当前推荐继续使用经部分真机验证的 62 LOCAL。63 仍为隔离禁用状态。
+- 下一步优先验证真实 SSE 的 choice ID 是否在所有需续答的流中可靠存在、上游终态 JSON 与增量关系是否符合目前的保守审计；在新协议证据出现前，不扩大未知 Siri 组白名单，不采用全局最近问题 fallback，不把 CI 通过视为 iPad Siri 通过。
