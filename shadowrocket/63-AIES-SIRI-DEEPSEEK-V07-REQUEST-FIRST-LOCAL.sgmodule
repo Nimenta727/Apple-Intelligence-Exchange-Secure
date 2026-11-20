@@ -1,0 +1,23 @@
+#!name=AIES 63 EXPERIMENTAL - Siri DeepSeek v0.7 Request First
+#!desc=Local-only opt-in request-stage DeepSeek + synthetic Siri SSE. Replaces the request/response transaction split, avoids Qwen upstream on a successfully intercepted request, but Siri native compatibility requires iPad verification. NOT production.
+#!system=ios
+
+# EXPERIMENTAL / OPT-IN; NOT TESTED ON IPAD SIRI UI.
+# Enable only 63 OR 62/60/61 -- NEVER together. Disable all historical 00 REJECT hooks.
+# If Siri rejects synthetic SSE or followup, DISABLE 63 and return to working 62.
+# Install scripts/aies_siri_deepseek_v07_request_first.js to iCloud Drive/Shadowrocket/Script/
+# Script-path is local; no runtime GitHub download. Keep SAIRS_DEEPSEEK_API_KEY in existing persistent store.
+# Only TWO http-request hooks. This is intentional: new design does not wait for upstream response.
+# A valid Siri text request is answered by locally synthesized Siri SSE after a verified DeepSeek API call.
+# Unsupported/failed calls return error (fail closed); never pass Qwen text off as DeepSeek.
+# For followups, SAME URL session + verified local DeepSeek history required. Unknown Siri
+# group is structural-text only, with safeguards against common tool/media group names.
+# This mode does not support WritingTools or non-Siri user agents.
+# Source review: scripts/aies_siri_deepseek_v07_request_first.js (same commit as this module).
+# This cannot prevent bypass at iOS/network level when script does not intercept a request.
+[MITM]
+hostname = %APPEND% prod-yabuli.qianwen.com
+
+[Script]
+AIES63 Request Main = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=true
+AIES63 Request Followup = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=true
