@@ -383,6 +383,12 @@ function parseRequest(raw,allowRecoveredSiri,followupMode){
     requestDiagnostic="FOLLOWUP_GROUP_UNVERIFIED";return null;
    }
    if(!tqaGroup&&!observedGroup){
+    if(!followupMode&&isSiriForProbe()){
+     // Categories only. Keep the actual group identifier private.
+     if(safeGroupIdentifier(g)&&/^siri[._]/i.test(g))
+      log("MAIN_GROUP_OTHER_SIRI");
+     else log("MAIN_GROUP_OTHER_UNVERIFIED");
+    }
     requestDiagnostic="GROUP_UNSUPPORTED";return null;
    }
    // TQA followups must satisfy the same strict text envelope as noRTI,
