@@ -40,3 +40,10 @@
 ## 隐私与风险
 
 本日志确实包含系统和网络环境信息，原始全文留在用户会话，**不提交 GitHub**。只引用阶段码和汇总计数。现有本地 DeepSeek 对话历史 5 分钟逻辑过期不代表物理删除。原 62 将请求发送给 Qwen 后再改写回应的架构不能保证「千问完全没有接收到问题」。本次 63 的失败不应成为放松会话隔离、工具权限检查、敏感字段保护的理由。
+
+## PR #41 合并和回归完成情况
+
+- [PR #41](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/41) 已合并至 `main`，merge commit `af9c524723c80c3945d08bb09e01b1f9ab218d1f`。
+- [GitHub Actions CI](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44668563988)：**133/133 tests passed, 0 failed**。检查包括 63 两条 request Hook 默认为 `enable=false`、文档明确“真机失败并隔离”、原 62 仍保留和 v0.6 回归测试。
+- **本机用户操作仍必需**：仓库合并**不能自动关闭设备上已经安装的 63**。用户需要关闭 63 → 开启原 62 LOCAL → 重新应用配置；原 v0.6 JS 若没有被覆盖则无需替换。
+- 下一个版本不能仅依赖 `LOCAL_SSE_RESPONSE_READY` 宣称可用；先明确客户端接受原生 SSE 的真实要求，能以真机直接问答显示和 followup 证据验证后再邀请测试。研究 v0.6 首连接 `RESPONSE_TAG_MISSING` 的可靠关联机制时，须继续避免跨会话猜测。
