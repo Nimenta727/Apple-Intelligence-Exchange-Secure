@@ -191,3 +191,17 @@ script-path=Script/aies_siri_deepseek_v06.js,enable=true
 - 若再出现 `FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL` 或 `OVERSIZE`，不要上传真实 previous choice 值，保留 fail-closed。依据固定分类再决定是否需要更精准的安全格式解析。
 
 **验收顺序**：先保存备份，使用新版 62 LOCAL + 新版 JS；原 60/61 关闭。仅做普通无隐私的同一次 Siri 交互两问。看第二轮是否有 `FOLLOWUP_SESSION_CONTEXT_RECOVERED` / `REQUEST_CAPTURED` 和最终 `【DeepSeek · AIES】`；若未修复，仅分享 `[AIES_V06]` 固定代码，停止重复提问。已通过单轮还不足以宣称多轮 UI 成功。
+
+## 2026-11-20 10:01：真实追问不是字符串 continuation；本地 62 JS 更新指南
+
+用户上传的 `PacketTunnel-20261120100109.log` 证实：主请求多次进入 `DEEPSEEK_STARTED` 并将 `【DeepSeek · AIES】` 注入尝试返回；但五条追问都在 `FOLLOWUP_PREVIOUS_CHOICE_NOT_STRING`、`ERROR_UNSUPPORTED_SIRI_REQUEST` 处失败，根本没有进入第二轮模型调用。**这与 PR #37 所处理的 `previous_choice_id === ""` 不是同一条件**，不能凭日志断言真实字段一定为 null 或缺失。
+
+最新版脚本对 `previous_choice_id` 为 **JSON null**、**字段不存在**、或**空字符串** 三种状态提供严格的 **同一会话**已验证 DeepSeek 历史恢复；不接受其他任意非字符串值、错误格式非空指针或跨会话复用。新增只有固定分类、不记录任何真实原值的日志：
+- `FOLLOWUP_PREVIOUS_CHOICE_NULL` / `FOLLOWUP_PREVIOUS_CHOICE_MISSING` / `FOLLOWUP_PREVIOUS_CHOICE_EMPTY`：后续请求的无 pointer 形态；
+- `FOLLOWUP_SESSION_CONTEXT_RECOVERED`：从 URL 指明的**精确同一 session**、5 分钟 TTL 内已验证 DeepSeek-only 上下文恢复；
+- `FOLLOWUP_PREVIOUS_CHOICE_NONSTRING_UNSUPPORTED`：该字段为数字、布尔、数组、对象等**仍不支持的类型**，继续拒绝且不调用 DeepSeek；
+- `FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL` / `..._OVERSIZE`：非空字符串格式不支持，继续拒绝。
+
+**62 LOCAL 用户只替换本地 JS 内容**，从 <https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/blob/c3a7014cdd8ec47841001748c615e704059d9370/scripts/aies_siri_deepseek_v06.js> 获取全部源码，保存到 `iCloud 云盘/Shadowrocket/Script/aies_siri_deepseek_v06.js`，确认文件已在本机下载并覆盖之前的版本。62 LOCAL 的四条脚本路径仍为 `script-path=Script/aies_siri_deepseek_v06.js,enable=true`，不需要重新安装模块、重新设置 DeepSeek Key 或修改 MITM 证书。60 Remote 的固定脚本 SHA 也同步升级，但远程下载在用户设备上曾报 310/超时，因此优先沿用本地 62。
+
+更新后**只做一组**无隐私的两轮 Siri 问答，确认第二轮是否出现 `FOLLOWUP_SESSION_CONTEXT_RECOVERED`、`REQUEST_CAPTURED`、`DEEPSEEK_STARTED`，最终须在 Siri UI 看到 `【DeepSeek · AIES】` 才算通过。若出现 `..._NONSTRING_UNSUPPORTED` 或 `ERROR_SSE_REWRITE_UNSUPPORTED`，不要循环重试或发送原始请求数据，返回固定状态码即可。
