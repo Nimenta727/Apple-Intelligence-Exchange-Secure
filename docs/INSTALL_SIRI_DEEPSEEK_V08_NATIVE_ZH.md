@@ -66,3 +66,7 @@
 - 首轮、多轮、并发/断线后的 Siri UI 可见回答、朗读和连续会话状态。
 
 综上，64 是**可回滚的协议验证候选**。它是针对真实会话、状态机和可核实诊断的下一步工程基座，并不是已经稳定的成品。全部技术修改与后续规划记录在 [docs/routine](routine/2026-11-21-00-34-AIES64-native-session-protocol-rebuild.md)。
+ 
+### v0.8 更严格的 choice ID 要求（与 v0.6 的重要区别）
+
+为了真正保留官方续答身份，新 64 **不再使用旧版 `choice_aies_...` 本地合成指针**。如果上游的 `session.response.choices[].added.choice.id` 缺失或无效，新增 `SSE_AUDIT_CHOICE_ID_MISSING`，在调用 DeepSeek 前直接拒绝。若上游提供的 choice ID 与其他终态事件中出现的 ID 不一致，也拒绝。现有 62 仍维持原本行为，不受影响。真实 iPad 的每一种原生 SSE 是否都包含该字段尚未确认，因此新版本更严格可能导致兼容性下降，这也是 64 必须默认关闭、后续以设备证据校验的原因。
