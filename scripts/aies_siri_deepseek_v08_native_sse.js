@@ -695,14 +695,15 @@ function auditNativeSse(raw,scene,route,expectedSid){
  var choiceComp=events[events.length-3].data;
  var choiceDone=events[events.length-2].data;
  var lastChoice=complete.choices&&complete.choices[0];
- if(id!==undefined&&id!==null){
-  if(!validId(id))return fail("CHOICE_IDENTITY");
-  var related=[choiceComp&&choiceComp.choice,
-   choiceDone&&choiceDone.choice,lastChoice];
-  for(i=0;i<related.length;i++)
-   if(related[i]&&related[i].id!==undefined&&related[i].id!==id)
-    return fail("CHOICE_IDENTITY");
- }
+ // Unlike v0.6, v0.8 must NEVER synthesize its own continuation ID.
+ // If the actual upstream choice has no ID, this is an unverified protocol
+ // form and should stop before billing a model.
+ if(!validId(id))return fail("CHOICE_ID_MISSING");
+ var related=[choiceComp&&choiceComp.choice,
+  choiceDone&&choiceDone.choice,lastChoice];
+ for(i=0;i<related.length;i++)
+  if(related[i]&&related[i].id!==undefined&&related[i].id!==id)
+   return fail("CHOICE_IDENTITY");
  // Check any present terminal snapshots, not arbitrary unknown SSE fields.
  function atom(x){return x&&x.text&&typeof x.text.value==="string"?x.text.value:null;}
  function item(x){return x&&x.item&&x.item.message&&
@@ -887,8 +888,10 @@ function rewriteSse(original,answer,scene,route,expectedSession){
  var sid=s.id,rid=r.id;
  var nativeModel=safeObjectName(r.model,null);
  if(!nativeModel)return null;
- var choiceId=choiceAdded&&validId(choiceAdded.id)?choiceAdded.id:
-   "choice_aies_"+rid.slice(0,80);
+ // Keep native upstream continuation identity. No guessed/synthetic
+ // choice ID in v0.8, including the original v0.6 fallback branch.
+ if(!choiceAdded||!validId(choiceAdded.id))return null;
+ var choiceId=choiceAdded.id;
  var continuation=safeContinueUrl(choiceAdded&&choiceAdded.continue_url);
  var content=scene==="writing"?
   safeJson({body:answer,refinements:["精炼表达","调整语气","优化结构"]}):
