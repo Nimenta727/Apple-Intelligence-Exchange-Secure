@@ -302,7 +302,10 @@ function observedSiriTextEnvelopeReasons(o,isFollowupRoute){
  var reasons=[],top=Object.keys(o);
  var allowedRoot=["configuration","input","client_tools","input_hint","response_format","server_tools","stream"];
  if(isFollowupRoute)allowedRoot.push("previous_choice_id");
- if(isFollowupRoute&&!validId(o.previous_choice_id))reasons.push("PREVIOUS_CHOICE_INVALID");
+ if(isFollowupRoute&&typeof o.previous_choice_id!=="string")
+  reasons.push("PREVIOUS_CHOICE_NOT_STRING");
+ else if(isFollowupRoute&&o.previous_choice_id!==""&&!validId(o.previous_choice_id))
+  reasons.push("PREVIOUS_CHOICE_INVALID");
  if(top.some(function(k){return allowedRoot.indexOf(k)<0;})||
     top.indexOf("configuration")<0||top.indexOf("input")<0)
   reasons.push("ROOT_FIELDS");
@@ -380,6 +383,14 @@ function parseRequest(raw,allowRecoveredSiri,followupMode){
   }
   if(observedGroup){
    var shapeReasons=observedSiriTextEnvelopeReasons(o,!!followupMode);
+   if(followupMode){
+    // Only fixed classification codes are logged, never the opaque choice value.
+    var pc=o.previous_choice_id;
+    if(pc==="")log("FOLLOWUP_PREVIOUS_CHOICE_EMPTY");
+    else if(typeof pc!=="string")log("FOLLOWUP_PREVIOUS_CHOICE_NOT_STRING");
+    else if(!validId(pc))log(pc.length>160?
+      "FOLLOWUP_PREVIOUS_CHOICE_OVERSIZE":"FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL");
+   }
    if(shapeReasons.length){
     captureNortiSchemaLocally(o);
     shapeReasons.forEach(function(code){log("NORTI_SHAPE_"+code);});
@@ -865,10 +876,32 @@ function followupIds(){
     !req.body.length||req.body.length>C.maxRequest)return null;
  try{obj=JSON.parse(req.body);}catch(e){return null;}
  if(!obj||typeof obj!=="object"||Array.isArray(obj)||
-    !validId(obj.previous_choice_id)||
+    (typeof obj.previous_choice_id!=="string"||
+      (obj.previous_choice_id!==""&&!validId(obj.previous_choice_id)))||
     !obj.configuration||
     obj.configuration.response_configuration_group_id!=="siri.multimodal.noRTI")return null;
  return {sid:sid,prev:obj.previous_choice_id};
+}
+// A blank previous_choice_id is an observed *type-compatible* but not yet
+// value-confirmed followup case. The session URL is the only safe identity
+// anchor in that case. Never accept arbitrary non-empty unmatched pointers.
+function latestVerifiedSessionChoice(sid){
+ if(!validId(sid))return null;
+ var raw=storeRead("AIES_CTX_SESSION_"+sid),v=null,now=Date.now();
+ if(typeof raw!=="string"||raw.length>1000)return null;
+ try{v=JSON.parse(raw);}catch(e){return null;}
+ if(!v||v.v!==1||v.sid!==sid||!validId(v.choice)||
+    typeof v.exp!=="number"||v.exp<=now||
+    v.exp>now+C.followupContextTtlMs)return null;
+ return verifiedHistory(v.choice,sid)?v.choice:null;
+}
+function resolveFollowupChoice(details){
+ if(!details||!validId(details.sid))return null;
+ if(details.prev!=="")return validId(details.prev)&&
+   verifiedHistory(details.prev,details.sid)?details.prev:null;
+ // Explicitly empty continuation pointer: use latest DeepSeek-only history
+ // from EXACTLY this URL session. Never use a global latest request.
+ return latestVerifiedSessionChoice(details.sid);
 }
 function verifiedHistory(prev,sid){
  if(!validId(prev)||!validId(sid))return null;
@@ -911,7 +944,12 @@ function saveVerifiedHistory(rewritten,prompt,answer,previous){
  msgs.push({role:"user",content:prompt},{role:"assistant",content:answer});
  var packed=safeJson({v:1,sid:sid,exp:Date.now()+C.followupContextTtlMs,messages:msgs});
  if(packed.length>32000)return false;
- return storeWrite("AIES_CTX_"+choiceId,packed);
+ if(!storeWrite("AIES_CTX_"+choiceId,packed))return false;
+ // This slot stores only a validated choice pointer, not prompt/answer data.
+ // It enables a narrow fallback when Siri uses previous_choice_id: "".
+ var marker=safeJson({v:1,sid:sid,choice:choiceId,
+   exp:Date.now()+C.followupContextTtlMs});
+ return storeWrite("AIES_CTX_SESSION_"+sid,marker);
 }
 function randomToken(){
  return "aies_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,14)+"_"+Math.random().toString(36).slice(2,14);
@@ -965,13 +1003,16 @@ if(!res){
  if(isWritingTools())log("WRITINGTOOLS_COMPOSE_SCOPED");
  if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){error("INVALID_METHOD");return;}
  var followupDetails=followupRoute?followupIds():null;
- if(followupRoute&&(!followupDetails||
-    !verifiedHistory(followupDetails.prev,followupDetails.sid))){
+ var resolvedPrevious=followupRoute?resolveFollowupChoice(followupDetails):null;
+ if(followupRoute&&!resolvedPrevious){
   error("FOLLOWUP_CONTEXT_UNAVAILABLE");return;
  }
+ if(followupRoute&&followupDetails.prev==="")
+  log("FOLLOWUP_SESSION_CONTEXT_RECOVERED");
  var token=randomToken();
  if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,scene:isWritingTools()?"writing":"siri",route:followupRoute?"followup":"main",
-   sid:followupDetails&&followupDetails.sid,prev:followupDetails&&followupDetails.prev,
+   sid:followupDetails&&followupDetails.sid,prev:resolvedPrevious,
+   previousRaw:followupDetails&&followupDetails.prev,
    exp:Date.now()+C.sessionTtlMs}))){
   error("SESSION_STORE_UNAVAILABLE");return;
  }
@@ -1032,7 +1073,7 @@ if(prompt2&&!responseUA&&req&&typeof req.body==="string"&&req.body.length&&!from
 if(prompt2&&fromReq&&prompt2!==fromReq){error("CORRELATION_MISMATCH");return;}
 if(followupRoute&&prompt2&&req&&typeof req.body==="string"&&req.body.length){
  var reflected=followupIds();
- if(!reflected||reflected.sid!==current.sid||reflected.prev!==current.prev){
+ if(!reflected||reflected.sid!==current.sid||reflected.prev!==current.previousRaw){
   error("CORRELATION_MISMATCH");return;
  }
 }
