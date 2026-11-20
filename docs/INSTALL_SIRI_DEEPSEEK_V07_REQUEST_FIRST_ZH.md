@@ -1,5 +1,7 @@
 # AIES 63：Siri → DeepSeek v0.7 请求优先实验版（仅本地）
 
+> **已停用／禁止作为可用方案安装（2026-11-20 11:25 真机验收失败）。** 用户真实 iPad 的 6 次请求均已完成 `DEEPSEEK_STARTED`、`SIRI_CONTEXT_STORED`、`LOCAL_SSE_RESPONSE_READY`，并由 Shadowrocket 向 Siri `send early response to client`，但 Siri 实际没有获得任何回答，亦没有出现一次 `/v1/sessions/{id}/responses` 续答请求。**原因尚不能具体归咎于 SSE 格式、合成 session/choice ID，或 Siri 对提前返回 200 的处理；必须先停用 63。** 该模块现以 `enable=false` 发布，仅供源码研究，不建议重新开启测试。**恢复方法：关闭 63 → 开启先前可用的 62 LOCAL → 重新应用配置**；保留原 v0.6 本地 JS、密钥和 MITM 证书。已验证工作流程和下一步分析见 [维护记录](routine/2026-11-20-11-25-v07-synthetic-sse-real-device-failure.md)。下文 63 安装说明保留作历史设计归档，不是当前操作推荐。
+
 > **2026-11-20 技术预览 / 不取代稳定的 62 LOCAL。** 63 是独立请求侧执行基座，解决 v0.6 `http-request → http-response` 两阶段方案在新连接上偶发丢失 `X-AIES-Request-ID` 而无法安全恢复问题的架构性限制。**CI 能验证协议模拟，不能保证真实 Siri 接受脚本生成的 SSE。**
 
 ## 为什么另建 63，而非继续改 62？
