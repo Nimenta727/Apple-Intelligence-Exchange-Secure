@@ -903,7 +903,7 @@ function followupIds(){
  try{obj=JSON.parse(req.body);}catch(e){return null;}
  if(!obj||typeof obj!=="object"||Array.isArray(obj)||
     !obj.configuration||
-    !((isV07AllowedFollowupGroup(obj.configuration.response_configuration_group_id))return null;
+    !isV07AllowedFollowupGroup(obj.configuration.response_configuration_group_id))return null;
  var present=Object.prototype.hasOwnProperty.call(obj,"previous_choice_id");
  var v=obj.previous_choice_id,kind=present?(v===null?"null":
     typeof v==="string"?(v===""?"empty":"canonical"):"invalid"):"missing";
