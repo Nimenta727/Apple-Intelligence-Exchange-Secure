@@ -99,3 +99,7 @@
 用户真机 `PacketTunnel-20261120101542.log` 中出现 16 次缺失 `previous_choice_id` 的同会话 DeepSeek 上下文恢复和 23 次 `DEEPSEEK_RESPONSE_ATTEMPTED`；但还有 **9 次后续配置组未验证、1 次主请求配置组不支持、5 次响应事务标记丢失**。其中多个成功的后续问题连续发生，证明新多轮路径至少能实际触发；不等于 Siri UI 每次成功。用户观察“请问一下千问”开头成功率高，但日志无法把具体问句与组名关联，不能宣称这是稳定系统路由规则。
 
 [PR #39](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/39)（merge `5922d93ca49064c378ca8c1d8eb88adff20d355f`）把已知 `siri.tqa` / `siri_tqa` 组纳入**严格同会话、同原生 SSE 校验的纯文本 followup**；其余未知配置组继续拒绝，但新增固定类别码以定位差异。不更改首次请求 `RESPONSE_TAG_MISSING` 的 fail-closed 行为，也不通过全球“最近提问”猜测关联。CI [120/120 passed](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44662425802)。60 Remote 四条 Hook pin 到 `637484295c10627f06e610bfe040dd58e67d309a`；62 LOCAL 用户须手工更新同 SHA 本地 JS。详情见 [维护记录](routine/2026-11-20-10-32-Siri-phrase-sensitive-group-and-response-tag-diagnosis.md)。多轮成功率和 Siri UI 真实结果仍需使用新 JS 确认。
+
+## 2026-11-20 10:32：新 v0.7 请求优先执行基座，非默认版
+
+基于 10:15 / 10:44 iPad 真机日志里未知 Siri followup 配置组与新连接首次响应丢失 `X-AIES-Request-ID` 的问题，独立新增 [63 请求优先 LOCAL 实验模块](../shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule)。它仅采用两条请求 Hook，将 DeepSeek 回答生成与合成 12/11 帧 SSE 收敛在单次 Hook 内，不等待 Qwen 原始响应，也不依赖跨 Hook 请求头。严格文本、同 URL session 的本地已验证历史、未知组结构门控和 fail-closed 保持；其他非 Siri 流量旁路。与 62 稳定版互斥。**真实 iPad Siri UI 对合成 SSE 的接受情况仍未知；绝不能视为已经修好稳定性。** 安装/回滚见 [v0.7 指南](INSTALL_SIRI_DEEPSEEK_V07_REQUEST_FIRST_ZH.md)，修改/后续验收见 [routine](routine/2026-11-20-10-32-v07-request-first-siri-engine-refactor.md)。
