@@ -22,3 +22,10 @@
 3. 先只测试配置加载：重新应用配置，检查脚本开关不再自动关闭并且没有 `js file is not found`。随后单轮无隐私 Siri 请求，日志必须出现 `[AIES_V06] REQUEST_CAPTURED` 或明确的固定错误码，才能继续检查回答。
 4. 如果自动关闭依然复现，关闭 62；在备份过的活跃 `.conf` 文件原生 `[Script]` 段添加相同四条本地规则，严格避免重复 Hook；收集脚本列表截图或固定错误码来确认是模块优先级/编译的冲突还是 iCloud 文件加载问题。
 5. 真机完成单轮、两轮、三轮 Siri UI 标记验收前，仍维持 Beta，不宣传完整多轮或防止所有 Qwen 穿透。
+
+## PR #36 合并结果与下一步（2026-11-20）
+
+- [PR #36](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/36) 已合并到 `main`，merge commit `03273a2d4848a098f90039a80c3129331db91013`。
+- [GitHub Actions 全量测试](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44653967264)：**107 tests / 107 pass / 0 fail**。本轮只更新了 62 LOCAL 的脚本路径/启用标记、静态测试与文档，没有修改 DeepSeek 模型逻辑。
+- **用户需要主动更新已安装的 62 模块文本**，目前 iPad 上旧模块可能仍缓存 `script-path=aies_siri_deepseek_v06.js`；必须看四条规则实际变成 `script-path=Script/aies_siri_deepseek_v06.js,enable=true` 才算采用本次修复。
+- 下一步先验证**启用模块后脚本列表开关是否保持开启**、`js file is not found` 是否消失。只在加载层恢复后再单问无隐私 Siri 问题，读取 `[AIES_V06]` 阶段码。若依然自动关闭，停用 62 改为直接写活跃配置的 `[Script]`，不再同时叠加 AIES 模块；仍需真机验证。
