@@ -105,3 +105,7 @@
 ## 2026-11-20 10:32：新 v0.7 请求优先执行基座，非默认版
 
 基于 10:15 / 10:44 iPad 真机日志里未知 Siri followup 配置组与新连接首次响应丢失 `X-AIES-Request-ID` 的问题，独立新增 [63 请求优先 LOCAL 实验模块](../shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule)。它仅采用两条请求 Hook，将 DeepSeek 回答生成与合成 12/11 帧 SSE 收敛在单次 Hook 内，不等待 Qwen 原始响应，也不依赖跨 Hook 请求头。严格文本、同 URL session 的本地已验证历史、未知组结构门控和 fail-closed 保持；其他非 Siri 流量旁路。与 62 稳定版互斥。**真实 iPad Siri UI 对合成 SSE 的接受情况仍未知；绝不能视为已经修好稳定性。** 安装/回滚见 [v0.7 指南](INSTALL_SIRI_DEEPSEEK_V07_REQUEST_FIRST_ZH.md)，修改/后续验收见 [routine](routine/2026-11-20-10-32-v07-request-first-siri-engine-refactor.md)。
+
+## 2026-11-21 00:34：新增 64 真实会话 SSE 协议验证版（不覆盖 62）
+
+按照用户的连续对话协议研究方向，新建 [64 LOCAL v0.8](../shadowrocket/64-AIES-SIRI-DEEPSEEK-V08-NATIVE-SESSION-LOCAL.sgmodule)，严格利用上游 Qwen 的**真实**会话 SSE，而非 63 失败的伪造会话。新增分层请求场景分类、状态事件序列和 delta/done/终态文本一致性校验、响应模型及 session/response/choice 身份保留、基于可信开始时刻的分段时延诊断。未知组/视觉保持未支持；缺失事务 tag 且无可信本次请求正文时仍拒绝，不引入 SAIR 的全局最新提问回退。**64 全部四条 Hook 默认关闭；62 当前可用版、63 禁用版均未修改；尚无真实 Siri UI 验收，不能说稳定性已修好。** 参考 [新指南](INSTALL_SIRI_DEEPSEEK_V08_NATIVE_ZH.md) 及 [routine](routine/2026-11-21-00-34-AIES64-native-session-protocol-rebuild.md)。
