@@ -33,3 +33,10 @@
 3. 若出现 `FOLLOWUP_GROUP_TQA_TEXT` + `REQUEST_CAPTURED` + `SSE_PREFLIGHT_PASSED` + `DEEPSEEK_RESPONSE_ATTEMPTED`，再以 Siri UI 每轮看到 `【DeepSeek · AIES】` 为准确认这条新路由接管；若是 `FOLLOWUP_GROUP_OTHER_SIRI`，只分享固定码，按照**具体组的协议形态**再定准入，而不盲目放开所有组。
 4. 若是 `RESPONSE_TAG_MISSING`，不要让用户无限重试：该问题待独立的稳定事务关联方案、可复现 mock 和真实 Shadowrocket 新连接测试。
 5. 整理脱敏的分支计数和每阶段成功/失败的本地观测方案（不采集用户问句或会话标识），针对是否直接提问与带唤醒词触发不同路径进一步设计可验证实验。
+
+## PR #39 合并与质量检查确认
+
+- [PR #39](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/39) 已合并到 `main`；merge commit `5922d93ca49064c378ca8c1d8eb88adff20d355f`。
+- [GitHub Actions](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44662425802)：**120 tests / 120 pass / 0 fail**，覆盖新 TQA followup 正例、同会话与 SSE 校验，以及未知组、非 Siri、图像、工具、跨会话拒绝。
+- 发布源码的 immutable commit 为 `637484295c10627f06e610bfe040dd58e67d309a`，**60 Remote** 四条 Hook 已 pin 到此版本。**62 LOCAL** 仍采用固定本地路径 `Script/aies_siri_deepseek_v06.js,enable=true`，用户必须人工覆盖本地 JS 才能运行本次新逻辑。
+- **下一步**不是重新跑 61 协议探针，而是用新本地 JS 做一次无隐私、直接提问+续答的真实 Siri UI 检验；留意 `FOLLOWUP_GROUP_TQA_TEXT` / `FOLLOWUP_GROUP_OTHER_SIRI` / `RESPONSE_TAG_MISSING` 的固定分类码，并结合每轮来源标记判定。**尚未证明此前 9 次拒绝是 TQA 组，也尚未解决新连接的 header/tag 丢失。**
