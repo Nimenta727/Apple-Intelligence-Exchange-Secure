@@ -1,5 +1,7 @@
 # Apple Intelligence Exchange Secure (AIES)
 
+> **Real-device status (2026-11-20): experimental module 63 v0.7 FAILED in Siri and is now disabled by default.** In six requests DeepSeek finished and Shadowrocket emitted a synthetic early response, but Siri displayed no usable DeepSeek reply and sent no session followup. **Restore module 62 LOCAL** with the previous v0.6 JavaScript, and leave 63, 60, and 61 disabled. Passing mock SSE tests does not imply compatibility with native Siri. See the [incident and next steps](docs/routine/2026-11-20-11-25-v07-synthetic-sse-real-device-failure.md).
+
 **Experimental Shadowrocket Siri and Apple Writing Tools text → DeepSeek response rewriting.** Not affiliated with Apple, Qwen, Shadowrocket or DeepSeek.
 
 > **v0.6.0-beta (2026-11-19). A simple Siri answer visibly carried the DeepSeek source marker; complex/continuous calls are NOT yet reliable.** A real iPad has confirmed the `siri.multimodal.noRTI` request group, a text-only JSON input, and a 13-event Qwen SSE response. One native Qwen stream passed the existing strict preflight. A historical DeepSeek call reached the script's response-attempt stage, but a simple device-visible reply has since been observed, but complex requests remain unreliable.
