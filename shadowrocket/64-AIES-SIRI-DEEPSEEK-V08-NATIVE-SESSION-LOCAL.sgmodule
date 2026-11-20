@@ -1,0 +1,25 @@
+#!name=AIES 64 DISABLED - Native Siri Session / DeepSeek v0.8 Protocol Preview
+#!desc=EXPERIMENTAL and DISABLED by default. Based on real upstream Qwen session SSE; strict native event/choice/schema verification and fixed latency buckets. Keep 62 LOCAL working, do not enable both.
+#!system=ios
+
+# OPT-IN RESEARCH PREVIEW, NOT A TESTED REPLACEMENT for working 62 LOCAL.
+# The existing 60 Remote, 61 Diagnostic, 62 LOCAL and quarantined 63 are UNCHANGED.
+# Safe default: ALL FOUR HOOKS have enable=false. User must explicitly opt in.
+# Do not enable any of 60/61/62/63 simultaneously with 64.
+# Uses a REAL Qwen response/session as SSE base. NEVER invent a session like failed 63.
+# Fail-closed if response tag or original request body cannot prove correlation.
+# No latest-prompt global fallback and no unsafe official-Qwen-as-DeepSeek fallback.
+# Strict text-only known Siri groups; classify vision/unknown groups but reject conversion.
+# Requires local iCloud Drive/Shadowrocket/Script/aies_siri_deepseek_v08_native_sse.js.
+# Existing SAIRS_DEEPSEEK_API_KEY and MITM cert reused; never put credentials here.
+# Apple Siri UI/multi-turn and the 6-8s estimate still require REAL DEVICE validation.
+# Rollback: disable 64, re-enable exactly 62 LOCAL; v06 files were not overwritten.
+
+[MITM]
+hostname = %APPEND% prod-yabuli.qianwen.com
+
+[Script]
+AIES64 Capture = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=Script/aies_siri_deepseek_v08_native_sse.js,enable=false
+AIES64 Rewrite = type=http-response,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/responses(?:\?.*)?$,requires-body=true,max-size=921600,timeout=20,script-path=Script/aies_siri_deepseek_v08_native_sse.js,enable=false
+AIES64 Followup Capture = type=http-request,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?.*)?$,requires-body=true,max-size=307200,timeout=20,script-path=Script/aies_siri_deepseek_v08_native_sse.js,enable=false
+AIES64 Followup Rewrite = type=http-response,pattern=^https:\/\/prod-yabuli\.qianwen\.com\/v1\/sessions\/[^\/?#]{1,160}\/responses(?:\?.*)?$,requires-body=true,max-size=921600,timeout=20,script-path=Script/aies_siri_deepseek_v08_native_sse.js,enable=false
