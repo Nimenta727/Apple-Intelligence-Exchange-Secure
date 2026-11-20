@@ -1264,7 +1264,7 @@ if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
  storeWrite("AIES_R1_"+tag,""); // consume once, even if invalid
  if(validStored&&current.scene===activeScene&&
     (current.route||"main")===(followupRoute?"followup":"main"))prompt2=current.p;
- if(prompt2)log("RESPONSE_PROMPT_FROM_STORE");
+ if(prompt2){log("RESPONSE_PROMPT_FROM_STORE");timeLog("UPSTREAM_ELAPSED",current&&current.capturedAt);}
  else log("RESPONSE_PROMPT_STORE_MISSING");
 }
 var responseBody=rawRequest();
@@ -1288,13 +1288,21 @@ if(!prompt2){
  if(fromReq){prompt2=fromReq;log("RESPONSE_PROMPT_FROM_BODY");}
  else log("RESPONSE_PROMPT_BODY_UNAVAILABLE");
 }
-if(!prompt2){error("PROMPT_UNAVAILABLE");return;}
+if(!prompt2){
+ log(!tag?"CORRELATION_NO_TAG_NO_VALID_BODY":"CORRELATION_NO_VALID_PROMPT");
+ error("PROMPT_UNAVAILABLE");return;
+}
 // Session followups MUST have a verified response tag and previous DeepSeek
 // choice context; never infer identity from a global "last question" slot.
 if(followupRoute&&(!current||current.route!=="followup"||
    !validId(current.prev)||!validId(current.sid))){error("FOLLOWUP_CORRELATION_UNAVAILABLE");return;}
 var priorMessages=followupRoute?verifiedHistory(current.prev,current.sid):[];
 if(followupRoute&&!priorMessages){error("FOLLOWUP_CONTEXT_UNAVAILABLE");return;}
+// Layer 3: native upstream state machine audited BEFORE model billing.
+var audit=auditNativeSse(res.body,activeScene,
+ followupRoute?"followup":"main",followupRoute?current.sid:null);
+if(!audit.ok){log("SSE_AUDIT_"+audit.code);error("SSE_CONTRACT_UNSUPPORTED");return;}
+log("SSE_AUDIT_PASSED");
 // Fail before billing DeepSeek if this upstream stream cannot be rewritten.
 if(!rewriteSse(res.body,"AIES_VALIDATION_ONLY",activeScene,
    followupRoute?"followup":"main",followupRoute?current.sid:null)){
@@ -1304,11 +1312,21 @@ log("SSE_PREFLIGHT_PASSED");
 var key=storeRead(C.keyName);
 if(!validKey(key)){error("KEY_NOT_PROVISIONED");return;}
 if(!http||typeof http.post!=="function"){error("HTTP_CLIENT_UNAVAILABLE");return;}
-if(typeof setTimeout==="function")timer=setTimeout(function(){error("MODEL_TIMEOUT");},C.timeoutMs);
+// SAIR's ~6-8s Siri client window is a third-party estimate.
+ // Bound model wait from the verified request capture, if available.
+var capturedAt=current&&typeof current.capturedAt==="number"?
+ current.capturedAt:null;
+var remaining=capturedAt===null?C.timeoutMs:
+ C.clientWindowEstimateMs-(Date.now()-capturedAt)-350;
+if(remaining<=0){log("SIRI_WINDOW_EXHAUSTED");error("CLIENT_WINDOW_ESTIMATE_EXCEEDED");return;}
+var modelBudget=Math.max(1,Math.min(remaining,C.timeoutMs));
+var modelStart=Date.now();
+if(typeof setTimeout==="function")
+ timer=setTimeout(function(){timeLog("MODEL_ELAPSED",modelStart);error("MODEL_TIMEOUT");},modelBudget);
 log("DEEPSEEK_STARTED");
 try{
  http.post({
-  url:C.endpoint,method:"POST",timeout:14,"auto-redirect":false,
+  url:C.endpoint,method:"POST",timeout:7,"auto-redirect":false,
   headers:{"Content-Type":"application/json","Accept":"application/json","Authorization":"Bearer "+key},
   body:safeJson({
    model:C.model,stream:false,thinking:{type:"disabled"},max_tokens:1000,
@@ -1320,6 +1338,8 @@ try{
   })
  },function(err,reply,bodyText){
   if(once)return;
+  timeLog("MODEL_ELAPSED",modelStart);
+  timeLog("END_TO_END_ATTEMPT",capturedAt);
   abModel(reply,bodyText,err);
   if(err){error("MODEL_NETWORK");return;}
   var answer=modelReply(reply,bodyText);
@@ -1334,7 +1354,7 @@ try{
   if(activeScene==="writing")log("WRITINGTOOLS_DEEPSEEK_PAYLOAD_READY");
   else if(saveVerifiedHistory(rewritten,prompt2,answer,priorMessages))
    log("SIRI_CONTEXT_STORED");
-  else log("SIRI_CONTEXT_STORE_FAILED");
+  else {log("SIRI_CONTEXT_STORE_FAILED");error("SESSION_STORE_UNAVAILABLE");return;}
   log("DEEPSEEK_LABEL_APPLIED");
   log("DEEPSEEK_RESPONSE_ATTEMPTED");
   done({status:200,headers:{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-store","X-AIES-Answer-Source":"deepseek"},body:rewritten});
