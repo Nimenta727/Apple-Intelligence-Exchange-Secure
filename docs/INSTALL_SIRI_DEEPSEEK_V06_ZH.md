@@ -174,3 +174,20 @@ script-path=Script/aies_siri_deepseek_v06.js,enable=true
 **操作**：保持 60 / 61 关闭；在 Shadowrocket 的 62 模块中**重新下载/导入 main 的最新 62 LOCAL 模块或覆盖本地模块文本**，因为已保存的模块不会自动采用仓库新内容。确认四条 Hook 都显示 `Script/aies_siri_deepseek_v06.js,enable=true`。JS 仍是固定 SHA `c9e8ac6332c7726594006fd243839742dba5d88a`，无需更换 DeepSeek Key、重复下载 JS 或新建证书。重新应用当前配置，先检查脚本开关是否维持开启、`script js file is not found` 是否消失；**没有真实 `[AIES_V06] REQUEST_CAPTURED` 前不继续做多轮 Siri 模型验收**。
 
 注意：日志只证明旧路径无法读取；`Script/` 前缀和 `enable=true` 是根据 Shadowrocket 发布的可用格式提出的具体修正，**尚未验证用户本机的自动关闭问题已被消除**。如果刷新模块后依旧自动关闭，应保持 62 停用，采用备份配置后直接在现有 `[Script]` 节添加四条与 62 相同的规则，不再同时使用任一 AIES 模块，并检查当前 Shadowrocket 版本的模块/脚本 UI 生效方式。
+
+## 2026-11-20 09:43：真机仅第一问成功——previous_choice_id 严格校验与空值备用关联
+
+用户使用已正常启动的 62 LOCAL，提交 `PacketTunnel-20261120094303.log`。在真机日志中，两次主 Siri 请求都进入了 `REQUEST_CAPTURED → RESPONSE_TAG_PRESENT → SSE_PREFLIGHT_PASSED → DEEPSEEK_STARTED → SIRI_CONTEXT_STORED → DEEPSEEK_LABEL_APPLIED → DEEPSEEK_RESPONSE_ATTEMPTED`；但两个后续会话请求分别在 09:44:03 和 09:44:39 报 `NORTI_SHAPE_PREVIOUS_CHOICE_INVALID → ERROR_UNSUPPORTED_SIRI_REQUEST`，**甚至还没调用 DeepSeek**。另有一次主请求响应丢失 tag，导致 `ERROR_PROMPT_UNAVAILABLE`；此错误与两次追问失败是独立问题。
+
+初代 60 以 `/^[A-Za-z0-9_-]{1,160}$/` 强制校验 `previous_choice_id`。而 61 原始无正文探针只证明字段**类型是字符串**，未披露值，因此当前日志**不能推断该字符串究竟为空、含特殊字符还是超长**。
+
+**已修复但仍需真机验收的限定场景**：
+
+- 当 `previous_choice_id === ""` 时，新版允许在同一 Siri `/v1/sessions/{id}/responses` URL session 中读取此前**已通过 DeepSeek + SSE 校验**的最新本地 choice，绑定在原 5 分钟 TTL 内继续；请求/响应 tag、纯文本白名单、模型来源标记、SSE 审核仍必须通过。
+- `previous_choice_id` **是非空、规范 ID** 时继续严格按原 choice ID 精确查找，不做宽松兜底。
+- `previous_choice_id` 是**非空、含不支持字符、超长、缺失、非字符串**时仍拒绝，不允许错误串用其他会话的回答。
+- 固定诊断日志新增 `FOLLOWUP_PREVIOUS_CHOICE_EMPTY`、`FOLLOWUP_PREVIOUS_CHOICE_NOT_STRING`、`FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL`、`FOLLOWUP_PREVIOUS_CHOICE_OVERSIZE`，**只输出分类，不记录 ID 值、提问文本或敏感元数据**。空指针且从同一会话找回上下文时记录 `FOLLOWUP_SESSION_CONTEXT_RECOVERED`。新源码固定到 `c9e8ac6332c7726594006fd243839742dba5d88a`。
+- 62 LOCAL 的四条 Hook 仍为 `script-path=Script/aies_siri_deepseek_v06.js,enable=true`，**仅本地文件内容需要从上述新 SHA 覆盖**；60 Remote 四条 Hook 则已重新 pin 新 SHA。不能把“模块已更新”等同于本地 JS 已经替换。
+- 若再出现 `FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL` 或 `OVERSIZE`，不要上传真实 previous choice 值，保留 fail-closed。依据固定分类再决定是否需要更精准的安全格式解析。
+
+**验收顺序**：先保存备份，使用新版 62 LOCAL + 新版 JS；原 60/61 关闭。仅做普通无隐私的同一次 Siri 交互两问。看第二轮是否有 `FOLLOWUP_SESSION_CONTEXT_RECOVERED` / `REQUEST_CAPTURED` 和最终 `【DeepSeek · AIES】`；若未修复，仅分享 `[AIES_V06]` 固定代码，停止重复提问。已通过单轮还不足以宣称多轮 UI 成功。
