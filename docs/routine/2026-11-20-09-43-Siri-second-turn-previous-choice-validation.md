@@ -33,3 +33,10 @@
 3. 只在同一个 Siri 会话中问两句非私人纯文本，核对 `[AIES_V06]` 日志：若 `FOLLOWUP_PREVIOUS_CHOICE_EMPTY` 和 `FOLLOWUP_SESSION_CONTEXT_RECOVERED`，再确认 `SSE_PREFLIGHT_PASSED`、`DEEPSEEK_RESPONSE_ATTEMPTED` 和 UI 标记。
 4. 若报告 `FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL` 或 `OVERSIZE`，根据类型/长度等级设计更严格的隐私安全协议探针，**绝不收集或上传原 ID**，且不放松跨会话和来源标记。
 5. 修复多轮后还需单独研究日志中偶发的主请求 `RESPONSE_TAG_MISSING`、并发和超时等回归问题。
+
+## PR #37 合并与 CI 补记
+
+- [PR #37](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/37) 已成功合并至 main，merge commit `f59df4e5e86a27b17170e678fe5eb5c1e1ff9dbf`。
+- [GitHub Actions](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44656987654)：**111 项测试全部通过，0 失败**。最初一次 CI 功能测试也是 111/111，通过后发现的是静态检查 `tools/check-docs.js` 未同步更新 62 注释所需的 Runtime pin；现已修正并通过最终 CI。
+- 当前 **60 Remote** 四 Hook 已 pin `c9e8ac6332c7726594006fd243839742dba5d88a`。**62 LOCAL** 的四 Hook 继续指向 `Script/aies_siri_deepseek_v06.js,enable=true`；用户要**手动替换 iCloud 云盘 `Shadowrocket/Script` 里的 JS 内容**才能使用本次运行时修复，单独刷新模块不足以更新本地文件。
+- 下一步真机判断应先看是否出现 `FOLLOWUP_PREVIOUS_CHOICE_EMPTY` 或 `FOLLOWUP_PREVIOUS_CHOICE_NONCANONICAL`，这只披露形式类别，不泄漏实际值；只有空指针才可通过同 session 已验证 DeepSeek 历史尝试续答。不把 CI 测试成功当作用户 Siri UI 已通过多轮验收。
