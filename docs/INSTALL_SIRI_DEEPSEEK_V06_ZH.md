@@ -1,5 +1,7 @@
 # AIES v0.6 Shadowrocket Siri / 写作工具安装、模式切换与回滚
 
+> **回滚提示（2026-11-20）：如果安装过 63 v0.7，请停止使用。** 该请求优先实验版在真实 Siri 上出现六次本地 SSE 已提交但完全无可见回答的问题，仓库已默认禁用它。恢复可用方案：关闭 63，启用 62 LOCAL，保持 iCloud 云盘 `Shadowrocket/Script/aies_siri_deepseek_v06.js` 的原版文件，重新应用当前配置；60 和 61 仍保持关闭。不需要重新设置 `SAIRS_DEEPSEEK_API_KEY` 或重装证书。详细证据：[11:25 回归记录](routine/2026-11-20-11-25-v07-synthetic-sse-real-device-failure.md)。
+
 > **实验 Beta，未通过原生 Siri UI 验收。** 60 是 Siri + WritingTools Compose Beta 的 DeepSeek 改写模式；61 是只读 Qwen 诊断模式，**两者不能同时启用**。用户问题可能先到 Qwen，再由 60 转交给 DeepSeek，无法提供系统级“零 Qwen 流量”保证。
 
 ## 1. 当前两个模块

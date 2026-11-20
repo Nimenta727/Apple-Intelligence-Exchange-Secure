@@ -108,7 +108,7 @@ if(!localModule.includes("637484295c10627f06e610bfe040dd58e67d309a"))
 const v07Module=fs.readFileSync(path.join(root,"shadowrocket/63-AIES-SIRI-DEEPSEEK-V07-REQUEST-FIRST-LOCAL.sgmodule"),"utf8");
 const v07Js=fs.readFileSync(path.join(root,"scripts/aies_siri_deepseek_v07_request_first.js"),"utf8");
 const v07Hooks=v07Module.match(/^AIES63 .+type=http-request.+script-path=.+$/gm)||[];
-if(v07Hooks.length!==2||v07Hooks.some(x=>!x.endsWith(",script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=true"))||
+if(v07Hooks.length!==2||v07Hooks.some(x=>!x.endsWith(",script-path=Script/aies_siri_deepseek_v07_request_first.js,enable=false"))||
   /type=http-response/.test(v07Module))
  fail("v07 request-first module requires exactly two local request hooks and NO response hooks");
 if(v07Hooks.some(x=>!hooks.filter(x=>x.includes("type=http-request")).some(remote=>
@@ -121,8 +121,8 @@ if(!v07Js.includes('version:"0.7.0-request-first-experimental"')||
   !v07Js.includes("LOCAL_SSE_RESPONSE_READY")||!v07Js.includes("buildSyntheticSiriSkeleton")||
   !v07Js.includes("FOLLOWUP_STRUCTURAL_GROUP_CANDIDATE"))
  fail("v07 must explicitly version and expose request-first synthetic/SSE paths");
-if(!/NEVER together/.test(v07Module)||!/EXPERIMENTAL/.test(v07Module))
- fail("v07 must disclose experimental and mutual-exclusion limitations");
+if(!/NEVER together/.test(v07Module)||!/QUARANTINED/.test(v07Module)||!/DISABLED/.test(v07Module))
+ fail("v07 must disclose actual device failure and stay quarantined");
 const passiveModule=fs.readFileSync(path.join(root,"shadowrocket/61-AIES-QWEN-PASSIVE-DIAG.sgmodule"),"utf8");
 const passiveScript=fs.readFileSync(path.join(root,"scripts/aies_qwen_passive_diag.js"),"utf8");
 const passiveHooks=passiveModule.match(/^AIES61 Passive (?:Followup )?(?:Request|Response) = .*type=http-(?:request|response).*script-path=.+$/gm)||[];

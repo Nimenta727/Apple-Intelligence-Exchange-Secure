@@ -1,5 +1,7 @@
 # AIES v0.6 当前状态（2026-11-19，真机证据归档后）
 
+> **2026-11-20 11:25 最新真机结论：v0.7 63 已失败并默认禁用，推荐恢复 v0.6 62 LOCAL。** 在六次 Siri 主请求中，63 的 DeepSeek 请求、合成 SSE 生成和 Shadowrocket 提前返回均成功记录；然而 Siri UI 均未得到 DeepSeek 答案，并且未观察到 session followup 请求。不能把 `LOCAL_SSE_RESPONSE_READY` 视为客户端接收成功。v0.7 请求优先架构仅保留供研究，仍需有设备证据才能确定拒绝发生在应用层还是合成协议层。详见 [问题复盘与后续方案](routine/2026-11-20-11-25-v07-synthetic-sse-real-device-failure.md)。
+
 > **真实功能状态：实验性 Beta、已证实至少一次 Siri 可见 DeepSeek 标记，但复杂问题尚未稳定验收。** 60 模块的 Siri 请求解析在真机曾成功，DeepSeek API 曾至少一次进入有效响应的脚本处理路径，61 模块已两次观测真实 Qwen SSE，其中一次满足 60 严格预检。**最新 60 已至少一次在 Siri UI 显示带来源标记的答案，复杂问答仍待验证**。不要将离线 CI 或“Qwen 卡片出现”误写成完整成功。
 
 ## 一张表看清进展

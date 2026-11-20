@@ -1,5 +1,7 @@
 # Apple Intelligence Exchange Secure (AIES)
 
+> **2026-11-20 真机重要更新：63 v0.7 请求优先实验模块已验证失败，现已默认禁用。** 11:25 日志中六次 DeepSeek 调用和合成 SSE 都完成，Shadowrocket 六次显示提前向客户端响应，但 Siri 没有显示 DeepSeek 答案，也没有发起 session followup。请使用此前可工作的 [62 LOCAL](shadowrocket/62-AIES-SIRI-DEEPSEEK-V06-LOCAL.sgmodule)，不要同时启用 63；详见 [故障归档](docs/routine/2026-11-20-11-25-v07-synthetic-sse-real-device-failure.md)。模拟测试通过不等于 Siri UI 通过。
+
 **实验性 Shadowrocket Siri + Apple 写作工具 → DeepSeek 文本回答改写项目。**
 
 > **v0.6.0-beta · 2026-11-19 真实协议已观测，至少一次可见 DeepSeek 标记已成功；复杂问答仍不稳定。**
