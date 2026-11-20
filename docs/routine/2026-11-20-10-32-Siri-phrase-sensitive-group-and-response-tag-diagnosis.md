@@ -40,3 +40,4 @@
 - [GitHub Actions](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44662425802)：**120 tests / 120 pass / 0 fail**，覆盖新 TQA followup 正例、同会话与 SSE 校验，以及未知组、非 Siri、图像、工具、跨会话拒绝。
 - 发布源码的 immutable commit 为 `637484295c10627f06e610bfe040dd58e67d309a`，**60 Remote** 四条 Hook 已 pin 到此版本。**62 LOCAL** 仍采用固定本地路径 `Script/aies_siri_deepseek_v06.js,enable=true`，用户必须人工覆盖本地 JS 才能运行本次新逻辑。
 - **下一步**不是重新跑 61 协议探针，而是用新本地 JS 做一次无隐私、直接提问+续答的真实 Siri UI 检验；留意 `FOLLOWUP_GROUP_TQA_TEXT` / `FOLLOWUP_GROUP_OTHER_SIRI` / `RESPONSE_TAG_MISSING` 的固定分类码，并结合每轮来源标记判定。**尚未证明此前 9 次拒绝是 TQA 组，也尚未解决新连接的 header/tag 丢失。**
+- 主分支后续追加 [`docs/CURRENT_STATUS_ZH.md`](../CURRENT_STATUS_ZH.md) 当前状态条目（commit `24ed65c5947d5afcc9f04b63e18b5cf26ebff0a5`），同步区分已证实的 16 次同会话恢复、23 次改写尝试、仍未完成的配置组兼容和丢失事务标记问题；下一步继续真机 UI 端验收，再针对固定码逐项修复，不把改写尝试等同于用户已见 DeepSeek 回答。
