@@ -46,3 +46,10 @@
 ### 真机完成前的禁止事项
 
 **不要将 63 宣称为稳定可用或自动替换 62。** 当前 CI 模拟验证了请求钩子返回结构，但没有真实设备对 `200 SSE` 的客户端接收与后续 session/choice 的确认。安装者必须手动启用实验模块；若 Siri 不接受或出现错误，关闭 63 并恢复原始 62 是最短的回退路径。下一步优先收集固定 `[AIES_V07]` 阶段码（不收集会话值、请求体、Key）验证这种全新传输结构。
+
+## PR #40 合并、最终 CI 和部署状态
+
+- [PR #40](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/40) **已合并 main**，merge commit `f2a683fdfcf458ff70cb05be0dfdbc42ff3a8bbe`。
+- 最新 PR [GitHub Actions](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44666238173) 全绿；在新增 v0.7 专项回归及 v0.6 既有测试的合并集上，**133/133 tests passed**。已包括 npm check 的 JS 语法、module 规则静态检查、Markdown 相对链接检查。
+- **安装策略不变：** 原 60 Remote、61 Passive、62 LOCAL 均未删除、更未被 63 覆盖；63 是显式人工安装 / 启用的独立实验版本。它只用本地 `Script/aies_siri_deepseek_v07_request_first.js`；不触及现有 `SAIRS_DEEPSEEK_API_KEY`。
+- **下一步：** 真机 iPad 只进行一次普通无隐私问题与一次接续问答。依据 `[AIES_V07]` 的 `REQUEST_VALIDATED`、`SYNTHETIC_SSE_PREFLIGHT_PASSED`、`DEEPSEEK_STARTED`、`LOCAL_SSE_RESPONSE_READY` 及 Siri UI 实际来源标签判定。若客户端出现不能解析合成 SSE、会话不继续或错误提示，则立即停用 63、启用原 62，不重复测试到成功为止。
