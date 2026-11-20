@@ -67,9 +67,6 @@ function textAtom(v){
 
 // ── CLIENT GATE: bounded request shape, pure user text ──
 var requestGroup=null;
-function isWritingTools(){
- return /^WritingTools(?:\s|\()/i.test(header(req&&req.headers,"User-Agent"));
-}
 function isSiriForProbe(){
  return /^Siri\s*\(/i.test(header(req&&req.headers,"User-Agent"));
 }
@@ -184,7 +181,8 @@ function parseRequest(raw,allowRecoveredSiri,followupMode){
    }
    if(structuralFollowup)log("FOLLOWUP_STRUCTURAL_GROUP_CANDIDATE");
    else if(followupMode)log("FOLLOWUP_KNOWN_GROUP_CANDIDATE");
-   if(true){
+   // Regardless of known/structural group, enforce the SAME Siri text shape.
+   {
    var shapeReasons=observedSiriTextEnvelopeReasons(o,!!followupMode);
    if(followupMode){
     // Only fixed classification codes are logged, never the opaque choice value.
