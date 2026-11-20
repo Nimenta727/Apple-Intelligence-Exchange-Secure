@@ -1,13 +1,9 @@
 /*
- * AIES v0.7 experimental request-first Siri adapter.
- * Independent from production v0.6: ONE request hook owns the transaction,
- * model call and synthetic Siri SSE. No Qwen upstream response is required.
- * Qwen is never contacted by a successfully intercepted request hook; a
- * system or MITM bypass is outside this script's control.
- * Experimental: Siri acceptance of synthetic session/SSE is NOT yet verified
- * on a real iPad. Enable only the opt-in module 63, never with 60/61/62.
- *
- * Original SAIR architecture research: boitar/sair, MIT.
+ * AIES v0.7 request-first experimental Siri/DeepSeek engine.
+ * Independent 63 LOCAL module. ONLY native Siri pure-text request hooks.
+ * Four layers: strict input gate -> verified session -> synthetic SSE
+ * -> async DeepSeek + direct response. No response-side transaction tag.
+ * Real Siri UI compatibility requires device verification.
  */
 (function () {
 "use strict";
@@ -32,7 +28,7 @@ var http=typeof $httpClient!=="undefined" ? $httpClient : null;
 var finish=typeof $done==="function" ? $done : null;
 if(!finish)return;
 var once=false,timer=null;
-function log(s){try{if(typeof console!=="undefined"&&console.log)console.log("[AIES_V07] "+s);}catch(e){};abStatus(s);}
+function log(s){try{if(typeof console!=="undefined"&&console.log)console.log("[AIES_V07] "+s);}catch(e){}}
 function done(data){if(once)return;once=true;if(timer!==null&&typeof clearTimeout==="function")try{clearTimeout(timer);}catch(e){};try{finish(data);}catch(e){log("DONE_EXCEPTION");}}
 function error(code){
  log("ERROR_"+code);
@@ -68,10 +64,8 @@ function textAtom(v){
     Object.keys(t).length===1&&typeof t.value==="string")return t.value;
  return null;
 }
-// Opt-in local-only v2 diagnostic. One state key avoids ARM/RESULT double-write
-// ambiguity. Never log group values, prompt text, headers or credential material.
-var GROUP_PROBE_STATE="AIES_SIRI_GROUP_PROBE_V2_STATE";
-var GROUP_PROBE_WINDOW_MS=600000;
+
+// ── CLIENT GATE: bounded request shape, pure user text ──
 var requestGroup=null;
 function isWritingTools(){
  return /^WritingTools(?:\s|\()/i.test(header(req&&req.headers,"User-Agent"));
@@ -85,221 +79,7 @@ function safeGroupIdentifier(v){
    !/[A-Za-z0-9]{25,}/.test(v)&&
    !/^(?:bearer|token|secret|sk-)/i.test(v);
 }
-function readArmedProbe(){
- var raw=storeRead(GROUP_PROBE_STATE),v=null,now=Date.now();
- if(!raw||typeof raw!=="string")return null;
- try{v=JSON.parse(raw);}catch(e){return null;}
- if(!v||v.v!==2||v.phase!=="armed"||
-    typeof v.expiresAt!=="number"||!isFinite(v.expiresAt)||
-    v.expiresAt<=now||v.expiresAt>now+GROUP_PROBE_WINDOW_MS)return null;
- return v;
-}
-function cappedCount(v){
- return typeof v==="number"&&isFinite(v)&&v>=0?Math.min(9,Math.floor(v)+1):1;
-}
-function probeObserveWritingTools(){
- if(res)return;
- var state=readArmedProbe();
- if(!state)return;
- state.writingToolsSeen=cappedCount(state.writingToolsSeen);
- if(storeWrite(GROUP_PROBE_STATE,JSON.stringify(state)))
-  log("SIRI_PROBE_WRITINGTOOLS_SEEN");
- else log("SIRI_PROBE_STORE_WRITE_FAILED");
-}
-function probeObserveRequest(){
- if(res)return;
- var state=readArmedProbe();
- if(!state)return;
- // Never record group IDs from non-POST traffic, even with a Siri-looking UA.
- if(String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){
-  log("SIRI_PROBE_NON_POST_IGNORED");return;
- }
- if(!isSiriForProbe()){
-  state.otherClientSeen=cappedCount(state.otherClientSeen);
-  if(storeWrite(GROUP_PROBE_STATE,JSON.stringify(state)))
-   log("SIRI_PROBE_OTHER_CLIENT_SEEN");
-  else log("SIRI_PROBE_STORE_WRITE_FAILED");
-  return;
- }
- state.siriSeen=cappedCount(state.siriSeen);
- // Only these fixed parser codes may be recorded, never untrusted values.
- var fixed={
-  OK:1,BODY_NOT_TEXT:1,BODY_EMPTY:1,BODY_OVERSIZE:1,
-  JSON_INVALID:1,ROOT_UNSUPPORTED:1,GROUP_MISSING:1,
-  GROUP_UNSUPPORTED:1,INPUT_UNSUPPORTED:1,CONTENT_UNSUPPORTED:1,
-  MEDIA_UNSUPPORTED:1,PROMPT_EMPTY:1,PROMPT_OVERSIZE:1,
-  STRUCTURE_UNSUPPORTED:1
- };
- state.lastCode=fixed[requestDiagnostic]?requestDiagnostic:"UNKNOWN_STAGE";
- var now=Date.now();
- if(requestDiagnostic==="GROUP_UNSUPPORTED"){
-  if(safeGroupIdentifier(requestGroup)){
-   state.phase="captured";
-   state.groupId=requestGroup;
-   // Keep the capture readable for ten minutes after the matching Siri request.
-   state.expiresAt=now+GROUP_PROBE_WINDOW_MS;
-   state.lastCode="GROUP_CAPTURED";
-  }else state.lastCode="GROUP_ID_UNSAFE";
- }
- if(!storeWrite(GROUP_PROBE_STATE,JSON.stringify(state))){
-  log("SIRI_PROBE_STORE_WRITE_FAILED");return;
- }
- if(state.phase==="captured")log("SIRI_GROUP_CAPTURED_LOCAL");
- else if(state.lastCode==="GROUP_ID_UNSAFE")log("SIRI_GROUP_PROBE_UNSAFE_ID");
- else log("SIRI_PROBE_SIRI_REQUEST_SEEN");
-}
-// The observed iPadOS 27.3 Siri group is named "multimodal". To prevent
-// accidentally routing images, audio, sidecar attachments or hidden context to
-// the text-only model, support only explicit text envelopes for this group.
-// The real Siri JSON envelope remains unverified: reject unknown structures.
-// Separate one-shot, opt-in *schema metadata* diagnostic for the real noRTI
-// parser mismatch. NEVER store request values, text, IDs, headers or secrets.
-// Key names are bounded and secret-looking names are redacted. All captured
-// material remains in Shadowrocket's local persistent store until manual read.
-var NORTI_SCHEMA_PROBE_STATE="AIES_NORTI_SCHEMA_PROBE_V1_STATE";
-var NORTI_SCHEMA_PROBE_TTL=600000;
-function safeSchemaFieldName(k){
- return typeof k==="string"&&k.length>0&&k.length<=40&&
-  /^[A-Za-z_][A-Za-z0-9_-]*$/.test(k)&&
-  !/[A-Za-z0-9]{22,}/.test(k)&&
-  !/(?:secret|token|auth|bearer|cookie|passwd|password|private|credential|api.?key|session|account|user|email|phone|address|location|uuid|identifier)/i.test(k);
-}
-function schemaTypeName(v){
- if(v===null)return "null";
- if(Array.isArray(v))return "array";
- var t=typeof v;
- return t==="string"||t==="number"||t==="boolean"||t==="object"?t:"other";
-}
-function schemaKeysOnly(obj,excluded){
- if(!obj||typeof obj!=="object"||Array.isArray(obj))return [];
- var out=[],keys=Object.keys(obj);
- for(var i=0;i<keys.length;i++){
-  var k=keys[i];
-  if(excluded.indexOf(k)>=0)continue;
-  if(out.length>=8){out.push({name:"TRUNCATED",type:"other"});break;}
-  out.push({name:safeSchemaFieldName(k)?k:"REDACTED",type:schemaTypeName(obj[k])});
- }
- return out;
-}
-function captureNortiSchemaLocally(o){
- // This executes ONLY during a rejected Siri POST request hook, and only
- // after manual opt-in; never use response, WritingTools or other clients.
- if(res||!isSiriForProbe()||
-    String(req.method||req.httpMethod||"").toUpperCase()!=="POST")return;
- var state=null,raw=storeRead(NORTI_SCHEMA_PROBE_STATE),now=Date.now();
- try{state=raw&&JSON.parse(raw);}catch(e){return;}
- if(!state||state.v!==1||state.phase!=="armed"||
-    typeof state.createdAt!=="number"||typeof state.expiresAt!=="number"||
-    !isFinite(state.createdAt)||!isFinite(state.expiresAt)||
-    state.createdAt>now||state.expiresAt<=now||state.expiresAt>now+NORTI_SCHEMA_PROBE_TTL)return;
- var item=null,message=null,items=Array.isArray(o.input)?o.input:[];
- // Select first item with an extra message wrapper (if present), otherwise
- // first object item. Do not enumerate content objects or any values.
- for(var i=0;i<items.length&&i<12;i++){
-  var candidate=items[i];
-  if(!candidate||typeof candidate!=="object"||Array.isArray(candidate))continue;
-  if(!item)item=candidate;
-  if(Object.prototype.hasOwnProperty.call(candidate,"message")&&
-     Object.keys(candidate).length>1){item=candidate;break;}
- }
- if(item&&item.message&&typeof item.message==="object"&&!Array.isArray(item.message))
-  message=item.message;
- var result={
-  v:1,phase:"captured",createdAt:state.createdAt,
-  expiresAt:now+NORTI_SCHEMA_PROBE_TTL,
-  inputType:schemaTypeName(o.input),
-  root:schemaKeysOnly(o,["configuration","input"]),
-  wrapper:schemaKeysOnly(item,["message","content"]),
-  message:schemaKeysOnly(message,[])
- };
- if(storeWrite(NORTI_SCHEMA_PROBE_STATE,JSON.stringify(result)))
-  log("NORTI_SCHEMA_CAPTURED_LOCAL");
- else log("NORTI_SCHEMA_STORE_FAILED");
-}
-// ONE-SHOT LOCAL, OPT-IN capture of the actual Siri->Qwen JSON request body.
-// The capture is redacted BEFORE persistence: preserves message text/shape,
-// never reads credentials/header values or forwards data to another server.
-// Does not change request/response behavior: unsupported requests still fail.
-var QWEN_BODY_PROBE_STATE="AIES_QWEN_BODY_PROBE_V1_STATE";
-var QWEN_BODY_PROBE_WINDOW_MS=600000;
-function qwenBodyType(v){
- if(v===null)return "null";
- if(Array.isArray(v))return "array";
- return typeof v;
-}
-function qwenBodyRedactString(s){
- return s.replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9_.-]{8,}|eyJ[A-Za-z0-9_-]{20,}(?:\.[A-Za-z0-9_-]+){1,2})\b/g,"[REDACTED_TOKEN]")
-  .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig,"[REDACTED_EMAIL]");
-}
-function qwenBodyScrub(v,key,depth,counts){
- counts.nodes++;
- if(counts.nodes>180)return "[NODE_LIMIT]";
- if(depth>7)return "[DEPTH_LIMIT]";
- if(/(?:authorization|auth|token|cookie|password|secret|api.?key|session|credential|private|signature|phone|email|address|location|device|account|uuid|identifier|bearer)/i.test(key)&&
-    key!=="response_configuration_group_id")return "[REDACTED_FIELD]";
- if(/(?:image|audio|video|attachment|media|base64|blob|file|binary|data_url)/i.test(key))
-  return "[REDACTED_MEDIA]";
- if(key==="input_hint")return "[REDACTED_CONTEXT]";
- if(v===null||typeof v==="number"||typeof v==="boolean")return v;
- if(typeof v==="string"){
-  if(v.length>2000)return "[LONG_TEXT_REDACTED]";
-  if(/^(?:https?:\/\/|data:|file:)/i.test(v))return "[REDACTED_URI]";
-  return qwenBodyRedactString(v);
- }
- if(Array.isArray(v)){
-  if(v.length>20)return "[ARRAY_COUNT_EXCEEDED]";
-  return v.map(function(x){return qwenBodyScrub(x,key,depth+1,counts);});
- }
- if(typeof v!=="object")return "[UNKNOWN_TYPE]";
- var out={},keys=Object.keys(v);
- if(keys.length>28)return "[OBJECT_FIELDS_EXCEEDED]";
- for(var i=0;i<keys.length;i++){
-  var k=keys[i];
-  if(k.length>80){out["[LONG_FIELD_NAME]"]="[REDACTED]";continue;}
-  out[k]=qwenBodyScrub(v[k],k,depth+1,counts);
- }
- return out;
-}
-function captureQwenRequestBodyOnce(){
- if(res||!isSiriForProbe()||!req||
-    String(req.method||req.httpMethod||"").toUpperCase()!=="POST")return;
- var raw=storeRead(QWEN_BODY_PROBE_STATE),st=null,now=Date.now();
- if(!raw)return;
- try{st=JSON.parse(raw);}catch(e){return;}
- if(!st||st.v!==1||st.phase!=="armed"||
-    typeof st.createdAt!=="number"||typeof st.expiresAt!=="number"||
-    st.createdAt>now||st.expiresAt<=now||st.expiresAt>now+QWEN_BODY_PROBE_WINDOW_MS)return;
- if(typeof req.body!=="string"||!req.body.length||req.body.length>40000){
-  log("QWEN_BODY_CAPTURE_BODY_UNAVAILABLE");return;
- }
- var parsed=null;
- try{parsed=JSON.parse(req.body);}catch(e){log("QWEN_BODY_CAPTURE_JSON_INVALID");return;}
- if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)){
-  log("QWEN_BODY_CAPTURE_ROOT_UNSUPPORTED");return;
- }
- var clean={},ks=Object.keys(parsed),counts={nodes:0};
- // Input text and JSON envelope retained; tool definitions and format options
- // contribute only type/count descriptors, never their private contents.
- for(var i=0;i<ks.length;i++){
-  var key=ks[i],val=parsed[key];
-  if(["configuration","input","input_hint","stream"].indexOf(key)<0)
-   clean[key]={omitted:true,type:qwenBodyType(val),
-    count:Array.isArray(val)?Math.min(val.length,99):undefined};
-  else clean[key]=qwenBodyScrub(val,key,0,counts);
- }
- var snapshot=JSON.stringify(clean);
- if(snapshot.length>18000){
-  log("QWEN_BODY_CAPTURE_SANITIZED_TOO_LARGE");return;
- }
- var captured={v:1,phase:"captured",createdAt:st.createdAt,
-  expiresAt:now+QWEN_BODY_PROBE_WINDOW_MS,body:snapshot};
- if(storeWrite(QWEN_BODY_PROBE_STATE,JSON.stringify(captured)))
-  log("QWEN_BODY_CAPTURED_LOCAL");
- else log("QWEN_BODY_CAPTURE_STORE_FAILED");
-}
-// A known root group or a narrowly named Siri group in a followup URL
-// may enter the *same* strict pure-text parser. No media/tool response is
-// copied or executed, and an exact locally verified session is mandatory.
+
 function isV07StructuralSiriGroup(v){
  return safeGroupIdentifier(v)&&/^siri[._][A-Za-z0-9_.-]{2,58}$/i.test(v)&&
    !/(?:tool|action|execute|automation|audio|video|image|camera|visual|location|media)/i.test(v);
@@ -464,62 +244,8 @@ function parseRequest(raw,allowRecoveredSiri,followupMode){
   return prompt;
  }catch(e){requestDiagnostic="STRUCTURE_UNSUPPORTED";return null;}
 }
-// Compose is documented by boitar/sair's iOS 27.3 Qwen reverse analysis.
-// Exact allowlist: other WritingTools modes and rich/media input are NOT proven.
-function parseWritingToolsRequest(raw,allowRecoveredScene){
- if(!isWritingTools()&&!allowRecoveredScene){requestDiagnostic="WRITING_CLIENT_UNSUPPORTED";return null;}
- if(!raw||raw.length>C.maxRequest){requestDiagnostic="WRITING_BODY_UNAVAILABLE";return null;}
- var o;
- try{o=JSON.parse(raw);}catch(e){requestDiagnostic="WRITING_JSON_INVALID";return null;}
- if(!o||typeof o!=="object"||Array.isArray(o)){
-  requestDiagnostic="WRITING_ROOT_UNSUPPORTED";return null;
- }
- var g=o.configuration&&o.configuration.response_configuration_group_id;
- if(g!=="compose_selectedAndAllText"){
-  requestDiagnostic="WRITING_GROUP_UNVERIFIED";return null;
- }
- if(o.stream!==true||!Array.isArray(o.input)||o.input.length<1||o.input.length>12){
-  requestDiagnostic="WRITING_INPUT_UNSUPPORTED";return null;
- }
- if(Object.keys(o).some(function(k){
-  return ["configuration","input","client_tools","server_tools","stream",
-   "response_format","input_hint"].indexOf(k)<0;
- })){requestDiagnostic="WRITING_ROOT_UNSUPPORTED";return null;}
- if((o.client_tools&&!Array.isArray(o.client_tools))||
-    (o.server_tools&&!Array.isArray(o.server_tools))){
-  requestDiagnostic="WRITING_TOOLS_UNSUPPORTED";return null;
- }
- var parts=[];
- for(var i=0;i<o.input.length;i++){
-  var item=o.input[i];
-  if(!item||typeof item!=="object"||Array.isArray(item)||
-     (item.type&&item.type!=="message")){
-   requestDiagnostic="WRITING_INPUT_UNSUPPORTED";return null;
-  }
-  var m=item.message&&typeof item.message==="object"?item.message:item;
-  if(m.role!=="user"){requestDiagnostic="WRITING_ROLE_UNSUPPORTED";return null;}
-  var content=m.content,atoms=Array.isArray(content)?content:[content];
-  if(atoms.length<1||atoms.length>32){requestDiagnostic="WRITING_CONTENT_UNSUPPORTED";return null;}
-  for(var j=0;j<atoms.length;j++){
-   var txt=textAtom(atoms[j]);
-   if(typeof txt!=="string"||/data:(?:image|audio|video)\//i.test(txt)){
-    requestDiagnostic="WRITING_MEDIA_OR_CONTENT_UNSUPPORTED";return null;
-   }
-   if(txt.trim())parts.push(txt.trim());
-  }
- }
- var prompt=parts.join("\n\n");
- if(!prompt||prompt.length>C.maxPrompt){
-  requestDiagnostic="WRITING_PROMPT_UNSUPPORTED";return null;
- }
- requestDiagnostic="OK";return prompt;
-}
-function parseApplePrompt(raw,recoveredScene,followupMode){
- return isWritingTools()||recoveredScene==="writing"?
-  parseWritingToolsRequest(raw,recoveredScene==="writing"):
-  parseRequest(raw,recoveredScene==="siri",!!followupMode);
-}
 
+// ── MODEL/PROVENANCE AND STRICT SSE: no Qwen text copied ──
 function validKey(k){return typeof k==="string"&&/^[A-Za-z0-9_-]{12,256}$/.test(k)&&!/REPLACE_WITH|PLACEHOLDER/i.test(k);}
 function statusCode(resp){
  var s=resp&&(resp.statusCode||resp.status)||0;
@@ -757,135 +483,8 @@ function rewriteSse(original,answer,scene,route,expectedSession){
  if(joined.length>C.maxSse||joined.indexOf(safeJson(content))<0)return null;
  return joined;
 }
-// Manually armed, ten-minute DeepSeek-side A/B trace. This is OFF by default.
-// Only one controlled nonsensitive Siri question should be asked per trace.
-// The trace is local only; never copy credentials, HTTP headers, Siri prompts,
-// session IDs or original Qwen text into the persistent snapshot or console.
-var AB_TRACE_STATE="AIES_AB_DEEPSEEK_V1_STATE",AB_TRACE_WINDOW=600000;
-function abState(){
- var raw=storeRead(AB_TRACE_STATE),st=null,now=Date.now();
- try{st=raw&&JSON.parse(raw);}catch(e){return null;}
- if(!st||st.v!==1||st.phase!=="armed"||!Array.isArray(st.events)||
-    typeof st.createdAt!=="number"||typeof st.expiresAt!=="number"||
-    st.createdAt>now||st.expiresAt<=now||
-    st.expiresAt>now+AB_TRACE_WINDOW)return null;
- return st;
-}
-function abRecord(kind,detail){
- var st=abState();if(!st||st.events.length>=72)return;
- var line={tMs:Math.max(0,Date.now()-st.createdAt),stage:kind};
- if(detail&&typeof detail==="object"){
-  var allowed=["code","route","method","group","promptChars","inputItems",
-   "rootFields","requestType","status","bodyChars","eventCount","eventNames",
-   "deltaCount","deltaChars","doneChars","unparsedFrames","reason",
-   "choiceCount","finishReason","outputChars","answerText","answerTruncated",
-   "reasoningType","reasoningChars","usage","rewrittenChars","markerPresent"];
-  for(var i=0;i<allowed.length;i++){
-   var key=allowed[i];
-   if(Object.prototype.hasOwnProperty.call(detail,key))line[key]=detail[key];
-  }
- }
- st.events.push(line);
- var packed=JSON.stringify(st);
- if(packed.length<=45000)storeWrite(AB_TRACE_STATE,packed);
-}
-function abText(text){
- // This MAY include the nonsensitive example answer the user explicitly asks
- // to compare. Keep it LOCAL until manual read; no reasoning traces or tokens.
- var clean=typeof text==="string"?text:"";
- clean=clean.replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g,"[REDACTED_KEY]")
-  .replace(/\bBearer\s+[A-Za-z0-9._-]{8,}\b/ig,"[REDACTED_AUTH]")
-  .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig,"[REDACTED_EMAIL]")
-  .replace(/https?:\/\/[^\s"'<>]+/ig,"[REDACTED_URL]");
- return {answerText:clean.slice(0,7000),answerTruncated:clean.length>7000};
-}
-function abStatus(code){
- if(typeof code==="string"&&/^[A-Z0-9_]{3,90}$/.test(code))
-  abRecord("CODE",{code:code});
-}
-function abRequest(raw,prompt){
- var record={route:"MAIN",method:String(req&&req.method||"").toUpperCase()==="POST"?"POST":"OTHER",
-  promptChars:typeof prompt==="string"?prompt.length:0};
- if(typeof raw!=="string"||raw.length>300000){
-  record.requestType="UNAVAILABLE";abRecord("SIRI_REQUEST",record);return;
- }
- try{
-  var o=JSON.parse(raw),c=o&&o.configuration,g=c&&c.response_configuration_group_id;
-  record.group=g==="siri.multimodal.noRTI"?"siri.multimodal.noRTI":
-   g==="compose_selectedAndAllText"?"compose_selectedAndAllText":
-   (/^siri[._]tqa$/.test(g)?"siri.tqa":"OTHER_OR_MISSING");
-  record.inputItems=Array.isArray(o.input)?Math.min(o.input.length,99):0;
-  record.rootFields=Object.keys(o).filter(function(k){
-   return ["configuration","input","client_tools","server_tools","response_format","stream","input_hint"].indexOf(k)>=0;
-  }).sort();
-  record.requestType="JSON_OBJECT";
- }catch(e){record.requestType="JSON_INVALID";}
- abRecord("SIRI_REQUEST",record);
-}
-function abSse(route,status,body){
- var info={route:route,status:typeof status==="number"?status:0,
-  bodyChars:typeof body==="string"?body.length:0,
-  eventCount:0,eventNames:[],deltaCount:0,deltaChars:0,doneChars:0,unparsedFrames:0};
- if(typeof body==="string"&&body.length<=900000){
-  var blocks=body.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n\n");
-  for(var i=0;i<blocks.length&&i<400;i++){
-   var lines=blocks[i].split("\n"),name="",data=[];
-   for(var j=0;j<lines.length;j++){
-    var x=lines[j],pos=x.indexOf(":");
-    if(x.slice(0,6)==="event:")name=x.slice(6).trim();
-    if(x.slice(0,5)==="data:")data.push(x.slice(5).replace(/^ /,""));
-   }
-   if(!name)continue;
-   var label=/^session(?:\.|$)/.test(name)&&
-    /^[a-zA-Z0-9_.\[\]-]{1,110}$/.test(name)?name:"UNKNOWN_EVENT";
-   info.eventCount++;
-   if(info.eventNames.length<24)info.eventNames.push(label);
-   try{
-    var obj=JSON.parse(data.join("\n")),event=obj[name];
-    if(/\.delta$/.test(name)){
-     info.deltaCount++;
-     if(event&&typeof event.delta==="string")info.deltaChars+=event.delta.length;
-    }
-    if(/text\.value\.done$/.test(name)&&event&&typeof event.value==="string")
-     info.doneChars+=event.value.length;
-   }catch(e){info.unparsedFrames++;}
-  }
- }
- abRecord("SSE_STRUCTURE",info);
-}
-function abModel(reply,body,err){
- var info={status:statusCode(reply),bodyChars:typeof body==="string"?body.length:0,
-  reason:err?"NETWORK_ERROR":"NONE"};
- if(typeof body==="string"&&body.length<=900000){
-  try{
-   var obj=JSON.parse(body),choice=Array.isArray(obj.choices)?obj.choices[0]:null;
-   var m=choice&&choice.message;
-   var txt=m&&m.content;
-   info.choiceCount=Array.isArray(obj.choices)?obj.choices.length:0;
-   info.finishReason=choice&&typeof choice.finish_reason==="string"&&
-     /^(stop|length|content_filter|tool_calls)$/.test(choice.finish_reason)?
-     choice.finish_reason:"OTHER_OR_MISSING";
-   info.outputChars=typeof txt==="string"?txt.length:0;
-   info.reasoningType=m&&typeof m.reasoning_content==="string"?"string":
-     m&&m.reasoning_content===null?"null":"missing_or_other";
-   info.reasoningChars=m&&typeof m.reasoning_content==="string"?m.reasoning_content.length:0;
-   var u=obj.usage;
-   if(u&&typeof u==="object"){
-    info.usage={};
-    ["prompt_tokens","completion_tokens","total_tokens"].forEach(function(k){
-     if(typeof u[k]==="number"&&isFinite(u[k])&&u[k]>=0&&u[k]<10000000)
-      info.usage[k]=Math.floor(u[k]);
-    });
-   }
-   if(typeof txt==="string"){
-    var preview=abText(txt);
-    info.answerText=preview.answerText;info.answerTruncated=preview.answerTruncated;
-   }
-  }catch(e){info.reason="BODY_NOT_JSON";}
- }
- abRecord("DEEPSEEK_API",info);
-}
 
+// ── VERIFIED SESSION AND REQUEST-FIRST RESPONSE ──
 // The previous_choice_id is an opaque Qwen continuation pointer, never
 // submitted to DeepSeek. A valid followup can use ONLY prior locally verified
 // DeepSeek text, scoped to the same session, with a five-minute logical TTL.
