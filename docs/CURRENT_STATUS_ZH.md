@@ -93,3 +93,9 @@
 ## 2026-11-20 10:01：多轮 Siri 真机 `previous_choice_id` 类型不匹配（PR #38 已合并）
 
 来自用户新上传的 `PacketTunnel-20261120100109.log`：62 LOCAL 已可靠执行单轮 DeepSeek 改写尝试；但 5 次后续会话请求均在 `FOLLOWUP_PREVIOUS_CHOICE_NOT_STRING` / `ERROR_UNSUPPORTED_SIRI_REQUEST` 阶段被拒，未调用第二轮 DeepSeek。不能从 `NOT_STRING` 直接判断是 JSON null、字段缺失还是其他非字符串。现已通过 [PR #38](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/38) 合并严格的 same-session `previous_choice_id` **null/缺失/空字符串**本地 DeepSeek 历史恢复，其他非法类型继续 fail closed；[CI](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44658856364) **115/115 tests passing**。60 Remote 四条 Hook pin `c3a7014cdd8ec47841001748c615e704059d9370`；62 LOCAL 的 Script 路径保持不变，但**必须人工覆盖本地 JS 内容至该固定版本**。新日志分类用于识别真实情况，**Siri 真机连续多轮仍未验收**。详情见 [routine](routine/2026-11-20-10-01-Siri-followup-null-missing-choice-id.md)。
+
+## 2026-11-20 10:32：多轮已可连续改写，但配置组与事务关联造成间歇失败（PR #39）
+
+用户真机 `PacketTunnel-20261120101542.log` 中出现 16 次缺失 `previous_choice_id` 的同会话 DeepSeek 上下文恢复和 23 次 `DEEPSEEK_RESPONSE_ATTEMPTED`；但还有 **9 次后续配置组未验证、1 次主请求配置组不支持、5 次响应事务标记丢失**。其中多个成功的后续问题连续发生，证明新多轮路径至少能实际触发；不等于 Siri UI 每次成功。用户观察“请问一下千问”开头成功率高，但日志无法把具体问句与组名关联，不能宣称这是稳定系统路由规则。
+
+[PR #39](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/pull/39)（merge `5922d93ca49064c378ca8c1d8eb88adff20d355f`）把已知 `siri.tqa` / `siri_tqa` 组纳入**严格同会话、同原生 SSE 校验的纯文本 followup**；其余未知配置组继续拒绝，但新增固定类别码以定位差异。不更改首次请求 `RESPONSE_TAG_MISSING` 的 fail-closed 行为，也不通过全球“最近提问”猜测关联。CI [120/120 passed](https://github.com/Nimenta727/Apple-Intelligence-Exchange-Secure/actions/runs/44662425802)。60 Remote 四条 Hook pin 到 `637484295c10627f06e610bfe040dd58e67d309a`；62 LOCAL 用户须手工更新同 SHA 本地 JS。详情见 [维护记录](routine/2026-11-20-10-32-Siri-phrase-sensitive-group-and-response-tag-diagnosis.md)。多轮成功率和 Siri UI 真实结果仍需使用新 JS 确认。
