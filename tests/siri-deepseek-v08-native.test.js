@@ -42,7 +42,7 @@ function env(){
   }};
   const context={$request:req,$persistentStore:{
     read:k=>Object.prototype.hasOwnProperty.call(data,k)?data[k]:null,
-    write:(val,k)=>{data[k]=val;return true;}
+    write:(val,k)=>{if(opts.failWrite&&opts.failWrite(k,val))return false;data[k]=val;return true;}
    },$httpClient:client,$done:x=>returns.push(x),
    console:{log:x=>logs.push(x)},Date:NativeDate,Math,
    setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.length;},
@@ -429,4 +429,24 @@ test("model failure does not return Qwen payload",()=>{
  assert.equal(r.returns[0].status,502);
  assert.ok(!r.returns[0].body.includes("QWEN_NATIVE_PRIVATE_ANSWER"));
  assert.equal(e.sent.length,0);
+});
+
+test("a failed native collision-index write aborts the second request before forwarding",()=>{
+ const e=env(),a=e.capture(nativeRequest("FIRST",ID_A));
+ const b=e.invoke(nativeRequest("SECOND",ID_A),undefined,
+  {failWrite:k=>k.startsWith("AIES08_NATIVE_")});
+ assert.equal(b.returns[0].response.status,502);
+ assert.ok(e.logs.includes("[AIES_V08] NATIVE_INDEX_WRITE_FAILED"));
+ const first=e.respond(lostTag(a),nativeSse("first"));
+ assert.equal(first.returns[0].status,200);
+ assert.equal(JSON.parse(e.sent[0].body).messages.at(-1).content,"FIRST");
+});
+test("untagged direct followup with absent choice cannot select a newer session pointer",()=>{
+ const e=env(),a=e.capture(request()),first=e.respond(a,nativeSse("first"));
+ assert.equal(first.returns[0].status,200);
+ const sid=eventBody(first.returns[0].body,"session.created").id;
+ const url=URL.replace("/sessions/responses","/sessions/"+sid+"/responses");
+ const r=e.respond(request(followupBody(undefined),url),followupSse(sid,"absent"));
+ assert.equal(r.returns[0].status,502);
+ assert.equal(e.sent.length,1);
 });
