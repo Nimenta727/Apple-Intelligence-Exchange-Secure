@@ -269,6 +269,143 @@ test("header loss plus absent request body fails closed rather than guessing oth
  assert.ok(e.logs.includes("[AIES_V08] ERROR_PROMPT_UNAVAILABLE"));
  assert.equal(e.sent.length,0);
 });
+
+const ID_A="8f2177ab-01e2-4ba5-8290-15ac77a3d8f3";
+const ID_B="09785836-45c0-454d-9bad-b635cd826021";
+const TRACE_A="00-39c88252c131458798bfef8cd97e6cea-2fb23590de4b4d91-01";
+const TRACE_B="00-724a453639714d9ab4fda35b596e8e83-348cc967b5574af6-01";
+function nativeRequest(text,id,extra={}){
+ return {...request(requestBody("siri.multimodal.noRTI",text)),
+  headers:{"Content-Type":"application/json","User-Agent":"Siri (iPad - Version 27.3.0)",
+   "X-Request-ID":id,...extra}};
+}
+function lostTag(req,body=undefined){
+ const headers={...req.headers};
+ for(const key of Object.keys(headers))
+  if(key.toLowerCase()==="x-aies-request-id")delete headers[key];
+ return {...req,headers,body};
+}
+test("first-connection tag and body loss: exact ORIGINAL native request UUID recovers captured prompt",()=>{
+ const e=env(),req=e.capture(nativeRequest("NATIVE_MATCH_ONLY",ID_A));
+ const r=e.respond(lostTag(req),nativeSse("native-alias"));
+ assert.equal(r.returns[0].status,200);
+ assert.ok(e.logs.includes("[AIES_V08] CORRELATION_NATIVE_ID_MATCH"));
+ assert.ok(e.logs.includes("[AIES_V08] DEEPSEEK_RESPONSE_ATTEMPTED"));
+ assert.equal(JSON.parse(e.sent[0].body).messages.at(-1).content,"NATIVE_MATCH_ONLY");
+ assert.ok(e.logs.every(x=>!x.includes(ID_A)&&!x.includes("NATIVE_MATCH_ONLY")));
+ // The original tag and native alias cannot independently replay the same capture.
+ const replay=e.respond(req,nativeSse("replayed"));
+ assert.equal(replay.returns[0].status,502);
+ assert.equal(e.sent.length,1);
+});
+test("parallel first connections with distinct original IDs recover in reversed response order",()=>{
+ const e=env(),a=e.capture(nativeRequest("QUESTION_A_PRIVATE",ID_A)),
+  b=e.capture(nativeRequest("QUESTION_B_PRIVATE",ID_B));
+ const rb=e.respond(lostTag(b),nativeSse("native-b"));
+ const ra=e.respond(lostTag(a),nativeSse("native-a"));
+ assert.equal(rb.returns[0].status,200);
+ assert.equal(ra.returns[0].status,200);
+ assert.deepEqual(e.sent.map(x=>JSON.parse(x.body).messages.at(-1).content),
+  ["QUESTION_B_PRIVATE","QUESTION_A_PRIVATE"]);
+});
+test("valid full traceparent can recover even when original UUID header is unavailable",()=>{
+ const e=env(),a=e.capture(nativeRequest("TRACE_PRIVATE",ID_A,{traceparent:TRACE_A}));
+ const req=lostTag(a);delete req.headers["X-Request-ID"];
+ const r=e.respond(req,nativeSse("trace"));
+ assert.equal(r.returns[0].status,200);
+ assert.equal(JSON.parse(e.sent[0].body).messages.at(-1).content,"TRACE_PRIVATE");
+ assert.ok(e.logs.every(x=>!x.includes(TRACE_A)));
+});
+test("duplicate header casing, reuse and conflicting native aliases cannot guess a prompt",()=>{
+ for(const mode of ["reuse","case","conflict"]){
+  const e=env(),a=e.capture(nativeRequest("FIRST_PRIVATE",ID_A,{traceparent:TRACE_A}));
+  const req=lostTag(a);
+  if(mode==="reuse")e.capture(nativeRequest("SECOND_PRIVATE",ID_A,{traceparent:TRACE_B}));
+  if(mode==="case")req.headers["x-request-id"]=ID_A;
+  if(mode==="conflict"){
+   e.capture(nativeRequest("SECOND_PRIVATE",ID_B,{traceparent:TRACE_B}));
+   req.headers.traceparent=TRACE_B;
+  }
+  const r=e.respond(req,nativeSse("conflict"));
+  assert.equal(r.returns[0].status,502,mode);
+  assert.equal(e.sent.length,0,mode);
+ }
+});
+test("reused consumed native identity remains poisoned; only an independently valid tag can proceed",()=>{
+ const e=env(),a=e.capture(nativeRequest("FIRST_PRIVATE",ID_A));
+ assert.equal(e.respond(lostTag(a),nativeSse("one")).returns[0].status,200);
+ const b=e.capture(nativeRequest("SECOND_PRIVATE",ID_A));
+ assert.equal(e.respond(lostTag(b),nativeSse("two")).returns[0].status,502);
+ assert.equal(e.sent.length,1);
+ assert.equal(e.respond(b,nativeSse("two")).returns[0].status,200);
+ assert.equal(JSON.parse(e.sent[1].body).messages.at(-1).content,"SECOND_PRIVATE");
+});
+test("native recovery rejects malformed identifiers, unindexed IDs, and expired transactions",()=>{
+ for(const mode of ["malformed","wrong","expired","zero-trace"]){
+  const e=env(),id=mode==="malformed"?"common-session-name":ID_A;
+  const a=e.capture(nativeRequest("NEVER_GUESS",id));
+  const req=lostTag(a);
+  if(mode==="wrong")req.headers["X-Request-ID"]=ID_B;
+  if(mode==="zero-trace"){
+   delete req.headers["X-Request-ID"];
+   req.headers.traceparent="00-00000000000000000000000000000000-0000000000000000-01";
+  }
+  const r=e.respond(req,nativeSse("never"),{offsetMs:mode==="expired"?46000:0});
+  assert.equal(r.returns[0].status,502,mode);
+  assert.equal(e.sent.length,0,mode);
+ }
+});
+test("present but invalid/stale injected tag cannot be bypassed by native identity or reflected body",()=>{
+ for(const tag of ["invalid","aies_unknown_token_12345"]){
+  const e=env(),a=e.capture(nativeRequest("VALID",ID_A));
+  const req={...a,headers:{...a.headers,"X-AIES-Request-ID":tag}};
+  const r=e.respond(req,nativeSse("stale"));
+  assert.equal(r.returns[0].status,502);
+  assert.equal(e.sent.length,0);
+ }
+});
+test("tag/native conflict and reflected prompt conflict reject before billing",()=>{
+ const e=env(),a=e.capture(nativeRequest("PROMPT_A",ID_A)),b=e.capture(nativeRequest("PROMPT_B",ID_B));
+ const conflict={...a,headers:{...a.headers,"X-Request-ID":ID_B}};
+ assert.equal(e.respond(conflict,nativeSse("bad")).returns[0].status,502);
+ const wrong={...lostTag(b),body:requestBody("siri.multimodal.noRTI","DIFFERENT_PROMPT")};
+ assert.equal(e.respond(wrong,nativeSse("bad2")).returns[0].status,502);
+ assert.equal(e.sent.length,0);
+});
+test("untagged followup uses only its own reflected request body with verified prior session/choice",()=>{
+ const e=env(),main=e.capture(request()),r1=e.respond(main,nativeSse("first"));
+ assert.equal(r1.returns[0].status,200);
+ const sid=eventBody(r1.returns[0].body,"session.created").id;
+ const choice=eventBody(r1.returns[0].body,"session.response.choices[].added").choice.id;
+ const url=URL.replace("/sessions/responses","/sessions/"+sid+"/responses");
+ const raw=request(followupBody(choice),url);
+ const result=e.respond(raw,followupSse(sid,"reflected"));
+ assert.equal(result.returns[0].status,200);
+ assert.ok(e.logs.includes("[AIES_V08] FOLLOWUP_CORRELATION_FROM_BODY"));
+ assert.deepEqual(JSON.parse(e.sent[1].body).messages.map(x=>x.role),
+  ["system","user","assistant","user"]);
+ assert.equal(JSON.parse(e.sent[1].body).messages.at(-1).content,"How does it look?");
+});
+test("native followup fallback requires matching route and session and an unexpired verified choice",()=>{
+ const e=env(),main=e.capture(request()),r1=e.respond(main,nativeSse("first"));
+ assert.equal(r1.returns[0].status,200);
+ const sid=eventBody(r1.returns[0].body,"session.created").id;
+ const choice=eventBody(r1.returns[0].body,"session.response.choices[].added").choice.id;
+ const url=URL.replace("/sessions/responses","/sessions/"+sid+"/responses");
+ const req=request(followupBody(choice),url);
+ req.headers["X-Request-ID"]=ID_A;
+ const captured=e.capture(req);
+ const wrong={...lostTag(captured),url:url.replace(sid,"sess_other")};
+ assert.equal(e.respond(wrong,followupSse("sess_other","bad")).returns[0].status,502);
+ assert.equal(e.sent.length,1);
+ const fresh=request(followupBody(choice),url);
+ fresh.headers["X-Request-ID"]=ID_B;
+ const ok=e.respond(lostTag(e.capture(fresh)),followupSse(sid,"good"));
+ assert.equal(ok.returns[0].status,200);
+ assert.equal(e.sent.length,2);
+ assert.ok(e.logs.includes("[AIES_V08] CORRELATION_NATIVE_ID_MATCH"));
+});
+
 test("known tagged upstream response saves only bounded timing buckets, not timestamps or IDs",()=>{
  const e=env(),req=e.capture(request());
  const r=e.respond(req,nativeSse());
