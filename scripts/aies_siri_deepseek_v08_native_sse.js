@@ -124,13 +124,13 @@ function probeObserveRequest(){
  var fixed={
   OK:1,BODY_NOT_TEXT:1,BODY_EMPTY:1,BODY_OVERSIZE:1,
   JSON_INVALID:1,ROOT_UNSUPPORTED:1,GROUP_MISSING:1,
-  GROUP_UNSUPPORTED:1,INPUT_UNSUPPORTED:1,CONTENT_UNSUPPORTED:1,
+  GROUP_UNSUPPORTED:1,FOLLOWUP_GROUP_UNVERIFIED:1,INPUT_UNSUPPORTED:1,CONTENT_UNSUPPORTED:1,
   MEDIA_UNSUPPORTED:1,PROMPT_EMPTY:1,PROMPT_OVERSIZE:1,
   STRUCTURE_UNSUPPORTED:1
  };
  state.lastCode=fixed[requestDiagnostic]?requestDiagnostic:"UNKNOWN_STAGE";
  var now=Date.now();
- if(requestDiagnostic==="GROUP_UNSUPPORTED"){
+ if(requestDiagnostic==="GROUP_UNSUPPORTED"||requestDiagnostic==="FOLLOWUP_GROUP_UNVERIFIED"){
   if(safeGroupIdentifier(requestGroup)){
    state.phase="captured";
    state.groupId=requestGroup;
@@ -363,6 +363,37 @@ function observedSiriTextEnvelopeReasons(o,isFollowupRoute){
  }
  return reasons;
 }
+// Unknown groups are classified for protocol research, not authorized.
+// Only fixed categories and no request content are emitted.
+function diagnoseUnknownFollowup(o){
+ if(res||!isSiriForProbe()||
+    String(req.method||req.httpMethod||"").toUpperCase()!=="POST")return;
+ var reasons=observedSiriTextEnvelopeReasons(o,true);
+ if(reasons.length){
+  log("UNKNOWN_FOLLOWUP_ENVELOPE_UNVERIFIED");
+  reasons.forEach(function(code){log("UNKNOWN_FOLLOWUP_SHAPE_"+code);});
+  return;
+ }
+ var sawText=false;
+ for(var i=0;i<o.input.length;i++){
+  var it=o.input[i],m=it.message||it;
+  var atoms=Array.isArray(m.content)?m.content:[m.content];
+  if(atoms.length<1||atoms.length>64){log("UNKNOWN_FOLLOWUP_CONTENT_UNVERIFIED");return;}
+  for(var j=0;j<atoms.length;j++){
+   var text=textAtom(atoms[j]);
+   if(typeof text!=="string"||/data:(image|audio|video)\//i.test(text)){
+    log("UNKNOWN_FOLLOWUP_CONTENT_UNVERIFIED");return;
+   }
+   if(text.trim())sawText=true;
+  }
+ }
+ log(sawText?"UNKNOWN_FOLLOWUP_TEXT_SHAPE_CANDIDATE":"UNKNOWN_FOLLOWUP_CONTENT_EMPTY");
+ // Tool declarations are not necessarily tool calls, but record a category
+ // so a later group admission decision can account for this distinction.
+ log((Array.isArray(o.client_tools)&&o.client_tools.length||
+      Array.isArray(o.server_tools)&&o.server_tools.length)?
+     "UNKNOWN_FOLLOWUP_TOOLS_DECLARED":"UNKNOWN_FOLLOWUP_NO_TOOLS_DECLARED");
+}
 function parseRequest(raw,allowRecoveredSiri,followupMode){
  if(!raw){if(requestDiagnostic==="UNSET")requestDiagnostic="BODY_EMPTY";return null;}
  if(raw.length>C.maxRequest){requestDiagnostic="BODY_OVERSIZE";return null;}
@@ -377,9 +408,10 @@ function parseRequest(raw,allowRecoveredSiri,followupMode){
    var tqaGroup=/^(siri\.tqa|siri_tqa)$/i.test(g);
    if(followupMode&&!observedGroup&&!tqaGroup){
     // Fixed category only. Never log raw group identifiers or request data.
-    if(safeGroupIdentifier(g)&&/^siri[._]/i.test(g))
+    if(safeGroupIdentifier(g)&&/^siri[._]/i.test(g)){
      log("FOLLOWUP_GROUP_OTHER_SIRI");
-    else log("FOLLOWUP_GROUP_OTHER_UNVERIFIED");
+     diagnoseUnknownFollowup(o);
+    }else log("FOLLOWUP_GROUP_OTHER_UNVERIFIED");
     requestDiagnostic="FOLLOWUP_GROUP_UNVERIFIED";return null;
    }
    if(!tqaGroup&&!observedGroup){
@@ -1238,6 +1270,45 @@ function consumeTransaction(token,t){
  if(!storeWrite("AIES08_TX_"+token,""))return false;
  return true;
 }
+// Pending-data transport experiment: submit the exact original decoded JSON
+// text together with the new header. Do not change its schema, URL or content.
+// Only use when original framing is compatible with plain UTF-8 text.
+// There is no evidence yet that Shadowrocket's new-connection path preserves
+// the changed header when the script explicitly returns body, so this is
+// a separate device experiment, not a proven association mechanism.
+function explicitOriginalBodyEligible(raw,headers){
+ if(typeof raw!=="string"||!raw.length||raw.length>C.maxRequest)return false;
+ var names=Object.keys(headers||{}),counts={};
+ for(var i=0;i<names.length;i++){
+  var name=names[i].toLowerCase();
+  if(name==="content-length"||name==="content-encoding"||
+     name==="transfer-encoding"||name==="content-type"){
+   counts[name]=(counts[name]||0)+1;
+   if(counts[name]>1)return false;
+  }
+ }
+ var ct=header(headers,"Content-Type");
+ if(!/^application\/json(?:\s*;\s*charset\s*=\s*"?utf-8"?)?\s*$/i.test(ct))return false;
+ var enc=header(headers,"Content-Encoding");
+ if(enc&&enc.toLowerCase()!=="identity")return false;
+ if(header(headers,"Transfer-Encoding"))return false;
+ var size=0;
+ for(i=0;i<raw.length;i++){
+  var cp=raw.charCodeAt(i);
+  if(cp<128)size++;
+  else if(cp<2048)size+=2;
+  else if(cp>=0xD800&&cp<=0xDBFF){
+   if(++i>=raw.length)return false;
+   var low=raw.charCodeAt(i);
+   if(low<0xDC00||low>0xDFFF)return false;
+   size+=4;
+  }else if(cp>=0xDC00&&cp<=0xDFFF)return false;
+  else size+=3;
+ }
+ var length=header(headers,"Content-Length");
+ if(counts["content-length"]&&(!/^(0|[1-9][0-9]{0,8})$/.test(length)||Number(length)!==size))return false;
+ return true;
+}
 function isTarget(){return !!(req&&typeof req.url==="string"&&C.target.test(req.url));}
 function isFollowup(){return !!(req&&typeof req.url==="string"&&C.followup.test(req.url));}
 function isFollowupTextSse(){
@@ -1306,7 +1377,13 @@ if(!res){
  });
  headers["X-AIES-Request-ID"]=token;
  log("REQUEST_CAPTURED");
- done({headers:headers});
+ if(explicitOriginalBodyEligible(requestRaw,req.headers)){
+  log("TRANSPORT_EXPLICIT_ORIGINAL_BODY");
+  done({headers:headers,body:requestRaw});
+ }else{
+  log("TRANSPORT_HEADER_ONLY_UNVERIFIED_FRAMING");
+  done({headers:headers});
+ }
  return;
 }
 // Phase 2: never return the raw Qwen body from code paths we control.
