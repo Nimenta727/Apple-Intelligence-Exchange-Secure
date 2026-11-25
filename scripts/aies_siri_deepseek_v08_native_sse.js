@@ -1197,14 +1197,15 @@ function readJsonSlot(key,limit){
 function writeNativeIndex(keys,token,now){
  // A second capture using an active identifier poisons that alias, even if
  // the first transaction was consumed. The random tag remains independent.
- if(!keys||!keys.length){log(keys===null?"NATIVE_ID_DUPLICATE_HEADER":"NATIVE_ID_UNAVAILABLE");return;}
+ if(!keys||!keys.length){log(keys===null?"NATIVE_ID_DUPLICATE_HEADER":"NATIVE_ID_UNAVAILABLE");return true;}
  for(var i=0;i<keys.length;i++){
   var key=keys[i],prior=readJsonSlot(key,1000);
   var collision=prior&&typeof prior.until==="number"&&prior.until>now;
   var next={v:1,token:collision?"":token,until:now+NATIVE_ID_TTL};
-  if(!storeWrite(key,safeJson(next)))log("NATIVE_INDEX_WRITE_FAILED");
-  else log(collision?"NATIVE_ID_REUSED_BLOCKED":"NATIVE_ID_INDEXED");
+  if(!storeWrite(key,safeJson(next))){log("NATIVE_INDEX_WRITE_FAILED");return false;}
+  log(collision?"NATIVE_ID_REUSED_BLOCKED":"NATIVE_ID_INDEXED");
  }
+ return true;
 }
 function nativeLookup(keys,now){
  if(keys===null)return {error:"NATIVE_ID_DUPLICATE_HEADER"};
@@ -1296,7 +1297,10 @@ if(!res){
     exp:captured+C.sessionTtlMs,capturedAt:captured}))){
   error("SESSION_STORE_UNAVAILABLE");return;
  }
- writeNativeIndex(keys,token,captured);
+ if(!writeNativeIndex(keys,token,captured)){
+  // Never forward a second request if a collided alias could not be poisoned.
+  storeWrite("AIES08_TX_"+token,"");error("SESSION_STORE_UNAVAILABLE");return;
+ }
  var headers={};Object.keys(req.headers||{}).forEach(function(k){
   if(k.toLowerCase()!=="x-aies-request-id")headers[k]=req.headers[k];
  });
@@ -1372,7 +1376,9 @@ if(!prompt2){
  // a global recent prompt. For followups independently validate its session
  // pointer and prior DeepSeek history exactly as in the request hook.
  if(followupRoute){
-  var d=followupIds(),prev=resolveFollowupChoice(d);
+  var d=followupIds(),prev=d&&d.kind==="canonical"?resolveFollowupChoice(d):null;
+  // Without a capture-time binding, an absent pointer could select a newer
+  // same-session choice. Require the explicit previously verified choice.
   if(!d||!prev){
    log("QWEN_SESSION_FOLLOWUP_SSE_BLOCKED");
    error("FOLLOWUP_CORRELATION_UNAVAILABLE");return;
