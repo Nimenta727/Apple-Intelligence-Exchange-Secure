@@ -1162,6 +1162,82 @@ function randomToken(){
 }
 function storeWrite(key,val){try{return !!(store&&store.write&&store.write(val,key));}catch(e){return false;}}
 function storeRead(key){try{return store&&store.read?store.read(key):null;}catch(e){return null;}}
+
+// v0.8.1: narrowly scoped native request identity, never a latest-prompt cache.
+// Header availability is not guaranteed by Shadowrocket. Only accept original
+// request-scoped IDs with a constrained format; do not use response headers,
+// auth tokens, cookies, session IDs, user-agent, URL, or timing as identity.
+var NATIVE_ID_TTL=600000;
+function nativeRequestKeys(headers){
+ var allowed=["x-request-id","x-client-request-id","traceparent"];
+ var out=[];
+ if(!headers||typeof headers!=="object")return out;
+ var names=Object.keys(headers);
+ for(var i=0;i<allowed.length;i++){
+  var n=allowed[i], matches=names.filter(function(k){return k.toLowerCase()===n;});
+  if(matches.length>1)return null;
+  if(!matches.length)continue;
+  var value=headers[matches[0]];
+  if(typeof value!=="string")continue;
+  var ok=n==="traceparent"?
+   /^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/.test(value)&&
+   value.slice(3,35)!=="00000000000000000000000000000000"&&
+   value.slice(36,52)!=="0000000000000000":
+   /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})$/i.test(value)&&
+   !/^0+$/.test(value.replace(/-/g,""));
+  if(ok)out.push("AIES08_NATIVE_"+n+"_"+value);
+ }
+ return out;
+}
+function readJsonSlot(key,limit){
+ var raw=storeRead(key);
+ if(typeof raw!=="string"||!raw.length||raw.length>limit)return null;
+ try{return JSON.parse(raw);}catch(e){return null;}
+}
+function writeNativeIndex(keys,token,now){
+ // A second capture using an active identifier poisons that alias, even if
+ // the first transaction was consumed. The random tag remains independent.
+ if(!keys||!keys.length){log(keys===null?"NATIVE_ID_DUPLICATE_HEADER":"NATIVE_ID_UNAVAILABLE");return true;}
+ for(var i=0;i<keys.length;i++){
+  var key=keys[i],prior=readJsonSlot(key,1000);
+  var collision=prior&&typeof prior.until==="number"&&prior.until>now;
+  var next={v:1,token:collision?"":token,until:now+NATIVE_ID_TTL};
+  if(!storeWrite(key,safeJson(next))){log("NATIVE_INDEX_WRITE_FAILED");return false;}
+  log(collision?"NATIVE_ID_REUSED_BLOCKED":"NATIVE_ID_INDEXED");
+ }
+ return true;
+}
+function nativeLookup(keys,now){
+ if(keys===null)return {error:"NATIVE_ID_DUPLICATE_HEADER"};
+ if(!keys.length)return {token:""};
+ var found="";
+ for(var i=0;i<keys.length;i++){
+  var index=readJsonSlot(keys[i],1000);
+  if(!index||index.v!==1||typeof index.until!=="number"||
+     index.until<=now||index.until>now+NATIVE_ID_TTL)continue;
+  if(!index.token)return {error:"NATIVE_ID_AMBIGUOUS"};
+  if(found&&found!==index.token)return {error:"NATIVE_ID_CONFLICT"};
+  found=index.token;
+ }
+ return {token:found};
+}
+function validTransaction(t,now){
+ return !!(t&&t.v===2&&typeof t.exp==="number"&&t.exp>now&&
+  t.exp<=now+C.sessionTtlMs&&typeof t.capturedAt==="number"&&
+  t.capturedAt<=now&&t.capturedAt>=now-C.sessionTtlMs&&
+  t.exp===t.capturedAt+C.sessionTtlMs&&
+  (t.scene==="siri"||t.scene==="writing")&&typeof t.p==="string"&&
+  t.p.length>0&&t.p.length<=C.maxPrompt&&typeof t.url==="string"&&
+  Array.isArray(t.nativeKeys)&&t.nativeKeys.length<=3);
+}
+function consumeTransaction(token,t){
+ // Consume the prompt slot before dispatch; leave native-index tombstones
+ // so replayed/reused identities cannot be interpreted as fresh requests.
+ // PersistentStore has no atomic CAS: simultaneous callback races remain
+ // an engine limitation, not a claimed exactly-once guarantee.
+ if(!storeWrite("AIES08_TX_"+token,""))return false;
+ return true;
+}
 function isTarget(){return !!(req&&typeof req.url==="string"&&C.target.test(req.url));}
 function isFollowup(){return !!(req&&typeof req.url==="string"&&C.followup.test(req.url));}
 function isFollowupTextSse(){
@@ -1189,13 +1265,7 @@ if(followupRoute){
  if(!res&&!isSiriForProbe()){done({});return;}
  if(res&&uaNow&&!isSiriForProbe()){done({});return;}
  if(res&&!isFollowupTextSse()){done({});return;}
- if(res&&!header(req.headers,"X-AIES-Request-ID")){
-  if(isSiriForProbe()){
-   abSse("SESSION_FOLLOWUP_BLOCKED",statusCode(res),res.body);
-   log("QWEN_SESSION_FOLLOWUP_SSE_BLOCKED");
-  }
-  error("QWEN_FOLLOWUP_UNVERIFIED_SOURCE");return;
- }
+
 }
 if(!res){
  // Phase 1: capture a prompt and explicitly couple request/response using
@@ -1216,13 +1286,20 @@ if(!res){
  }
  if(followupRoute&&followupDetails.kind!=="canonical")
   log("FOLLOWUP_SESSION_CONTEXT_RECOVERED");
- var token=randomToken();
- if(!storeWrite("AIES_R1_"+token,safeJson({p:prompt,scene:isWritingTools()?"writing":"siri",route:followupRoute?"followup":"main",
-   sid:followupDetails&&followupDetails.sid,prev:resolvedPrevious,
-   previousRaw:followupDetails&&followupDetails.prev,
-   previousKind:followupDetails&&followupDetails.kind,
-   exp:Date.now()+C.sessionTtlMs,capturedAt:Date.now()}))){
+ var token=randomToken(),captured=Date.now();
+ var keys=nativeRequestKeys(req.headers);
+ if(!storeWrite("AIES08_TX_"+token,safeJson({
+    v:2,p:prompt,scene:isWritingTools()?"writing":"siri",
+    route:followupRoute?"followup":"main",url:req.url,
+    nativeKeys:keys||[],sid:followupDetails&&followupDetails.sid,
+    prev:resolvedPrevious,previousRaw:followupDetails&&followupDetails.prev,
+    previousKind:followupDetails&&followupDetails.kind,
+    exp:captured+C.sessionTtlMs,capturedAt:captured}))){
   error("SESSION_STORE_UNAVAILABLE");return;
+ }
+ if(!writeNativeIndex(keys,token,captured)){
+  // Never forward a second request if a collided alias could not be poisoned.
+  storeWrite("AIES08_TX_"+token,"");error("SESSION_STORE_UNAVAILABLE");return;
  }
  var headers={};Object.keys(req.headers||{}).forEach(function(k){
   if(k.toLowerCase()!=="x-aies-request-id")headers[k]=req.headers[k];
@@ -1237,68 +1314,85 @@ abSse(followupRoute?"FOLLOWUP_UPSTREAM":"MAIN_UPSTREAM",statusCode(res),res&&res
 if(statusCode(res)!==200){error("ORIGINAL_RESPONSE_STATUS");return;}
 if(!res||typeof res.body!=="string"||res.body.length>C.maxSse){error("SSE_UNAVAILABLE");return;}
 var tag=header(req.headers,"X-AIES-Request-ID"),current=null,prompt2=null;
-var responseUA=header(req.headers,"User-Agent");
-var activeScene=isWritingTools()?"writing":"siri";
+var responseUA=header(req.headers,"User-Agent"),activeScene=isWritingTools()?"writing":"siri";
+var now=Date.now(),nativeKeys=nativeRequestKeys(req.headers),native=nativeLookup(nativeKeys,now);
+var token=tag,source=tag?"TAG":"NATIVE";
 if(!tag)log("RESPONSE_TAG_MISSING");
-else if(!/^aies_[a-z0-9_]{12,90}$/.test(tag))log("RESPONSE_TAG_INVALID");
-else log("RESPONSE_TAG_PRESENT");
-if(/^aies_[a-z0-9_]{12,90}$/.test(tag)){
- var raw=storeRead("AIES_R1_"+tag);
- try{current=raw&&JSON.parse(raw);}catch(e){}
- // Only a valid, unexpired transaction tag can recover WritingTools when
- // Shadowrocket drops User-Agent in the response hook. An explicit Siri/other
- // User-Agent is never overridden and still fails closed on scene mismatch.
- var validStored=current&&current.exp>Date.now()&&
-  current.exp<=Date.now()+C.sessionTtlMs&&
-  (current.scene==="siri"||current.scene==="writing")&&
-  typeof current.p==="string"&&current.p.length>0&&current.p.length<=C.maxPrompt;
- if(!responseUA&&validStored){
-  activeScene=current.scene;
-  if(activeScene==="writing")log("WRITINGTOOLS_SCENE_RECOVERED_FROM_TAG");
+else if(!/^aies_[a-z0-9_]{12,90}$/.test(tag)){
+ log("RESPONSE_TAG_INVALID");error("CORRELATION_INVALID_TAG");return;
+}else log("RESPONSE_TAG_PRESENT");
+// Native aliases can only rescue a truly absent tag. A present bad/stale tag
+// is not bypassed with a different prompt. Conflicting exact IDs fail closed.
+if(!tag){
+ if(native.error){log(native.error);error("CORRELATION_NATIVE_CONFLICT");return;}
+ token=native.token;
+ if(token)log("CORRELATION_NATIVE_ID_MATCH");
+ else log(nativeKeys&&nativeKeys.length?"NATIVE_ID_NO_MATCH":"NATIVE_ID_UNAVAILABLE");
+}else if(native.token&&native.token!==tag){
+ error("CORRELATION_MISMATCH");return;
+}
+if(token){
+ if(!/^aies_[a-z0-9_]{12,90}$/.test(token)){error("CORRELATION_INVALID_TAG");return;}
+ current=readJsonSlot("AIES08_TX_"+token,64000);
+ if(!validTransaction(current,now)){
+  log("RESPONSE_PROMPT_STORE_MISSING");error("CORRELATION_EXPIRED_OR_CONSUMED");return;
  }
- // A mismatched transaction tag is never rescued by reading the current
- // request body: it may belong to an unrelated Siri/WritingTools operation.
- if(current&&typeof current.scene==="string"&&(current.scene!==activeScene||
-     (current.route||"main")!==(followupRoute?"followup":"main")||
-     (followupRoute&&current.sid!==followupSessionId()))){
-  storeWrite("AIES_R1_"+tag,"");
-  error("CORRELATION_MISMATCH");return;
+ if(!responseUA)activeScene=current.scene;
+ if((responseUA&&!isSiriForProbe()&&!isWritingTools())||
+    current.scene!==activeScene||
+    current.route!==(followupRoute?"followup":"main")||
+    current.url!==req.url||
+    (followupRoute&&current.sid!==followupSessionId())){
+  consumeTransaction(token,current);error("CORRELATION_MISMATCH");return;
  }
- storeWrite("AIES_R1_"+tag,""); // consume once, even if invalid
- if(validStored&&current.scene===activeScene&&
-    (current.route||"main")===(followupRoute?"followup":"main"))prompt2=current.p;
- if(prompt2){log("RESPONSE_PROMPT_FROM_STORE");timeLog("UPSTREAM_ELAPSED",current&&current.capturedAt);}
- else log("RESPONSE_PROMPT_STORE_MISSING");
+ if(source==="NATIVE"&&(!nativeKeys||!nativeKeys.some(function(k){
+  return current.nativeKeys.indexOf(k)>=0;
+ }))){error("CORRELATION_MISMATCH");return;}
+ if(!consumeTransaction(token,current)){error("SESSION_STORE_UNAVAILABLE");return;}
+ prompt2=current.p;
+ log("RESPONSE_PROMPT_FROM_STORE");timeLog("UPSTREAM_ELAPSED",current.capturedAt);
 }
 var responseBody=rawRequest();
 var fromReq=parseApplePrompt(responseBody,!responseUA&&prompt2?activeScene:"",followupRoute);
-// When recovering scene without a response UA, a *present* request body must
-// still be parseable as that same scene. Otherwise a Siri body carrying a
-// WritingTools token could bypass the usual cross-scene comparison.
-if(prompt2&&!responseUA&&req&&typeof req.body==="string"&&req.body.length&&!fromReq){
+if(prompt2&&req&&typeof req.body==="string"&&req.body.length&&!fromReq){
  error("CORRELATION_MISMATCH");return;
 }
 if(prompt2&&fromReq&&prompt2!==fromReq){error("CORRELATION_MISMATCH");return;}
-if(followupRoute&&prompt2&&req&&typeof req.body==="string"&&req.body.length){
+if(followupRoute&&prompt2&&responseBody){
  var reflected=followupIds();
  if(!reflected||reflected.sid!==current.sid||
-     reflected.kind!==current.previousKind||
-     reflected.prev!==current.previousRaw){
+    reflected.kind!==current.previousKind||reflected.prev!==current.previousRaw){
   error("CORRELATION_MISMATCH");return;
  }
 }
 if(!prompt2){
- if(fromReq){prompt2=fromReq;log("RESPONSE_PROMPT_FROM_BODY");}
- else log("RESPONSE_PROMPT_BODY_UNAVAILABLE");
+ if(!fromReq||(!isSiriForProbe()&&!isWritingTools())||
+   String(req.method||req.httpMethod||"").toUpperCase()!=="POST"){
+  log("RESPONSE_PROMPT_BODY_UNAVAILABLE");
+  log("CORRELATION_NO_TAG_NO_VALID_BODY");
+  error("PROMPT_UNAVAILABLE");return;
+ }
+ // Direct body is provided by this very response hook, not retrieved from
+ // a global recent prompt. For followups independently validate its session
+ // pointer and prior DeepSeek history exactly as in the request hook.
+ if(followupRoute){
+  var d=followupIds(),prev=d&&d.kind==="canonical"?resolveFollowupChoice(d):null;
+  // Without a capture-time binding, an absent pointer could select a newer
+  // same-session choice. Require the explicit previously verified choice.
+  if(!d||!prev){
+   log("QWEN_SESSION_FOLLOWUP_SSE_BLOCKED");
+   error("FOLLOWUP_CORRELATION_UNAVAILABLE");return;
+  }
+  current={scene:"siri",route:"followup",sid:d.sid,prev:prev,
+   previousKind:d.kind,previousRaw:d.prev};
+  log("FOLLOWUP_CORRELATION_FROM_BODY");
+ }
+ prompt2=fromReq;log("RESPONSE_PROMPT_FROM_BODY");
 }
-if(!prompt2){
- log(!tag?"CORRELATION_NO_TAG_NO_VALID_BODY":"CORRELATION_NO_VALID_PROMPT");
- error("PROMPT_UNAVAILABLE");return;
-}
-// Session followups MUST have a verified response tag and previous DeepSeek
-// choice context; never infer identity from a global "last question" slot.
 if(followupRoute&&(!current||current.route!=="followup"||
-   !validId(current.prev)||!validId(current.sid))){error("FOLLOWUP_CORRELATION_UNAVAILABLE");return;}
+    !validId(current.prev)||!validId(current.sid))){
+ error("FOLLOWUP_CORRELATION_UNAVAILABLE");return;
+}
 var priorMessages=followupRoute?verifiedHistory(current.prev,current.sid):[];
 if(followupRoute&&!priorMessages){error("FOLLOWUP_CONTEXT_UNAVAILABLE");return;}
 // Layer 3: native upstream state machine audited BEFORE model billing.
