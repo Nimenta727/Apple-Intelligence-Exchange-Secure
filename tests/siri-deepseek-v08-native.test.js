@@ -450,3 +450,71 @@ test("untagged direct followup with absent choice cannot select a newer session 
  assert.equal(r.returns[0].status,502);
  assert.equal(e.sent.length,1);
 });
+
+test("pending-data experiment returns the original JSON body unchanged with the correlation tag",()=>{
+ const e=env(),q=request(requestBody("siri.multimodal.noRTI","土星🌙"));
+ q.headers["Content-Length"]=String(Buffer.byteLength(q.body,"utf8"));
+ const r=e.invoke(q).returns[0];
+ assert.equal(r.body,q.body);
+ assert.equal(r.headers["Content-Length"],q.headers["Content-Length"]);
+ assert.ok(r.headers["X-AIES-Request-ID"]);
+ assert.ok(e.logs.includes("[AIES_V08] TRANSPORT_EXPLICIT_ORIGINAL_BODY"));
+ const response=e.respond({...q,headers:r.headers},nativeSse("explicit"));
+ assert.equal(response.returns[0].status,200);
+ assert.equal(e.sent.length,1);
+});
+test("body transport experiment skips compressed, ambiguous or nonmatching framing",()=>{
+ for(const extra of [
+  {"Content-Encoding":"gzip"},
+  {"Transfer-Encoding":"chunked"},
+  {"Content-Length":"1"},
+  {"content-type":"application/json"},
+  {"Content-Type":"application/json; charset=iso-8859-1"}
+ ]){
+  const e=env(),q=request();
+  Object.assign(q.headers,extra);
+  const r=e.invoke(q).returns[0];
+  assert.equal(r.body,undefined);
+  assert.ok(r.headers["X-AIES-Request-ID"]);
+  assert.ok(e.logs.includes("[AIES_V08] TRANSPORT_HEADER_ONLY_UNVERIFIED_FRAMING"));
+ }
+});
+test("rejected unknown followup reports bounded text shape without admitting unknown group",()=>{
+ const e=env(),stateKey="AIES_SIRI_GROUP_PROBE_V2_STATE",now=Date.now();
+ e.data[stateKey]=JSON.stringify({v:2,phase:"armed",createdAt:now,expiresAt:now+600000,lastCode:"NONE"});
+ const group="siri.unverifiedExample",q=request(followupBody(undefined,group),
+ URL.replace("/sessions/responses","/sessions/sess_example/responses"));
+ const r=e.invoke(q).returns[0];
+ assert.equal(r.response.status,502);
+ assert.equal(e.sent.length,0);
+ assert.ok(e.logs.includes("[AIES_V08] UNKNOWN_FOLLOWUP_TEXT_SHAPE_CANDIDATE"));
+ assert.ok(e.logs.includes("[AIES_V08] UNKNOWN_FOLLOWUP_NO_TOOLS_DECLARED"));
+ assert.ok(e.logs.includes("[AIES_V08] SIRI_GROUP_CAPTURED_LOCAL"));
+ const captured=JSON.parse(e.data[stateKey]);
+ assert.equal(captured.phase,"captured");
+ assert.equal(captured.groupId,group);
+ assert.equal(captured.lastCode,"GROUP_CAPTURED");
+ assert.ok(e.logs.every(x=>!x.includes(group)&&!x.includes("How does it look?")));
+});
+test("unknown group media content is not classified as candidate text or sent to model",()=>{
+ const e=env(),q=JSON.parse(followupBody(undefined,"siri.unverifiedExample"));
+ q.input[0].message.content=[{type:"image",value:"private-media"}];
+ const r=e.invoke(request(JSON.stringify(q),
+ URL.replace("/sessions/responses","/sessions/sess_example/responses"))).returns[0];
+ assert.equal(r.response.status,502);
+ assert.equal(e.sent.length,0);
+ assert.ok(e.logs.includes("[AIES_V08] UNKNOWN_FOLLOWUP_CONTENT_UNVERIFIED"));
+ assert.ok(!e.logs.includes("[AIES_V08] UNKNOWN_FOLLOWUP_TEXT_SHAPE_CANDIDATE"));
+ assert.ok(e.logs.every(x=>!x.includes("private-media")));
+ assert.equal(e.data.AIES_SIRI_GROUP_PROBE_V2_STATE,undefined);
+});
+test("unknown followup unexpected root fields are reported without printing their names or values",()=>{
+ const e=env(),q=JSON.parse(followupBody(undefined,"siri.unverifiedExample"));
+ q.privateField="PRIVATE_VALUE";
+ const r=e.invoke(request(JSON.stringify(q),
+ URL.replace("/sessions/responses","/sessions/sess_example/responses"))).returns[0];
+ assert.equal(r.response.status,502);
+ assert.ok(e.logs.includes("[AIES_V08] UNKNOWN_FOLLOWUP_SHAPE_ROOT_FIELDS"));
+ assert.ok(e.logs.every(x=>!x.includes("privateField")&&!x.includes("PRIVATE_VALUE")));
+ assert.equal(e.sent.length,0);
+});
